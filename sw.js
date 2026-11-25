@@ -1,11 +1,11 @@
 /* Rev Up service worker — generated at build time from src/sw/sw-template.js.
  * Precaches one immutable revision of the app. Updates wait until the page asks
  * (after saving, on a safe screen), so HTML and hashed assets never mix versions. */
-const VERSION = 'bd4a79271e2f';
+const VERSION = 'db5b982099f2';
 const SCOPE = '/Rev-Up/';
 const PREFIX = 'revup:' + SCOPE + ':';
 const CACHE = PREFIX + VERSION;
-const ASSETS = ["./","assets/barlow-latin-400-normal-qiz4-Cze.woff2","assets/barlow-latin-600-normal-DILqtrty.woff2","assets/barlow-latin-800-normal-s1sAMnoV.woff2","assets/index-DzOTrXdB.js","assets/index-qn3n3cvl.css","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","manifest.webmanifest","index.html"];
+const ASSETS = ["./","assets/barlow-latin-400-normal-qiz4-Cze.woff2","assets/barlow-latin-600-normal-DILqtrty.woff2","assets/barlow-latin-800-normal-s1sAMnoV.woff2","assets/index-Bj6WnQuV.css","assets/index-DDzcYxjU.js","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","manifest.webmanifest","index.html"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
