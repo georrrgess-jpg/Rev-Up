@@ -583,6 +583,9 @@ export function drawBackdrop(v: SceneView) {
   const { ctx, camX, ppm } = v;
   const scroll = camX * ppm;
   ctx.drawImage(b.sky, 0, 0);
+  // the ground band under every layer (the canvas is not cleared between frames)
+  ctx.fillStyle = palOf(v.theme).ground;
+  ctx.fillRect(0, v.horizon, v.W, v.roadTop - v.horizon + 1);
   // far layers first; live motion sits between the sky layers and the near ground
   const nearIdx = b.layers.length - 1;
   for (let i = 0; i < b.layers.length; i++) {
