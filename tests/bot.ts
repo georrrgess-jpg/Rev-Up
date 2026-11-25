@@ -32,7 +32,7 @@ export interface BotOpts {
   seed: number;
   untilCar?: string;
   maxS?: number;
-  policy?: NitroPolicy;
+  policy?: NitroPolicy | 'mixed';
   quickRace?: boolean;
   forceStd?: boolean;
 }
@@ -84,6 +84,7 @@ export function runBot(o: BotOpts): BotLog {
       }
       if (e.type === 'catchup') { L.catchups++; L.log.push(`${t.toFixed(0)}s catch-up crate ${e.family} T${e.tier}`); }
       if (e.type === 'keystone' && ((e.family === 'tires' && e.tier === 3) || (e.family === 'turbo' && e.tier === 4) || (e.family === 'engine' && e.tier === 5)) && !L.milestones['key-' + e.family]) L.milestones['key-' + e.family] = Math.round(t);
+      if (e.type === 'keystone' && e.tier === 6 && !L.milestones['t6-' + e.family]) L.milestones['t6-' + e.family] = Math.round(t);
     }
   });
   const maxS = o.maxS ?? 3600;
@@ -167,27 +168,35 @@ export function runBot(o: BotOpts): BotLog {
       spend(COST.quick);
       continue;
     }
+    // class meets: take the earlier car out, then go back to the best car
+    const sw = P.eventUnlocked(g.state, ev).switchCar;
+    if (sw) g.setActiveCar(sw, now);
+    const best = [...g.state.owned].reverse().find((id) => id !== sw)!;
     const setup = g.startRace(ev.id, now);
-    if (!setup) { L.waiting += 1; spend(1); continue; }
+    if (!setup) { if (sw) g.setActiveCar(best, now); L.waiting += 1; spend(1); continue; }
     countEvent(ev.id);
     if (!L.firstLaunch) L.firstLaunch = Math.round(t);
     const sim = new RaceSim(setup);
-    const policy = o.policy ?? 'perfect';
+    // 'mixed' models a human: every other race the boost lands just after the window instead of in it
+    const policy = o.policy === 'mixed' ? (L.races % 2 ? 'late' : 'perfect') : (o.policy ?? 'perfect');
     while (!sim.done) {
       if (policy !== 'none' && sim.charges > 0 && sim.player.nitroLeft <= 0) {
         const { active } = sim.windowState();
         if (policy === 'perfect' && active && !sim.usedWindows.has(active.segIndex)) sim.tapNitro();
+        if (policy === 'late' && !active && sim.windows.some((w) => sim.player.x > w.end && sim.player.x < w.end + 25)) sim.tapNitro();
       }
       sim.step();
     }
     const out = sim.outcome();
     spend((out.playerTime ?? 30) + COST.raceOverhead);
     const res = g.commitRace(g.pendingRaceId!, out, now);
+    if (sw) g.setActiveCar(best, now);
     L.races++;
     if (res && res.place > 1) L.lossRaces++;
     if (!L.milestones.firstRace) L.milestones.firstRace = Math.round(t);
     if (res?.boss) L.milestones.ray = Math.round(t);
-    if (L.log.length < 400) L.log.push(`${t.toFixed(0)}s race ${ev.id} P${res?.place} ${res?.gapText} +$${res?.cash} +${res?.rep}rep [${g.state.activeCar}] rep=${g.state.rep}`);
+    const lo2 = computeLoadout(g.state);
+    if (L.log.length < 400) L.log.push(`${t.toFixed(0)}s race ${ev.id} P${res?.place} ${res?.gapText} +$${res?.cash} +${res?.rep}rep [${g.state.activeCar} E${lo2.equipped.engine?.t ?? 0}T${lo2.equipped.tires?.t ?? 0}U${lo2.equipped.turbo?.t ?? 0} nitro${setup.nitroCharges} perf${out.perfects}] rep=${g.state.rep}`);
   }
   B.luck.force = null;
   void eventById; void UPGRADES;

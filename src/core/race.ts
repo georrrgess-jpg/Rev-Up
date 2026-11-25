@@ -204,7 +204,9 @@ export class RaceSim {
     const p = this.player;
     const place = st.indexOf(p) + 1;
     let gapText = '';
-    if (place === 1) {
+    if (st.length === 1) {
+      gapText = p.finishTime !== null ? `${p.finishTime.toFixed(2)} s` : '';
+    } else if (place === 1) {
       const second = st[1];
       if (p.finishTime !== null && second.finishTime !== null) gapText = `${(second.finishTime - p.finishTime).toFixed(1)} s ahead of ${second.name}`;
       else gapText = `${Math.round(p.x - second.x)} m ahead of ${second.name}`;

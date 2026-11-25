@@ -255,7 +255,7 @@ export class GarageView implements View {
         h('span', {}, p ? `T${p.t} ${FAMILIES[f].name}` : `No ${FAMILIES[f].name}`));
     }));
     const blocked = (Object.keys(lo.blocked) as Family[])[0];
-    this.capEl.textContent = blocked ? `Stored · T${lo.blocked[blocked]!.t} ${FAMILIES[blocked].name} exceeds this car’s T${cls.cap} cap` : '';
+    this.capEl.textContent = blocked ? `Your T${lo.blocked[blocked]!.t} ${FAMILIES[blocked].name} runs at T${cls.cap} on the ${cls.model} (its cap). The next car gets the full part.` : '';
     this.capEl.style.display = blocked ? '' : 'none';
   }
 

@@ -1,4 +1,4 @@
-import { CarId, Family, carById } from '../data/tables';
+import { CREW_NITRO, CarId, Family, carById } from '../data/tables';
 import * as B from './board';
 import type { GameEvent, SlotRef } from './events';
 import { computeLoadout } from './loadout';
@@ -147,7 +147,7 @@ export class Game {
         eventId,
         seed: d.pendingRace!.seed,
         player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: d.paints[d.activeCar] ?? cls.paint },
-        nitroCharges: d.stats.races === 0 ? Math.max(1, d.nitro) : d.nitro,
+        nitroCharges: d.nitro + CREW_NITRO,
       };
       return [];
     }, now);

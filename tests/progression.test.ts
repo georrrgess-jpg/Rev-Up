@@ -48,7 +48,7 @@ describe('unlocks and keystones', () => {
     put(s, 1, 1, 'tires', 3);
     B.moveOrFuse(s, at(s, 1, 1), at(s, 0, 1), 5000); // consumed into T4
     expect(B.allParts(s).some((p) => p.f === 'tires' && p.t === 3)).toBe(false);
-    s.rep = 45;
+    s.rep = 70;
     P.checkUnlocks(s, []);
     expect(s.owned).toContain('beater');
   });
@@ -56,7 +56,7 @@ describe('unlocks and keystones', () => {
   it('shows the exact remaining goal', () => {
     const s = emptyGame();
     s.rep = 10;
-    expect(P.goalStatus(s)!.line).toBe('Craft T3 Tires · 35 more Rep to unlock the Beater');
+    expect(P.goalStatus(s)!.line).toBe('Craft T3 Tires · 60 more Rep to unlock the Corsa Rojo');
   });
 
   it('offers one catch-up crate after a stall in active play, never from idle time', () => {
@@ -84,7 +84,7 @@ describe('expanded career', () => {
     const kv = new MemoryKV();
     const g = mkGame(kv);
     g.transact((s) => {
-      s.rep = 1500;
+      s.rep = 2000;
       s.crafted = ['tires:3', 'turbo:4', 'engine:5'];
       const events: Parameters<typeof P.checkUnlocks>[1] = [];
       P.checkUnlocks(s, events);
@@ -111,7 +111,7 @@ describe('expanded career', () => {
     expect(quick?.signatureFinish).toBeUndefined();
     expect(g.state.events['yard-sprint'].bestTime).toBe(60);
     const setup = g.startRace('yard-sprint', T0);
-    expect(setup?.nitroCharges).toBe(0);
+    expect(setup?.nitroCharges).toBe(1); // the free crew charge
     const live = P.commitRace(g.state, { raceId: g.pendingRaceId!, mode: 'live', outcome }, []);
     expect(live?.signatureFinish).toBe('junker');
     expect(live?.personalBest).toBe(true);
@@ -252,7 +252,7 @@ describe('race payouts', () => {
     expect(r1).not.toBeNull();
     expect(r2).toBeNull();
     expect(g.state.cash).toBe(cash0 + r1!.cash);
-    expect(g.state.nitro).toBe(3 - out.nitroUsed);
+    expect(g.state.nitro).toBe(3 - Math.max(0, out.nitroUsed - 1)); // crew charge spent first
     expect(out.nitroUsed).toBeGreaterThan(0);
   });
 
@@ -364,7 +364,7 @@ describe('saves', () => {
   it('keeps car ownership when the browser closes mid-reveal', () => {
     const kv = new MemoryKV();
     const g = mkGame(kv);
-    g.state.rep = 50;
+    g.state.rep = 80;
     g.transact((d) => {
       put(d, 0, 0, 'tires', 2);
       put(d, 0, 1, 'tires', 2);

@@ -233,14 +233,19 @@ describe('full board, overflow, crates and scrap', () => {
     expect(scrapImpact(s, s.board[1]!.id)).toBeNull();
   });
 
-  it('auto-equips under the cap and reports stronger capped parts', () => {
+  it('auto-equips the strongest part; parts above the cap fit but run at the cap tier', () => {
     const s = emptyGame();
     put(s, 0, 0, 'tires', 3);
     put(s, 0, 1, 'tires', 2);
     const lo = computeLoadout(s, 'junker');
-    expect(lo.equipped.tires?.t).toBe(2);
-    expect(lo.blocked.tires?.t).toBe(3);
+    expect(lo.equipped.tires?.t).toBe(2); // tie at the T2 cap: the lower part is used, the T3 stays free
+    expect(lo.blocked.tires).toBeUndefined();
     expect(computeLoadout(s, 'beater').equipped.tires?.t).toBe(3);
+    s.board[1] = null; // only the T3 left: the Tapeback runs it at T2
+    const only = computeLoadout(s, 'junker');
+    expect(only.equipped.tires?.t).toBe(3);
+    expect(only.blocked.tires?.t).toBe(3);
+    expect(only.stats.grip).toBeCloseTo(lo.stats.grip, 9);
   });
 
   it('expanding the bench keeps parts in place', () => {

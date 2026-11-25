@@ -41,6 +41,11 @@ export interface LastResult {
   boss: boolean;
   personalBest?: boolean;
   freshRep?: number;
+  /** Time attack: medal reached this run, medals newly earned, and the next target. */
+  medal?: number;
+  newMedals?: number[];
+  nextMedal?: { name: string; target: number; gap: number } | null;
+  trophy?: string;
   signatureFinish?: CarId;
   perfects: number;
   nitroUsed: number;
@@ -90,6 +95,8 @@ export interface GameState {
   livePodiums: CarId[];
   /** last two events raced (live or quick), for the Fresh route Rep bonus */
   recentEvents: string[];
+  /** Best time-attack medal per event: 1 bronze, 2 silver, 3 gold (rewards paid once per medal). */
+  medals: Record<string, number>;
   activeS: number;
   catchup: { goal: CarId | null; effort: number; bestTier: number; claimed: CarId[] };
   offline: { lastSeenAt: number; pendingCash: number; pendingS: number };
@@ -141,6 +148,7 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     paints: {},
     livePodiums: [],
     recentEvents: [],
+    medals: {},
     activeS: 0,
     catchup: { goal: null, effort: 0, bestTier: 0, claimed: [] },
     offline: { lastSeenAt: now, pendingCash: 0, pendingS: 0 },

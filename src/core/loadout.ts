@@ -9,39 +9,39 @@ export const contribution = (p: Part) => TIER_STAT[p.t] * (p.q === 'std' ? 1 : Q
 export interface Loadout {
   car: CarId;
   equipped: Partial<Record<Family, Part>>;
-  /** A stronger part exists but exceeds the car's equip cap. */
+  /** Equipped parts above the car's cap, running restricted at the cap tier. */
   blocked: Partial<Record<Family, Part>>;
   stats: { top: number; accel: number; grip: number };
 }
 
-const better = (a: Part, b: Part | undefined) => {
-  if (!b) return true;
-  const ca = contribution(a);
-  const cb = contribution(b);
-  return ca > cb || (ca === cb && a.id < b.id);
-};
 
+/** A part's contribution on a given car: parts above the car's cap fit but run at the cap tier. */
+export const contributionOn = (p: Part, cap: number) => TIER_STAT[Math.min(p.t, cap)] * (p.q === 'std' ? 1 : QUALITY_BONUS);
+
+/**
+ * Auto-equip the strongest part per family. Parts above the car's equip cap still fit and run at the cap
+ * tier, so earlier cars stay competitive after you craft higher tiers. `blocked` lists families whose
+ * equipped part is running restricted to the cap (shown in the Garage).
+ */
 export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?: number): Loadout {
-  const cls = carById(car);
+  const cap = carById(car).cap;
   const equipped: Loadout['equipped'] = {};
-  const blocked: Loadout['blocked'] = {};
   for (const p of allParts(s)) {
     if (p.id === exclude) continue;
-    if (p.t <= cls.cap) {
-      if (better(p, equipped[p.f])) equipped[p.f] = p;
-    } else if (better(p, blocked[p.f])) blocked[p.f] = p;
+    const cur = equipped[p.f];
+    if (!cur) { equipped[p.f] = p; continue; }
+    const a = contributionOn(p, cap), b = contributionOn(cur, cap);
+    // prefer the stronger part; on a tie prefer the lower tier (keeps the higher part free for the next car), then lower id
+    if (a > b || (a === b && (p.t < cur.t || (p.t === cur.t && p.id < cur.id)))) equipped[p.f] = p;
   }
-  for (const f of ACTIVE_FAMILIES) {
-    const b = blocked[f];
-    const e = equipped[f];
-    if (b && e && contribution(b) <= contribution(e)) delete blocked[f];
-  }
+  const blocked: Loadout['blocked'] = {};
+  for (const f of ACTIVE_FAMILIES) if (equipped[f] && equipped[f]!.t > cap) blocked[f] = equipped[f];
   return { car, equipped, blocked, stats: statsFor(car, equipped) };
 }
 
 export function statsFor(car: CarId, equipped: Partial<Record<Family, Part>>) {
   const cls = carById(car);
-  const c = (f: Family) => (equipped[f] ? contribution(equipped[f]!) : 0);
+  const c = (f: Family) => (equipped[f] ? contributionOn(equipped[f]!, cls.cap) : 0);
   return {
     top: cls.base.top + c('engine') * STAT_SCALE.top,
     accel: cls.base.accel + c('turbo') * STAT_SCALE.accel,

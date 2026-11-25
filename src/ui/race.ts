@@ -130,6 +130,12 @@ export class RaceView implements View {
 
   startLive(id: string) {
     if (this.app.busy) return;
+    // A class meet recommended for an earlier car switches to that car first.
+    const u = P.eventUnlocked(this.app.game.state, eventById(id));
+    if (!u.ok && u.switchCar && this.app.game.state.owned.includes(u.switchCar)) {
+      this.app.game.setActiveCar(u.switchCar);
+      this.app.toast(`Racing the ${carById(u.switchCar).model} for ${eventById(id).name}`);
+    }
     const setup = this.app.game.startRace(id);
     if (!setup) return;
     this.app.busy = true;

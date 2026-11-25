@@ -30,7 +30,7 @@ export const FAMILIES: Record<Family, FamilyDef> = {
 export const ACTIVE_FAMILIES: Family[] = (Object.keys(FAMILIES) as Family[]).filter((f) => FAMILIES[f].active);
 
 /** Highest tier reachable in this release (data supports T10). */
-export const MAX_TIER = 5; // tunable
+export const MAX_TIER = 6; // tunable — T6 opens with the Open Road chapter (Altamar GT, cap T6)
 export const DATA_MAX_TIER = 10;
 
 /** Stat contribution of a part by tier (index = tier). */
@@ -47,7 +47,9 @@ export const TARGETED_CRATE_CASH_COST = 70; // tunable — repeatable cash route
 export const MERGE_CASH = (tier: number) => tier * 2; // reward per fusion
 export const COMBO_WINDOW_MS = 2000;
 export const COMBO_NITRO_EVERY = 3;
-export const NITRO_CAP = 3; // tunable
+export const NITRO_CAP = 3; // tunable — banked charges
+/** Every live race includes this many free crew charges on top of the bank (spent first). */
+export const CREW_NITRO = 1;
 
 export const MERGE_ALL_UNLOCK_ACTIVE_S = 600; // fallback if the player hasn't raced yet
 export const MERGE_ALL_UNLOCK_RACES = 5;
@@ -97,22 +99,27 @@ export interface CarClass {
   district: DistrictId;
   cap: number;
   base: { top: number; accel: number; grip: number };
-  unlock: null | { rep: number; family: Family; tier: number };
+  /** Rep + a crafted keystone, and optionally a won event (e.g. a rival series final). */
+  unlock: null | { rep: number; family: Family; tier: number; event?: string };
   enabled: boolean;
   paint: string;
   trim: string;
   blurb: string;
   offlineRate: number; // cash per minute while away
   rev: { base: number; peak: number }; // reveal sound
+  /** One line on how it drives, shown in the Showroom. */
+  handling?: string;
 }
 
-export type DistrictId = 'scrapyard' | 'suburbs' | 'downtown' | 'coastal' | 'riviera' | 'neon' | 'desert' | 'summit';
+export type DistrictId = 'scrapyard' | 'suburbs' | 'meets' | 'trials' | 'downtown' | 'coastal' | 'riviera' | 'neon' | 'desert' | 'summit';
 
 export const DISTRICTS: Record<DistrictId, { name: string; enabled: boolean }> = {
   scrapyard: { name: 'Scrapyard', enabled: true },
   suburbs: { name: 'Suburbs', enabled: true },
   downtown: { name: 'Downtown', enabled: false },
-  coastal: { name: 'Coastal Highway', enabled: false },
+  coastal: { name: 'Coastal Highway', enabled: true },
+  meets: { name: 'Class meets', enabled: true },
+  trials: { name: 'Time attack', enabled: true },
   riviera: { name: 'Azure Riviera', enabled: false },
   neon: { name: 'Neon Skyline', enabled: false },
   desert: { name: 'Desert Proving Ground', enabled: false },
@@ -128,24 +135,29 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'beater', name: 'Beater', model: 'Corsa Rojo', district: 'scrapyard', cap: 3,
-    base: { top: 32, accel: 4.2, grip: 0.75 }, unlock: { rep: 45, family: 'tires', tier: 3 }, enabled: true,
+    base: { top: 32, accel: 4.2, grip: 0.75 }, unlock: { rep: 70, family: 'tires', tier: 3 }, enabled: true,
     paint: '#b5452f', trim: '#3c2a24', blurb: 'A compact sedan with honest bones and a sunburnt roof.',
     offlineRate: 2, rev: { base: 65, peak: 180 },
   },
   {
     id: 'hothatch', name: 'Hot hatch', model: 'Vexa GTi', district: 'suburbs', cap: 4,
-    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 450, family: 'turbo', tier: 4 }, enabled: true,
+    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 600, family: 'turbo', tier: 4 }, enabled: true,
     paint: '#e9e4d8', trim: '#d7262e', blurb: 'Short, sharp, and loud. A red pinstripe and a roof spoiler that means it.',
     offlineRate: 3, rev: { base: 80, peak: 260 },
   },
   {
     id: 'muscle', name: 'Muscle', model: 'Ironhorse 455', district: 'suburbs', cap: 5,
-    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1450, family: 'engine', tier: 5 }, enabled: true,
+    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1850, family: 'engine', tier: 5 }, enabled: true,
     paint: '#1f3a5f', trim: '#f2b33d', blurb: 'A restored long-hood coupe with twin stripes and a V8 you can feel in your chest.',
     offlineRate: 4, rev: { base: 45, peak: 160 },
   },
   // Full campaign (data only). The hypercar is gated by reputation, a crafted T10 keystone, and the Summit Gala rival win.
-  { id: 'tourer', name: 'Grand tourer', model: '—', district: 'downtown', cap: 6, base: { top: 45, accel: 6, grip: 0.9 }, unlock: { rep: 800, family: 'transmission', tier: 6 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 5, rev: { base: 60, peak: 200 } },
+  {
+    id: 'tourer', name: 'Grand tourer', model: 'Altamar GT', district: 'coastal', cap: 6,
+    base: { top: 46, accel: 5.7, grip: 0.97 }, unlock: { rep: 5600, family: 'engine', tier: 6, event: 'coast-crown' }, enabled: true,
+    paint: '#0f6b6b', trim: '#e9d8b4', blurb: 'A long-tailed coastal grand tourer with covered lamps and a cream-leather cabin. Built for the open road.',
+    offlineRate: 6, rev: { base: 70, peak: 230 }, handling: 'Fastest on long straights and fast sweepers; heavier off the line.',
+  },
   { id: 'rally', name: 'Rally', model: '—', district: 'coastal', cap: 7, base: { top: 48, accel: 6.5, grip: 0.95 }, unlock: { rep: 1400, family: 'aero', tier: 7 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 6, rev: { base: 60, peak: 200 } },
   { id: 'gt', name: 'GT', model: '—', district: 'riviera', cap: 8, base: { top: 52, accel: 7, grip: 1 }, unlock: { rep: 2200, family: 'engine', tier: 8 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 7, rev: { base: 60, peak: 200 } },
   { id: 'super', name: 'Supercar', model: '—', district: 'neon', cap: 9, base: { top: 56, accel: 7.5, grip: 1.05 }, unlock: { rep: 3200, family: 'turbo', tier: 9 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 8, rev: { base: 60, peak: 200 } },
@@ -159,9 +171,14 @@ export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: st
   beater: { name: 'Creamline', paint: '#d2b58b', stripe: '#394252' },
   hothatch: { name: 'Apex Violet', paint: '#6247a4', stripe: '#9ee3c9' },
   muscle: { name: 'Midnight Bronze', paint: '#70442d', stripe: '#f3c975' },
+  tourer: { name: 'Riviera Pearl', paint: '#e8e2d2', stripe: '#b0862f' },
 };
 
 export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
+/** Won from Vale Moreau in the Coastal Crown; usable on any car. */
+export const CROWN_FINISH = { name: 'Crown Teal', paint: '#127c8a' };
+/** Blueprint finishes that any owned car can wear, by blueprint name. */
+export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH];
 
 export function finishStripe(car: CarId, paint: string | undefined): string | undefined {
   const finish = SIGNATURE_FINISHES[car];
@@ -186,11 +203,11 @@ export interface Segment {
   window?: [number, number]; // nitro window as fraction of segment
 }
 export interface Track {
-  id: 'scrapyard' | 'maple' | 'foundry';
+  id: 'scrapyard' | 'maple' | 'foundry' | 'harbor' | 'cliffs' | 'coast';
   name: string;
   district: DistrictId;
   segments: Segment[];
-  theme: 'scrap' | 'suburb';
+  theme: 'scrap' | 'suburb' | 'coast';
   /** Short player-facing course type and the part family it rewards. */
   course: string;
   favours: string;
@@ -225,6 +242,36 @@ export const TRACKS: Record<Track['id'], Track> = {
       { type: 'straight', length: 235, window: [0.17, 0.52] },
     ],
   },
+  harbor: {
+    id: 'harbor', name: 'Harbor Launch', district: 'coastal', theme: 'coast', course: 'Long launch · short sprint', favours: 'Turbo and traction off the line',
+    segments: [
+      { type: 'launch', length: 165 },
+      { type: 'straight', length: 150, window: [0.08, 0.48] },
+      { type: 'bend', length: 70, radius: 95 },
+      { type: 'straight', length: 160, window: [0.12, 0.5] },
+    ],
+  },
+  cliffs: {
+    id: 'cliffs', name: 'Cliffside Esses', district: 'coastal', theme: 'coast', course: 'Esses · three tight bends', favours: 'Grip, and nitro out of each bend',
+    segments: [
+      { type: 'launch', length: 60 },
+      { type: 'bend', length: 70, radius: 44 },
+      { type: 'straight', length: 105, window: [0.04, 0.45] },
+      { type: 'bend', length: 70, radius: 40 },
+      { type: 'straight', length: 100, window: [0.04, 0.45] },
+      { type: 'bend', length: 60, radius: 48 },
+      { type: 'straight', length: 135, window: [0.04, 0.42] },
+    ],
+  },
+  coast: {
+    id: 'coast', name: 'Coast Road', district: 'coastal', theme: 'coast', course: 'Open highway · one fast sweeper', favours: 'Engine top speed',
+    segments: [
+      { type: 'launch', length: 75 },
+      { type: 'highway', length: 330, window: [0.2, 0.45] },
+      { type: 'hwbend', length: 150, radius: 150 },
+      { type: 'highway', length: 340, window: [0.15, 0.4] },
+    ],
+  },
 };
 
 export const trackLength = (t: Track) => t.segments.reduce((a, s) => a + s.length, 0);
@@ -254,6 +301,16 @@ export const RIVALS: Record<string, Rival> = {
   june: { id: 'june', name: 'June Hale', car: 'hothatch', paint: '#2d6a4f', line: 'Commutes at race pace. Waves as she passes.', stats: { top: 37.2, accel: 5.4, grip: 0.9 } },
   priya: { id: 'priya', name: 'Priya Vance', car: 'hothatch', paint: '#c9a227', line: 'Spreadsheet tuner. Knows your gear ratios.', stats: { top: 39.0, accel: 5.9, grip: 0.95 } },
   hank: { id: 'hank', name: 'Hank “Two-Tone”', car: 'muscle', paint: '#6b2737', line: 'His coupe has two colors and zero patience.', stats: { top: 42.0, accel: 6.2, grip: 0.96 } },
+  ines: { id: 'ines', name: 'Inês Faro', car: 'beater', paint: '#4f6d8c', line: 'Keeps a logbook of every fuel stop since 1998.', stats: { top: 38.4, accel: 5.5, grip: 0.95 } },
+  bram: { id: 'bram', name: 'Bram Hollis', car: 'beater', paint: '#8b7d5a', line: 'Taxi driver. Takes the racing line out of habit.', stats: { top: 38.0, accel: 5.8, grip: 0.93 } },
+  otto: { id: 'otto', name: 'Otto Brandt', car: 'beater', paint: '#5d2f3a', line: 'Restores sedans nobody else wants. Then races them.', stats: { top: 38.8, accel: 5.4, grip: 0.92 } },
+  zoe: { id: 'zoe', name: 'Zoe Arkwright', car: 'hothatch', paint: '#d1d63f', line: 'Hatch purist. Calls every other car "a bit much".', stats: { top: 42.2, accel: 6.9, grip: 1.2 } },
+  rafa: { id: 'rafa', name: 'Rafa Soler', car: 'hothatch', paint: '#2b8a5a', line: 'Left-foot braker. Never seems to lift.', stats: { top: 41.8, accel: 7.2, grip: 1.16 } },
+  kit: { id: 'kit', name: 'Kit Navarro', car: 'hothatch', paint: '#c2462e', line: 'Grew up on these roads. Knows every apex.', stats: { top: 42.5, accel: 6.8, grip: 1.24 } },
+  mara: { id: 'mara', name: 'Mara Quint', car: 'muscle', paint: '#3d3a6b', line: 'Drag-strip veteran. Wins most races in the first 100 m.', stats: { top: 50.0, accel: 8.75, grip: 1.22 } },
+  dane: { id: 'dane', name: 'Dane Okoro', car: 'muscle', paint: '#7c2d2d', line: 'Hill-climb champion. Brakes later than anyone.', stats: { top: 50.6, accel: 8.2, grip: 1.42 } },
+  lux: { id: 'lux', name: 'Lux Ferrin', car: 'tourer', paint: '#9a9fa8', line: 'Collects grand tourers. Races them on weekends.', stats: { top: 52.0, accel: 8.1, grip: 1.3 } },
+  vale: { id: 'vale', name: 'Vale Moreau', car: 'tourer', paint: '#16233a', line: 'Owns the coast road. Drives the only Altamar anyone has seen.', stats: { top: 53.6, accel: 8.6, grip: 1.38 }, boss: true },
   sol: { id: 'sol', name: 'Sol Ortega', car: 'muscle', paint: '#264653', line: 'Quiet, precise, already in fifth gear.', stats: { top: 44.0, accel: 6.6, grip: 1.0 } },
 };
 
@@ -262,13 +319,19 @@ export interface RaceEvent {
   name: string;
   district: DistrictId;
   track: Track['id'];
-  rivals: [string, string, string];
+  rivals: string[]; // three rivals; a time attack has none
   payout: { cash: number[]; rep: number[]; crates: number[] }; // by placement 1..4
   firstClear: { cash: number; crates: number };
-  requires: { rep?: number; car?: CarId; beatBoss?: string };
+  requires: { rep?: number; car?: CarId; beatBoss?: string; afterWin?: string };
   /** Class-limited invitational: only this car may enter. */
   carOnly?: CarId;
   boss?: { rival: string; reward: { cash: number; crates: number; blueprint: string; badge: string } };
+  /** Staged rival series: rounds open one at a time as each is won. */
+  series?: { id: string; name: string; round: number; of: number };
+  /** Replayable time target: no rivals, medals at these finish times (seconds). */
+  timeAttack?: { bronze: number; silver: number; gold: number };
+  /** Class meet trophy badge, awarded on the first win. */
+  trophy?: string;
   blurb: string;
 }
 
@@ -311,7 +374,64 @@ export const EVENTS: RaceEvent[] = [
     firstClear: { cash: 280, crates: 4 },
     requires: { beatBoss: 'ray', car: 'muscle' }, blurb: 'Tight bends test your grip. Save nitro for the exits.',
   },
+  // ---- Open Road chapter: the Coastal Crown rival series (opens after the Foundry Invitational)
+  {
+    id: 'harbor-launch', name: 'Harbor Launch', district: 'coastal', track: 'harbor', rivals: ['mara', 'dane', 'lux'],
+    series: { id: 'crown', name: 'Coastal Crown', round: 1, of: 3 },
+    payout: { cash: [300, 210, 160, 120], rep: [44, 32, 24, 18], crates: [2, 1, 1, 1] }, firstClear: { cash: 350, crates: 4 },
+    requires: { afterWin: 'foundry-final' }, blurb: 'Round 1 of the Coastal Crown. A long launch off the harbor wall rewards turbo and traction.',
+  },
+  {
+    id: 'cliff-esses', name: 'Cliffside Esses', district: 'coastal', track: 'cliffs', rivals: ['dane', 'lux', 'mara'],
+    series: { id: 'crown', name: 'Coastal Crown', round: 2, of: 3 },
+    payout: { cash: [330, 230, 170, 130], rep: [48, 34, 26, 20], crates: [2, 1, 1, 1] }, firstClear: { cash: 400, crates: 4 },
+    requires: { afterWin: 'harbor-launch' }, blurb: 'Round 2. Three tight bends above the sea: grip, then nitro out of each exit.',
+  },
+  {
+    id: 'coast-crown', name: 'Coastal Crown', district: 'coastal', track: 'coast', rivals: ['lux', 'dane', 'vale'],
+    series: { id: 'crown', name: 'Coastal Crown', round: 3, of: 3 },
+    payout: { cash: [360, 250, 185, 140], rep: [52, 36, 28, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 0, crates: 0 },
+    requires: { afterWin: 'cliff-esses' },
+    boss: { rival: 'vale', reward: { cash: 600, crates: 5, blueprint: 'Crown Teal', badge: 'Coastal Crown' } },
+    blurb: 'Final round on the open Coast Road. Beat Vale Moreau to earn the right to an Altamar GT.',
+  },
+  // ---- Class meets: earlier cars come back off the shelf
+  {
+    id: 'corsa-club', name: 'Corsa Club Run', district: 'meets', track: 'maple', rivals: ['ines', 'bram', 'otto'], carOnly: 'beater', trophy: 'Sedan Club',
+    payout: { cash: [190, 135, 100, 75], rep: [26, 18, 14, 10], crates: [2, 1, 1, 0] }, firstClear: { cash: 260, crates: 3 },
+    requires: { car: 'hothatch' }, blurb: 'Corsa Rojos only, on the highway. A tuned sedan needs a strong engine here.',
+  },
+  {
+    id: 'hatch-attack', name: 'Hatch Attack', district: 'meets', track: 'cliffs', rivals: ['zoe', 'rafa', 'kit'], carOnly: 'hothatch', trophy: 'Hatch Hero',
+    payout: { cash: [260, 185, 140, 105], rep: [34, 24, 18, 14], crates: [2, 1, 1, 0] }, firstClear: { cash: 340, crates: 3 },
+    requires: { afterWin: 'harbor-launch' }, blurb: 'Vexa GTis only, through the cliff esses. Nimble beats powerful here.',
+  },
+  // ---- Time attack: beat the clock on courses you know (no rivals, medals pay once)
+  {
+    id: 'ta-strip', name: 'Strip Time Attack', district: 'trials', track: 'scrapyard', rivals: [], timeAttack: { bronze: 17.4, silver: 14.6, gold: 13.1 },
+    payout: { cash: [40, 40, 40, 40], rep: [6, 6, 6, 6], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
+    requires: { beatBoss: 'ray' }, blurb: 'Solo run on Scrapyard Strip. Launch hard and hit both windows.',
+  },
+  {
+    id: 'ta-maple', name: 'Highway Time Attack', district: 'trials', track: 'maple', rivals: [], timeAttack: { bronze: 20.6, silver: 18.4, gold: 16.6 },
+    payout: { cash: [50, 50, 50, 50], rep: [8, 8, 8, 8], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
+    requires: { car: 'hothatch' }, blurb: 'Solo run on Maple Highway. Top speed and two clean boosts.',
+  },
+  {
+    id: 'ta-cliffs', name: 'Esses Time Attack', district: 'trials', track: 'cliffs', rivals: [], timeAttack: { bronze: 22.3, silver: 21.5, gold: 19.9 },
+    payout: { cash: [60, 60, 60, 60], rep: [10, 10, 10, 10], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
+    requires: { afterWin: 'harbor-launch' }, blurb: 'Solo run through Cliffside Esses. Every bend exit counts.',
+  },
 ];
+
+/** Medal rewards for time attack, each paid once per event. */
+export const MEDALS = ['bronze', 'silver', 'gold'] as const;
+export type Medal = (typeof MEDALS)[number];
+export const MEDAL_REWARDS: Record<Medal, { cash: number; crates: number }> = {
+  bronze: { cash: 120, crates: 1 },
+  silver: { cash: 240, crates: 2 },
+  gold: { cash: 450, crates: 3 },
+};
 
 export const eventById = (id: string): RaceEvent => {
   const e = EVENTS.find((x) => x.id === id);

@@ -27,7 +27,7 @@ describe('baseline playthrough (simulation)', () => {
       const m = r.log.milestones;
       expect(m.beater).toBeGreaterThan(2 * 60);
       expect(m.beater).toBeLessThan(4.5 * 60);
-      expect(m.hothatch).toBeGreaterThan(10 * 60);
+      expect(m.hothatch).toBeGreaterThan(9 * 60);
       expect(m.hothatch).toBeLessThan(14.5 * 60);
       expect(m.muscle).toBeGreaterThan(19 * 60);
       expect(m.muscle).toBeLessThan(26 * 60);
