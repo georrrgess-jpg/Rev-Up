@@ -199,6 +199,26 @@ describe('recommended fit', () => {
     expect(I.recommendedFit(s, 'junker').tires?.part.t).toBe(1);
   });
 
+  it('fits a keystone-family part when enough spares stay on the bench to craft the keystone', () => {
+    const s = emptyGame();
+    for (let i = 0; i < 5; i++) put(s, 0, i, 'tires', 1); // five T1 Tires: fitting one leaves four, a T3's worth
+    expect(I.recommendedFit(s, 'junker').tires?.part.t).toBe(1);
+    s.board[4] = null; // four: fitting one would leave too few
+    expect(I.recommendedFit(s, 'junker').tires).toBeUndefined();
+  });
+
+  it('a car that gave its part to a new car gets the best bench part back in that slot', () => {
+    const s = emptyGame();
+    s.installed.junker = { engine: part(s, 'engine', 2) };
+    put(s, 0, 0, 'engine', 1);
+    s.owned.push('beater');
+    I.fitRecommended(s, 'beater');
+    expect(s.installed.beater?.engine?.t).toBe(2);
+    I.fillEmptyFromBench(s, 'junker');
+    expect(s.installed.junker?.engine?.t).toBe(1);
+    expectNoDuplicates(s);
+  });
+
   it('takes a part from another car only when strictly better than anything on the bench', () => {
     const s = emptyGame();
     s.owned.push('beater', 'hothatch');

@@ -105,6 +105,7 @@ export function bestBuy(s: GameState): { pick: BuyPick | null; affordable: boole
   const slots = fitted(s, s.activeCar);
   const parts: BuyPick[] = [];
   for (const f of ACTIVE_FAMILIES) {
+    if (g && !g.keystoneDone && f === g.family && ingredients(s, f, g.tier).have >= ingredients(s, f, g.tier).need) continue; // merge them up instead
     const held = Math.max(slots[f]?.t ?? 0, ...allParts(s).filter((p) => p.f === f).map((p) => p.t));
     for (let t = Math.min(car.cap, maxT); t > held; t--) {
       parts.push({ kind: 'order', fam: f, tier: t, price: PART_ORDER_PRICE[t], title: `T${t} ${FAMILIES[f].name}`,

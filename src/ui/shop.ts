@@ -168,7 +168,7 @@ export function openShop(app: App, focusFamily?: Family, startTab: ShopTab = 'pa
           }),
           UPGRADES.some((u) => !P.upgradeShown(s, u)) ? h('p', { class: 'd' }, 'More upgrades appear as your garage grows (after your first win and with more cars).') : null,
           h('h3', {}, 'While you are away'),
-          h('p', { class: 'd' }, `Your ${s.owned.length} car${s.owned.length > 1 ? 's' : ''} earn $${away} a minute while the game is closed, for up to ${P.offlineMaxS(s) / 3600} h ($${fmt(away * P.offlineMaxS(s) / 60)}). Each new car adds to the rate.`),
+          h('p', { class: 'd' }, `${s.owned.length > 1 ? `Your ${s.owned.length} cars earn` : 'Your car earns'} $${away} a minute while the game is closed, for up to ${P.offlineMaxS(s) / 3600} h ($${fmt(away * P.offlineMaxS(s) / 60)}). Each new car adds to the rate.`),
         ];
       };
 

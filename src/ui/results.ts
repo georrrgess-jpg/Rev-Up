@@ -3,7 +3,7 @@
 // now stands against the next threshold, and — separately — any craft or race win the next car still needs.
 import * as P from '../core/progression';
 import type { LastResult } from '../core/state';
-import { FAMILIES, MEDAL_REWARDS, styleItem, RIVALS, SIGNATURE_FINISHES, carById, eventById } from '../data/tables';
+import { DISTRICTS, FAMILIES, MEDAL_REWARDS, styleItem, RIVALS, SIGNATURE_FINISHES, carById, eventById } from '../data/tables';
 import type { App } from './app';
 import { repMilestones } from './app';
 import { fitStatus } from './benefit';
@@ -30,7 +30,7 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
     h('span', { class: 'chip rep' }, `+${r.rep} Rep`),
   ];
   if (r.crates) pills.push(h('span', { class: 'chip' }, `📦 ${r.crates} crate${r.crates > 1 ? 's' : ''}`));
-  if (r.perfects) pills.push(h('span', { class: 'chip nitro' }, `Perfect ×${r.perfects}${r.precision ? ` (+$${r.precision})` : ''}`));
+  if (r.perfects) pills.push(h('span', { class: 'chip nitro' }, r.precision && r.perfects > 2 ? `Perfect ×${r.perfects} (2 paid, +$${r.precision})` : `Perfect ×${r.perfects}${r.precision ? ` (+$${r.precision})` : ''}`));
   if (r.firstClear) pills.push(h('span', { class: 'chip', style: 'color:var(--gold)' }, 'First win bonus'));
   const g = P.goalStatus(s);
   const finish = r.signatureFinish ? SIGNATURE_FINISHES[r.signatureFinish] : undefined;
@@ -62,7 +62,7 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
     r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ({ ray: ' The Suburbs are open.', vale: ' The coast road is yours.', nova: ' Downtown is yours.', sable: ' The canyon is yours.', iver: ' The summit is yours — the whole ladder is beaten.' } as Record<string, string>)[ev.boss.rival] ?? '', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
     r.newMedals?.length ? h('div', { class: 'finish-earned medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), h('div', {}, h('strong', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal`), h('div', {}, r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ') + ' · paid once'))) : null,
     r.nextMedal ? h('p', { class: 'explain' }, (r.trapMph ?? r.trapKmh) ? `${r.nextMedal.name} at ${r.nextMedal.target} mph — ${Math.max(0, Math.round(r.nextMedal.gap))} mph to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
-    r.newStars?.length ? h('div', { class: 'finish-earned stars-earned' }, h('span', { class: 'star-ico', 'aria-hidden': 'true' }, '★'), h('div', {}, h('strong', {}, `${r.newStars.length} new goal${r.newStars.length > 1 ? 's' : ''}: ${r.newStars.join(', ')}`), h('div', {}, `${P.starsIn(s)} Downtown stars`))) : null,
+    r.newStars?.length ? h('div', { class: 'finish-earned stars-earned' }, h('span', { class: 'star-ico', 'aria-hidden': 'true' }, '★'), h('div', {}, h('strong', {}, `${r.newStars.length} new goal${r.newStars.length > 1 ? 's' : ''}: ${r.newStars.join(', ')}`), h('div', {}, `${P.starsIn(s, ev.district)} ${DISTRICTS[ev.district].name} star${P.starsIn(s, ev.district) === 1 ? '' : 's'}`))) : null,
     (r.trapMph ?? r.trapKmh) ? h('div', { class: 'trap' }, h('span', { class: 'num' }, `${r.trapMph ?? Math.round((r.trapKmh ?? 0) / 1.609344)}`), h('small', {}, 'mph through the gate')) : null,
     r.earnedStyle?.length ? h('div', { class: 'finish-earned' }, h('span', { 'aria-hidden': 'true' }, '🎨'), h('div', {}, h('strong', {}, r.earnedStyle.map((id) => styleItem(id)?.name ?? id).join(', ')), h('div', {}, 'Earned — apply it in the Showroom Paint shop'))) : null,
     r.heat ? h('div', { class: `heat-result${r.heat.champion ? ' champ' : r.heat.advanced ? ' through' : ' out'}` },

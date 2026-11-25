@@ -284,13 +284,13 @@ export const CARS: CarClass[] = [
     id: 'gt', name: 'Endurance GT', model: 'Strata GTR', district: 'summit', cap: 8,
     base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 9500, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
     paint: '#d5dade', trim: '#d6202a', blurb: 'A wide endurance racer with a splitter, a swan-neck wing and race numbers. Built to run flat out for hours.',
-    offlineRate: 13, rev: { base: 70, peak: 260 }, handling: 'Aero grip: the fastest car through fast sweepers, strong at speed (~190 mph). Softer off the line than the Corvo.',
+    offlineRate: 13, rev: { base: 70, peak: 260 }, handling: 'Aero grip: the fastest car through fast sweepers, strong at speed (~200 mph on a long straight, fully built). Softer off the line than the Corvo.',
   },
   {
     id: 'proto', name: 'Prototype', model: 'Halcyon X', district: 'summit', cap: 9,
     base: { top: 54, accel: 7.4, grip: 1.36 }, unlock: { rep: 14000, family: 'turbo', tier: 9, event: 'summit-1000' }, enabled: true,
     paint: '#1d4e6b', trim: '#36f0d0', blurb: 'A closed-cockpit prototype with a shark fin and a light blade. The fastest thing in the game, and the hardest to drive well.',
-    offlineRate: 16, rev: { base: 90, peak: 340 }, handling: 'The highest top speed (~225 mph) and strong everywhere, with the narrowest shift light in the game: missed shifts cost it the most.',
+    offlineRate: 16, rev: { base: 90, peak: 340 }, handling: 'The highest top speed (~225 mph on a long straight, fully built) and strong everywhere, with the narrowest shift light in the game: missed shifts cost it the most.',
   },
   { id: 'hyper', name: 'Hypercar', model: 'One-of-one', district: 'summit', cap: 10, base: { top: 64, accel: 8.5, grip: 1.15 }, unlock: { rep: 99999, family: 'engine', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: 'Legacy placeholder (never enabled).', offlineRate: 10, rev: { base: 60, peak: 200 } },
 ];

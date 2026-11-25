@@ -2,7 +2,7 @@ import { carStyle } from '../core/style';
 import { mph } from '../core/units';
 import { sfx, unlockAudio } from '../audio';
 import { signature } from '../audio-reveal';
-import { computeLoadout } from '../core/loadout';
+import { fullTop } from '../core/race';
 import { CarId, ENABLED_CARS, carById, finishStripe } from '../data/tables';
 import { FACTORY_LOOKS, carLengthM, drawCar, drawCarCover, drawHeadlightBeam, fitCanvas } from '../render/car';
 import type { App } from './app';
@@ -147,10 +147,9 @@ export class RevealOverlay {
     const prev = i > 0 ? ENABLED_CARS[i - 1] : null;
     if (this.replay || !prev) return `${c.name} · equips parts up to T${c.cap}`;
     const s = this.app.game.state;
-    const now = computeLoadout(s, this.car).stats.top;
-    const before = computeLoadout(s, prev.id).stats.top;
-    const gain = mph(now) - mph(before);
-    return `T${c.cap} parts now fit (was T${prev.cap})${gain > 0 ? ` · +${gain} mph` : ''}`;
+    const fittedN = Object.keys(s.installed[this.car] ?? {}).length;
+    const room = mph(fullTop(this.car)) - mph(fullTop(prev.id));
+    return `Fits T${c.cap} parts (the ${prev.model}: T${prev.cap})${room > 0 ? ` · fully built, ${room} mph more top speed` : ''}${fittedN ? ' · your best parts are fitted' : ''}`;
   }
 
   private skip() {

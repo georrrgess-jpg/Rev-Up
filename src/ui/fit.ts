@@ -177,7 +177,7 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
           h('div', { class: 't' }, `${FAMILIES[fam].name} slot`),
           h('div', { class: 'd' }, cur
             ? `${partName(cur)} fitted${cur.t > cls.cap ? ` · runs at T${cls.cap} (the ${cls.model}'s cap)` : ''}`
-            : `Empty — fit a ${FAMILIES[fam].name} for more ${FAMILIES[fam].statLabel.toLowerCase()}`)),
+            : `Empty — fit ${/^[AEIOU]/.test(FAMILIES[fam].name) ? 'an' : 'a'} ${FAMILIES[fam].name} for more ${FAMILIES[fam].statLabel.toLowerCase()}`)),
         cur ? h('button', {
           class: `btn sm${room ? '' : ' off'}`, 'aria-disabled': room ? 'false' : 'true',
           onclick: () => {
@@ -195,7 +195,16 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
       const roomNote = cur && !room ? h('p', { class: 'fit-room' }, 'Bench and spare rack are full, so this part can\'t come off. Merge a pair or scrap a part to make room — or swap in another part below (swaps never need space).') : null;
 
       // ---- candidates
-      const cands = I.fitCandidates(s, curCar, fam);
+      // identical bench parts show once, with a count (fitting any of them is the same)
+      const dupes = new Map<string, number>();
+      const cands = I.fitCandidates(s, curCar, fam).filter((c) => {
+        if (!('at' in c)) return true;
+        const key = `${c.part.f}:${c.part.t}:${c.part.q ?? ''}`;
+        const n = dupes.get(key) ?? 0;
+        dupes.set(key, n + 1);
+        return n === 0 || (!!pick && pick.part.id === c.part.id);
+      });
+      const countOf = (c: I.PartSource) => ('at' in c ? dupes.get(`${c.part.f}:${c.part.t}:${c.part.q ?? ''}`) ?? 1 : 1);
       const curScore = cur ? contributionOn(cur, cls.cap) : 0;
       const list = cands.length
         ? h('div', { class: 'fit-list', role: 'listbox', 'aria-label': `${FAMILIES[fam].plural} you can fit` }, ...cands.map((c) => {
@@ -210,7 +219,7 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
           },
           h('span', { class: 'fc-art', html: partTileHtml(c.part.f, c.part.t, c.part.q, 'mini') }),
           h('span', { class: 'grow' },
-            h('span', { class: 't' }, partName(c.part), isRec ? h('span', { class: 'rec' }, 'Best') : null),
+            h('span', { class: 't' }, partName(c.part), countOf(c) > 1 ? h('small', {}, ` ×${countOf(c)}`) : null, isRec ? h('span', { class: 'rec' }, 'Best') : null),
             h('span', { class: 'd' }, cap1(srcWhere(app, c)), capped ? ` · runs at T${cls.cap}` : '')),
           h('span', { class: `delta ${d > 0 ? 'up' : d < 0 ? 'down' : 'same'}` }, d ? changeText(k, d) : contributionOn(c.part, cls.cap) === curScore && cur ? 'same' : '±0'));
         }))

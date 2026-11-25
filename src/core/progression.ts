@@ -3,7 +3,7 @@ import {
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
   PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
-import { fitRecommended } from './install';
+import { fillEmptyFromBench, fitRecommended } from './install';
 import type { GameEvent } from './events';
 import { computeLoadout } from './loadout';
 import type { CarMastery, EventRecord, GameState, LastResult, LeanOutcome } from './state';
@@ -25,8 +25,8 @@ export function rivalShiftFor(e: RaceEvent): 'ordinary' | 'clean' {
 // ---------------- Goals ----------------
 
 /** Stars earned on Downtown Nights event goals (win · under par · a Perfect boost). */
-export function starsIn(s: GameState): number {
-  return EVENTS.filter((e) => e.goals && e.district === 'downtown').reduce((n, e) => n + bitCount(s.stars?.[e.id] ?? 0), 0);
+export function starsIn(s: GameState, district: string = 'downtown'): number {
+  return EVENTS.filter((e) => e.goals && e.district === district).reduce((n, e) => n + bitCount(s.stars?.[e.id] ?? 0), 0);
 }
 const bitCount = (b: number) => (b & 1) + ((b >> 1) & 1) + ((b >> 2) & 1);
 export const STAR_LABELS = ['Win', 'Under par', 'A Perfect boost'];
@@ -95,6 +95,8 @@ export function checkUnlocks(s: GameState, events: GameEvent[]) {
       // a new car arrives with your best parts fitted (bench first; another car's part only when strictly better),
       // so the unlock is an upgrade the moment it is revealed — swaps stay possible in Fit Parts
       events.push(...fitRecommended(s, car.id));
+      // a car that gave up a part gets the best bench part back in that slot, so older cars stay raceable
+      for (const other of s.owned) if (other !== car.id) events.push(...fillEmptyFromBench(s, other));
     } else return;
   }
 }

@@ -2,6 +2,7 @@
 // only when running `npm run dev`; excluded from production builds by import.meta.env.DEV.
 import { expandBoard } from './core/board';
 import type { Game } from './core/game';
+import { fitRecommended } from './core/install';
 import type { GameState, Part } from './core/state';
 import { EVENTS, type Family } from './data/tables';
 
@@ -34,6 +35,7 @@ export function applyPreset(game: Game, preset: string) {
         s.rep = 990; s.bosses = ['ray']; s.blueprints = ['Ray’s Rust-Red']; s.badges = ['Scrapyard King'];
         s.crafted = ['tires:3', 'turbo:4', 'engine:4']; s.cash = 2000; s.activeS = 1200;
         fill(s, [['engine', 4], ['engine', 4], ['tires', 4], ['turbo', 4]]);
+        fitRecommended(s, 'hothatch');
         break;
       case 'late':
         s.owned = ['junker', 'beater', 'hothatch', 'muscle']; s.activeCar = 'muscle'; s.revealed = [...s.owned];
@@ -41,6 +43,7 @@ export function applyPreset(game: Game, preset: string) {
         s.crafted = ['tires:3', 'turbo:4', 'engine:5']; s.cash = 5000; s.activeS = 1800; s.nitro = 3;
         for (const id of ['yard-sprint', 'crusher-run', 'rusty-ray', 'cul-de-sac', 'maple-mile']) s.events[id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 18 };
         fill(s, [['engine', 5], ['tires', 5], ['turbo', 5], ['engine', 3], ['engine', 3], ['tires', 1], ['turbo', 2]]);
+        fitRecommended(s, 'muscle'); // a real save at this point has its build fitted
         break;
       // Endgame states (the Overhaul ladder): parts fitted to the newest car at its cap, Rep just short of the next car.
       case 'desert':

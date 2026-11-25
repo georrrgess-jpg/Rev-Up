@@ -138,20 +138,19 @@ export function fitCandidates(s: GameState, car: CarId, family: Family): PartSou
  * Bench parts come first; a part fitted to another car is suggested only when it is strictly better than
  * anything on the bench (it would leave that car). Ties keep the fitted part, then prefer the lower tier.
  */
-export function recommendedFit(s: GameState, car: CarId): Partial<Record<Family, PartSource>> {
+export function recommendedFit(s: GameState, car: CarId, benchOnly = false): Partial<Record<Family, PartSource>> {
   const cap = carById(car).cap;
   const cur = fitted(s, car);
   const best: Partial<Record<Family, PartSource>> = {};
   const score = (p: Part) => contributionOn(p, cap);
   // Keep the next car's crafting ingredients on the bench: a bench part of the keystone family below the
-  // keystone tier that still has a merge partner is an ingredient, not an upgrade (first session: the starter
-  // T1 Tires pair is the Corsa Rojo's T3 Tires).
+  // keystone tier is an ingredient, not an upgrade, while fitting it would leave too few to craft the keystone
+  // (first session: the starter T1 Tires pair is the Corsa Rojo's T3 Tires). With spares to share, it fits.
   const next = ENABLED_CARS.find((c) => !s.owned.includes(c.id))?.unlock ?? null;
-  const benchKey = (q: Part) => `${q.f}:${q.t}`;
-  const pairs = new Map<string, number>();
-  for (const q of [...s.board, ...s.tray]) if (q) pairs.set(benchKey(q), (pairs.get(benchKey(q)) ?? 0) + 1);
+  const pool = next ? allParts(s).filter((q) => q.f === next.family && q.t < next.tier).reduce((n, q) => n + 2 ** (q.t - 1), 0) : 0;
   const ingredient = (src: PartSource) => 'at' in src && !!next && src.part.f === next.family && src.part.t < next.tier
-    && craftedTier(s, next.family) < next.tier && (pairs.get(benchKey(src.part)) ?? 0) >= 2;
+    && craftedTier(s, next.family) < next.tier && pool - 2 ** (src.part.t - 1) < 2 ** (next.tier - 1)
+    && allParts(s).filter((q) => q.f === src.part.f && q.t === src.part.t).length >= 2; // only a part with a merge partner
   const consider = (src: PartSource, strict: boolean) => {
     const p = src.part;
     if (!ACTIVE_FAMILIES.includes(p.f)) return;
@@ -167,7 +166,7 @@ export function recommendedFit(s: GameState, car: CarId): Partial<Record<Family,
   s.tray.forEach((p, i) => p && consider({ at: { zone: 'tray', i }, part: p }, false));
   for (const other of s.owned) {
     if (other === car) continue;
-    for (const p of Object.values(fitted(s, other))) if (p) consider({ car: other, part: p }, true);
+    if (!benchOnly) for (const p of Object.values(fitted(s, other))) if (p) consider({ car: other, part: p }, true);
   }
   return best;
 }
@@ -179,6 +178,18 @@ export function fitRecommended(s: GameState, car: CarId): GameEvent[] {
   for (const f of ACTIVE_FAMILIES) {
     const r = rec[f];
     if (r) events.push(...fitFrom(s, car, r));
+  }
+  return events;
+}
+
+/** Fill this car's empty slots from the bench only (never from another car): used when a new car takes parts. */
+export function fillEmptyFromBench(s: GameState, car: CarId): GameEvent[] {
+  const events: GameEvent[] = [];
+  const cur = fitted(s, car);
+  const rec = recommendedFit(s, car, true);
+  for (const f of ACTIVE_FAMILIES) {
+    const r = rec[f];
+    if (!cur[f] && r && 'at' in r) events.push(...fitFrom(s, car, r));
   }
   return events;
 }
