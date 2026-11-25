@@ -192,6 +192,21 @@ export function collection(s: GameState): { have: number; total: number; next: s
   return { have, total, next };
 }
 
+/** Per-car records (races, wins, best times, Perfects, shifts, top speed) for future masteries and levels. */
+export function recordMastery(s: GameState, car: CarId, e: RaceEvent, o: LeanOutcome) {
+  const m = ((s.mastery ??= {})[car] ??= { races: 0, wins: 0, podiums: 0, best: {}, perfects: 0, shiftsClean: 0, shifts: 0, topSpeed: 0 });
+  m.races++;
+  if (o.place === 1) m.wins++;
+  if (o.place <= 3) m.podiums++;
+  const id = e.heatOf ?? e.id;
+  if (o.playerTime !== null && (m.best[e.id] === undefined || o.playerTime < m.best[e.id])) m.best[e.id] = o.playerTime;
+  void id;
+  m.perfects += o.perfects;
+  m.shifts += o.shifts ?? 0;
+  m.shiftsClean += o.shiftsClean ?? 0;
+  m.topSpeed = Math.max(m.topSpeed, o.topSpeed ?? o.trapSpeed ?? 0);
+}
+
 /** Tune-up the active car one stage. */
 export function buyTune(s: GameState, car: CarId): GameEvent[] {
   const stage = s.tune?.[car] ?? 0;
@@ -489,6 +504,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     s.badges.push(e.trophy);
     trophy = e.trophy;
   }
+  if (input.mode === 'live') recordMastery(s, pr.car, e, o);
   s.recentEvents = [e.id, ...(s.recentEvents ?? []).filter((id) => id !== e.id)].slice(0, 2);
   s.stats.races++;
   if (o.place === 1) s.stats.wins++;

@@ -1,3 +1,4 @@
+import * as I from './install';
 import { eventById } from '../data/tables';
 import * as S from './style';
 import type { UpgradeId } from '../data/tables';
@@ -127,6 +128,22 @@ export class Game {
   }
   applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material', now = Date.now()) {
     return this.transact((d) => S.applyStyle(d, itemId, car, kind), now);
+  }
+  installPart(car: CarId, from: SlotRef, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => I.installPart(d, car, from), now);
+  }
+  removePart(car: CarId, family: Family, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => I.removePart(d, car, family), now);
+  }
+  movePartBetweenCars(fromCar: CarId, family: Family, toCar: CarId, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => I.movePartBetweenCars(d, fromCar, family, toCar), now);
+  }
+  fitRecommended(car: CarId = this.state.activeCar, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => I.fitRecommended(d, car), now);
   }
   buyTune(car: CarId, now = Date.now()) {
     this.input(now);

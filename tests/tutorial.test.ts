@@ -83,10 +83,10 @@ describe('teach-through-play steps', () => {
       s.stats.milestones.firstMerge = 1; s.stats.races = 4;
       Object.assign(s.tips, { craftGoal: true, shop: true, goalCard: true, nitroBank: true, overflow: true, scrap: true, mergeAll: true });
       s.board = s.board.map(() => null); s.crates = [];
-      s.board[0] = { id: s.nextPartId++, f: 'tires', t: 3, q: 'std' }; // Tapeback cap is T2
+      s.installed = { junker: { tires: { id: s.nextPartId++, f: 'tires', t: 3, q: 'std' } } }; // Tapeback cap is T2
       return [];
     }, T0);
     expect(tutorialStep(g.state)).toBe('cap');
-    expect(B.allParts(g.state)).toHaveLength(1);
+    expect(B.allParts(g.state)).toHaveLength(0); // the fitted part is on the car, not the bench
   });
 });

@@ -23,6 +23,9 @@ export type GameEvent =
   | { type: 'quickDone' }
   | { type: 'invalid'; reason: string }
   | { type: 'mergeAll'; fusions: number; longest: number }
-  | { type: 'styleBought'; item: string; car: CarId };
+  | { type: 'styleBought'; item: string; car: CarId }
+  | { type: 'install'; car: CarId; family: Family; partId: number; from: SlotRef; outgoingId: number | null }
+  | { type: 'uninstall'; car: CarId; family: Family; partId: number; to: SlotRef }
+  | { type: 'move-fit'; fromCar: CarId; toCar: CarId; family: Family; partId: number; outgoingId: number | null };
 
 export const sameRef = (a: SlotRef, b: SlotRef) => a.zone === b.zone && a.i === b.i;

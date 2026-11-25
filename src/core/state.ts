@@ -1,8 +1,24 @@
+import { installLegacyLoadout } from './install';
 import {
   ACTIVE_FAMILIES, BOARD_BASE, CarId, Family, NITRO_CAP, Quality, STARTER_CRATES, TRAY_SLOTS,
 } from '../data/tables';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2; // v2: parts are fitted to cars (installed) instead of auto-equipped from the bench
+
+/** Per-car milestones, updated on every committed live race. Kept small and additive. */
+export interface CarMastery {
+  races: number;
+  wins: number;
+  podiums: number;
+  /** best live time per event id */
+  best: Record<string, number>;
+  perfects: number;
+  /** timed shifts: clean (in the green), and total attempted */
+  shiftsClean: number;
+  shifts: number;
+  /** highest speed reached, m/s (display converts to mph) */
+  topSpeed: number;
+}
 
 export interface Part {
   id: number;
@@ -71,6 +87,10 @@ export interface LeanOutcome {
   nitroUsed: number;
   nitroLeft?: number;
   trapSpeed?: number;
+  /** Timed shifting (race workstream): shifts attempted, clean ones, and the player's top speed (m/s). */
+  shifts?: number;
+  shiftsClean?: number;
+  topSpeed?: number;
   standings: { name: string; time: number | null; isPlayer: boolean }[];
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
 }
@@ -108,6 +128,10 @@ export interface GameState {
   owns: string[];
   /** Tune-up stage per car (0–3). */
   tune: Partial<Record<CarId, number>>;
+  /** Parts fitted to each car, one per family. A fitted part is not on the board or the spare rack. */
+  installed: Partial<Record<CarId, Partial<Record<Family, Part>>>>;
+  /** Per-car records for future masteries / levels (races, wins, best times, shift and nitro skill). */
+  mastery: Partial<Record<CarId, CarMastery>>;
   /** Event goals met (Downtown Nights): bit 1 win, 2 under par, 4 a Perfect boost. */
   stars: Record<string, number>;
   /** The Main Event in progress: the next heat to race (0-based), or null. */
@@ -169,6 +193,8 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     paints: {},
     owns: [],
     tune: {},
+    installed: {},
+    mastery: {},
     stars: {},
     knockout: null,
     style: {},
@@ -240,7 +266,8 @@ export function validateState(s: unknown): string[] {
   if (!g.stats || !g.stats.milestones) errs.push('stats');
   // unique part ids
   if (Array.isArray(g.board) && Array.isArray(g.tray)) {
-    const ids = [...g.board, ...g.tray].filter(Boolean).map((p) => (p as Part).id);
+    const fittedIds = Object.values(g.installed ?? {}).flatMap((sl) => Object.values(sl ?? {}).filter(Boolean).map((p) => (p as Part).id));
+    const ids = [...[...g.board, ...g.tray].filter(Boolean).map((p) => (p as Part).id), ...fittedIds];
     if (new Set(ids).size !== ids.length) errs.push('duplicate part ids');
     if (isNum(g.nextPartId) && ids.some((id) => id >= g.nextPartId)) errs.push('part id counter');
   }
@@ -253,6 +280,7 @@ export function migrate(raw: unknown): GameState | null {
   const g = raw as Partial<GameState> & { v?: number };
   if (typeof g.v !== 'number') return null;
   if (g.v > SAVE_VERSION) return null; // from a newer build; refuse rather than corrupt
+  const fromV1 = g.v < 2;
   // v1 is the first shipped schema. Future migrations: if (g.v === 1) { ...; g.v = 2 }
   // Fill optional fields added during development so partially-shaped v1 saves load.
   const base = newGame(0);
@@ -263,5 +291,8 @@ export function migrate(raw: unknown): GameState | null {
   merged.offline = { ...base.offline, ...(g.offline ?? {}) };
   merged.upgrades = { ...base.upgrades, ...(g.upgrades ?? {}) };
   merged.tips = { ...(g.tips ?? {}) };
+  merged.installed = { ...(g.installed ?? {}) };
+  merged.mastery = { ...(g.mastery ?? {}) };
+  if (fromV1) { merged.v = SAVE_VERSION; installLegacyLoadout(merged); }
   return validateState(merged).length === 0 ? merged : null;
 }

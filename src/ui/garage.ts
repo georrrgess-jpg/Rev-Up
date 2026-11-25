@@ -5,28 +5,21 @@ import { sameRef } from '../core/events';
 import { computeLoadout, scrapImpact } from '../core/loadout';
 import * as P from '../core/progression';
 import type { Part } from '../core/state';
-import {
-  ACTIVE_FAMILIES, CRATE_SCRAP_COST, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_RACES, nitroCapFor,
-  PART_ORDER_PRICE, TARGETED_CRATE_SCRAP_COST, TUNE_STAGES, UPGRADES, tunePrice, carById, eventById,
-} from '../data/tables';
-import { drawCar, fitCanvas } from '../render/car';
+import { ACTIVE_FAMILIES, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_RACES, nitroCapFor, PART_ORDER_PRICE, carById, eventById } from '../data/tables';
 import { familyIcon, partSvg } from '../render/parts';
 import type { App, View } from './app';
 import { tutorialStep } from '../core/tutorial';
 import { Coach, CoachStep } from './coach';
-import { fmt, h } from './dom';
+import { h } from './dom';
+import { openShop } from './shop';
+import { openFitParts } from './fit';
+import { GoalCard } from './goalCard';
 
 const PRESS: SlotRef = { zone: 'tray', i: -1 }; // sentinel for the scrap press
 
 export class GarageView implements View {
   el: HTMLElement;
-  private goalBtn: HTMLButtonElement;
-  private goalCanvas: HTMLCanvasElement;
-  private goalTitle: HTMLElement;
-  private goalLine: HTMLElement;
-  private goalBar: HTMLElement;
   private benchStatus: HTMLElement;
-  private goalArtKey = '';
   private equipEl: HTMLElement;
   private capEl: HTMLElement;
   private boardEl: HTMLElement;
@@ -39,19 +32,15 @@ export class GarageView implements View {
   private raceBtn: HTMLButtonElement;
   private cells: HTMLButtonElement[] = [];
   private trayCells: HTMLButtonElement[] = [];
+  private goal: GoalCard;
   private sel: SlotRef | null = null;
   private drag: { from: SlotRef; id: number; x0: number; y0: number; ghost: HTMLElement | null } | null = null;
   private boardCols = 0;
   private visible = false;
 
   constructor(private app: App) {
-    this.goalCanvas = h('canvas', { 'aria-hidden': 'true' });
-    this.goalTitle = h('div', { class: 'gt' });
-    this.goalLine = h('div', { class: 'gl' });
-    this.goalBar = h('i');
-    this.goalBtn = h('button', { class: 'goal', onclick: () => this.onGoal() }, this.goalCanvas,
-      h('div', { class: 'gtxt' }, this.goalTitle, this.goalLine, h('div', { class: 'bar' }, this.goalBar)));
-    this.equipEl = h('div', { class: 'equip', 'aria-label': 'Equipped parts' });
+    this.goal = new GoalCard(app);
+    this.equipEl = h('button', { class: 'equip', 'aria-label': 'Fitted parts — open Fit Parts', onclick: () => openFitParts(this.app) });
     this.capEl = h('div', { class: 'capnote' });
     this.benchStatus = h('span', { class: 'num' });
     this.boardEl = h('div', { class: 'board', role: 'grid', 'aria-label': 'Parts board' });
@@ -64,12 +53,12 @@ export class GarageView implements View {
     this.cratesBtn = h('button', { class: 'btn crates', onclick: () => this.onCrates() });
     this.mergeAllBtn = h('button', { class: 'btn', onclick: () => this.onMergeAll() });
     this.raceBtn = h('button', { class: 'btn primary race', onclick: () => this.onRace() });
-    const shopBtn = h('button', { class: 'btn', 'aria-label': 'Shop: parts, crates and upgrades', onclick: () => this.openWorkshop() }, 'Shop');
+    const shopBtn = h('button', { class: 'btn', 'aria-label': 'Shop: parts, crates and upgrades', onclick: () => openShop(this.app) }, 'Shop');
     this.shopBtn = shopBtn;
 
     this.el = h('section', { class: 'view garage', 'aria-label': 'Garage' },
       h('div', { class: 'garage-body scroll' },
-        this.goalBtn, this.equipEl, this.capEl,
+        this.goal.el, this.equipEl, this.capEl,
         h('div', { class: 'benchhead' }, h('strong', {}, 'Workbench'), this.benchStatus),
         h('div', { class: 'boardwrap' }, this.boardEl),
         h('div', { class: 'trayrow' }, h('span', { class: 'traycaption' }, 'Spare rack'), this.trayEl, this.pressEl),
@@ -113,13 +102,13 @@ export class GarageView implements View {
     const vw = this.el.clientWidth - 24;
     const gap = 5;
     const cellW = (Math.min(vw, 520) - 14 - gap * (s.cols - 1)) / s.cols;
-    const others = [this.goalBtn, this.equipEl, this.capEl, this.hintEl, this.el.querySelector('.benchhead')!, this.el.querySelector('.actions')!]
+    const others = [this.goal.el, this.equipEl, this.capEl, this.hintEl, this.el.querySelector('.benchhead')!, this.el.querySelector('.actions')!]
       .reduce((a, e) => a + (e as HTMLElement).offsetHeight, 0) + (window.innerHeight < 661 ? 18 : 30);
     const H = this.el.clientHeight - others;
     const cellH = (H - 14 - gap * (s.rows - 1) - 14) / (s.rows + 0.86);
     const cell = Math.max(36, Math.min(84, Math.floor(Math.min(cellW, cellH))));
     this.el.style.setProperty('--cell', `${cell}px`);
-    this.drawGoal();
+    this.goal.draw();
   }
 
   // ---------------- Rendering ----------------
@@ -184,7 +173,7 @@ export class GarageView implements View {
     s.board.forEach((p, i) => paint(this.cells[i], p, `board:${i}`));
     s.tray.forEach((p, i) => paint(this.trayCells[i], p, `tray:${i}`));
     this.renderHighlights();
-    this.renderGoal();
+    this.goal.render();
     this.renderEquip(lo);
     // Show the auto-equipped stat change right where the equipped parts are listed.
     const st = lo.stats;
@@ -262,7 +251,7 @@ export class GarageView implements View {
       case 'shop':
         return { id: step, targets: [this.shopBtn], ack: true, text: `You have $${s.cash}. In the Shop, you can order a known ${FAMILIES[g!.family].name} part toward the ${g!.car.model} (T1 from $${PART_ORDER_PRICE[1]}), and upgrades speed up your garage.` };
       case 'goalCard':
-        return { id: step, targets: [this.goalBtn], ack: true, text: 'This is your next car. Tap it any time to see exactly what is left and where to earn it.' };
+        return { id: step, targets: [this.goal.el], ack: true, text: 'This is your next car. Tap it any time to see exactly what is left and where to earn it.' };
       case 'nitroBank': {
         const chip = document.querySelector('.chip.nitro');
         return chip ? { id: step, targets: [chip], ack: true, text: 'You banked nitro: three quick merges in a row add a charge (up to 3). Banked charges add to your free crew nitro in live races.' } : null;
@@ -287,51 +276,7 @@ export class GarageView implements View {
     return null;
   }
 
-  private renderGoal() {
-    const s = this.s;
-    const g = P.goalStatus(s);
-    this.goalBtn.classList.toggle('ready', !!s.pendingReveal);
-    if (s.pendingReveal) {
-      const c = carById(s.pendingReveal);
-      this.goalTitle.textContent = 'Car ready';
-      this.goalBtn.setAttribute('aria-label', `Reveal the ${c.model}`);
-      this.goalLine.innerHTML = `Unveil the <b>${c.model}</b>`;
-      this.goalBar.style.width = '100%';
-    } else if (g) {
-      this.goalTitle.textContent = `Next car · ${g.car.model}`;
-      this.goalLine.replaceChildren(
-        h('span', { class: g.keystoneDone ? 'met' : '' }, `${g.keystoneDone ? '✓' : 'Craft'} T${g.tier} ${FAMILIES[g.family].name}`),
-        ...(g.event ? [h('span', { class: g.eventDone ? 'met' : '' }, `${g.eventDone ? '✓' : 'Win'} ${eventById(g.event).name}`)] : []),
-        ...(g.car.unlock?.stars ? [h('span', { class: P.starsIn(s) >= g.car.unlock.stars ? 'met' : '' }, `★ ${Math.min(P.starsIn(s), g.car.unlock.stars)}/${g.car.unlock.stars}`)] : []),
-        h('span', { class: s.rep >= g.repNeed ? 'met' : '' }, s.rep >= g.repNeed ? '✓ Rep' : `${s.rep}/${g.repNeed} Rep`));
 
-      this.goalBar.style.width = `${Math.round(g.progress * 100)}%`;
-      this.goalBtn.setAttribute('aria-label', `Next car: ${g.line}`);
-    } else {
-      // every car owned: the card follows the long collection instead of claiming it is complete
-      const c = P.collection(s);
-      this.goalTitle.textContent = `Collection · ${Math.round((c.have / c.total) * 100)}%`;
-      this.goalBtn.setAttribute('aria-label', `Collection ${c.have} of ${c.total}. Next: ${c.next}`);
-      this.goalLine.textContent = c.next;
-      this.goalBar.style.width = `${Math.round((c.have / c.total) * 100)}%`;
-    }
-    this.drawGoal();
-  }
-
-  private drawGoal() {
-    const s = this.s;
-    const { w, h: hh } = fitCanvas(this.goalCanvas, 2);
-    const ctx = this.goalCanvas.getContext('2d')!;
-    const id = s.pendingReveal ?? P.nextCar(s)?.id ?? s.activeCar;
-    const cls = carById(id);
-    const cw = Math.min(w * .89, hh * 1.92);
-    const covered = !!(s.pendingReveal || P.nextCar(s));
-    const key = [w, hh, id, covered, s.paints[id]].join('|');
-    if (this.goalArtKey === key) return;
-    this.goalArtKey = key;
-    ctx.clearRect(0, 0, w, hh);
-    drawCar(ctx, id, (w - cw) / 2, hh * .93, cw, { paint: s.paints[id] ?? cls.paint, trim: cls.trim, cover: covered ? 1 : 0 });
-  }
 
   private renderEquip(lo: ReturnType<typeof computeLoadout>) {
     const s = this.s;
@@ -495,7 +440,7 @@ export class GarageView implements View {
         if (car?.unlock && car.unlock.family === e.family && car.unlock.tier === e.tier) {
           // the next car's part: the biggest Garage moment, so it gets its own sound, a flash and the goal card pulses
           sfx.keystone();
-          this.goalBtn.classList.remove('keystone-hit'); void this.goalBtn.offsetWidth; this.goalBtn.classList.add('keystone-hit');
+          this.goal.pulse();
           this.floaterTop(`★ T${e.tier} ${FAMILIES[e.family].name} crafted`, 'gold');
           this.app.toast(g?.keystoneDone && this.s.rep < g.repNeed ? `T${e.tier} ${FAMILIES[e.family].name} crafted — the ${car.model}'s part is done. ${g.repNeed - this.s.rep} more Rep to unlock it` : `T${e.tier} ${FAMILIES[e.family].name} crafted for the ${car.model}`);
         }
@@ -718,31 +663,6 @@ export class GarageView implements View {
   }
 
   // ---------------- Actions ----------------
-  private onGoal() {
-    const s = this.s;
-    if (s.pendingReveal) return this.app.openReveal(s.pendingReveal);
-    const g = P.goalStatus(s);
-    if (!g) return this.app.go('showroom');
-    const tips: string[] = [];
-    if (!g.keystoneDone) {
-      tips.push(g.bestHeld >= 1
-        ? `Your best ${FAMILIES[g.family].name} is T${g.bestHeld}. Merge pairs up to T${g.tier} — crafting it yourself counts, crate drops don't.`
-        : `Merge ${FAMILIES[g.family].plural} up to T${g.tier}. Crafting it yourself counts, crate drops don't.`);
-    }
-    if (s.rep < g.repNeed) tips.push(`Earn ${g.repNeed - s.rep} more Rep from races. Every finish pays Rep — wins pay most.`);
-    this.app.sheet((close) => h('div', {},
-      h('button', { class: 'btn sm close', onclick: close }, 'Close'),
-      h('h2', {}, g.car.model),
-      h('p', {}, g.car.blurb),
-      h('div', { class: 'goal-requirement' }, h('strong', {}, `Craft T${g.tier} ${FAMILIES[g.family].name}`),
-        h('span', {}, g.keystoneDone ? 'Complete' : g.keyProgress >= 1 ? 'Ingredients ready' : `${Math.round(g.keyProgress * 100)}% of ingredients`)),
-      h('div', { class: 'goal-requirement' }, h('strong', {}, 'Earn reputation'),
-        h('span', {}, `${g.repHave} / ${g.repNeed} Rep`)),
-      ...tips.map((t) => h('p', {}, t)),
-      !g.keystoneDone ? h('button', { class: 'btn wide', onclick: () => { close(); this.openWorkshop(); } }, `Get ${FAMILIES[g.family].name} crates`) : null,
-      s.rep < g.repNeed ? h('button', { class: 'btn wide goal-race', onclick: () => { close(); this.app.go('race'); } }, 'Browse races') : null,
-    ));
-  }
 
   private onCrates() {
     const s = this.s;
@@ -781,94 +701,5 @@ export class GarageView implements View {
     if (s.pendingQuick) { this.app.go('race'); return; }
     this.app.game.markTip('nitro');
     (this.app.views.race as unknown as { startLive(id: string): void }).startLive(P.recommendedEvent(s).id);
-  }
-
-  openWorkshop(focusFamily?: Family) {
-    const game = this.app.game;
-    let fam: Family | null = focusFamily ?? null;
-    let tier = 0;
-    this.app.sheet((close) => {
-      const body = h('div', { class: 'workshop' });
-      const build = () => {
-        const s = game.state;
-        const g = P.goalStatus(s);
-        const maxT = B.orderMaxTier(s);
-        const goalFam = g && !g.keystoneDone ? g.family : null;
-        fam ??= goalFam ?? 'engine';
-        // default tier: the one that feeds the goal craft (two of these make the next), else the highest sold
-        if (!tier || tier > maxT) tier = goalFam === fam && g ? Math.max(1, Math.min(maxT, g.tier - 1)) : maxT;
-        const price = PART_ORDER_PRICE[tier];
-        const short = price - s.cash;
-        const famBtn = (f: Family) => h('button', {
-          class: `btn fam-pick${f === fam ? ' on' : ''}`, 'aria-pressed': String(f === fam),
-          onclick: () => { fam = f; tier = 0; build(); },
-        }, h('span', { html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, f === goalFam ? h('small', {}, 'goal') : null);
-        const tierBtn = (t: number) => h('button', {
-          class: `btn sm tier-pick${t === tier ? ' on' : ''}`, 'aria-pressed': String(t === tier),
-          onclick: () => { tier = t; build(); },
-        }, h('b', {}, `T${t}`), h('small', { class: 'num' }, `$${fmt(PART_ORDER_PRICE[t])}`));
-        const upgrades = UPGRADES.filter((u) => P.upgradeShown(s, u)).map((u) => {
-          const lvl = s.upgrades[u.id] ?? 0;
-          const next = u.levels[lvl];
-          const fx = P.upgradeEffect(s, u.id);
-          return h('div', { class: 'row up-row' },
-            h('div', { class: 'grow' },
-              h('div', { class: 't' }, u.name, u.levels.length > 1 ? h('span', { class: 'lvl' }, ` ${lvl}/${u.levels.length}`) : null),
-              h('div', { class: 'd' }, next ? h('span', {}, fx.now, h('span', { class: 'arrow', 'aria-hidden': 'true' }, ' → '), h('b', {}, fx.next)) : h('span', {}, `${fx.now} · fully upgraded`))),
-            next ? h('button', {
-              class: `btn sm${s.cash < next.cost ? ' off' : ' primary'}`,
-              'aria-label': `${u.name}: ${next.label}, $${next.cost}`,
-              onclick: () => { if (s.cash >= next.cost) { game.buyUpgrade(u.id); sfx.cash(); } else this.app.toast(`Need $${fmt(next.cost - s.cash)} more for ${u.name}`); build(); },
-            }, s.cash < next.cost ? h('span', { class: 'stack' }, `$${fmt(next.cost)}`, h('small', {}, `$${fmt(next.cost - s.cash)} more`)) : `$${fmt(next.cost)}`) : h('span', { class: 'd done' }, '✓'));
-        });
-        const away = P.offlineRate(s);
-        body.replaceChildren(
-          h('button', { class: 'btn sm close', onclick: close }, 'Close'),
-          h('h2', {}, 'Shop'),
-          h('p', { class: 'wallet' }, h('span', { class: 'chip cash' }, `$${fmt(s.cash)}`), h('span', { class: 'chip scrap' }, `${fmt(s.scrap)} scrap`), h('span', { class: 'd' }, 'Cash buys parts and upgrades; scrap buys crates.')),
-          h('h3', {}, 'Order a part'),
-          h('p', { class: 'd' }, goalFam && g
-            ? `Your ${g.car.model} needs a crafted T${g.tier} ${FAMILIES[goalFam].name}: two T${g.tier - 1}s make one. Ordered parts arrive on your bench; the craft is yours.`
-            : `A known part, straight to your bench. Up to T${maxT} (your best car's top tier is crafted).`),
-          h('div', { class: 'fams' }, ...ACTIVE_FAMILIES.map(famBtn)),
-          h('div', { class: 'tiers' }, ...Array.from({ length: maxT }, (_, k) => tierBtn(k + 1))),
-          h('button', {
-            class: `btn order-btn${short > 0 ? ' off' : ' primary'}`,
-            onclick: () => {
-              if (short > 0) { this.app.toast(`Need $${fmt(short)} more for a T${tier} ${FAMILIES[fam!].name}`); return; }
-              const ev = game.orderPart(fam!, tier);
-              if (ev.some((e) => e.type === 'place')) this.app.toast(`T${tier} ${FAMILIES[fam!].name} is on your bench`);
-              else if (!ev.some((e) => e.type === 'invalid')) this.app.toast(`T${tier} ${FAMILIES[fam!].name} is first in the crate queue — make room on the bench`);
-              build();
-            },
-          }, short > 0 ? h('span', { class: 'stack' }, `Order T${tier} ${FAMILIES[fam].name} · $${fmt(price)}`, h('small', {}, `$${fmt(short)} more`)) : `Order T${tier} ${FAMILIES[fam].name} · $${fmt(price)}`),
-          h('h3', {}, `Tune-up · ${carById(s.activeCar).model}`),
-          (() => {
-            const stage = s.tune?.[s.activeCar] ?? 0;
-            const price = tunePrice(s.activeCar, stage);
-            return h('div', { class: 'row up-row' },
-              h('div', { class: 'grow' },
-                h('div', { class: 't' }, `Stage ${Math.min(stage + 1, TUNE_STAGES)} of ${TUNE_STAGES}`),
-                h('div', { class: 'd' }, stage < TUNE_STAGES ? h('span', {}, `+${stage * 2}% speed, acceleration and grip`, h('span', { class: 'arrow', 'aria-hidden': 'true' }, ' → '), h('b', {}, `+${(stage + 1) * 2}%`)) : `+${stage * 2}% · fully tuned`)),
-              stage < TUNE_STAGES ? h('button', {
-                class: `btn sm${s.cash < price ? ' off' : ' primary'}`,
-                onclick: () => { if (s.cash >= price) { game.buyTune(s.activeCar); sfx.cash(); this.app.toast(`${carById(s.activeCar).model} tuned to stage ${stage + 1}`); } else this.app.toast(`Need $${fmt(price - s.cash)} more for the tune-up`); build(); },
-              }, s.cash < price ? h('span', { class: 'stack' }, `$${fmt(price)}`, h('small', {}, `$${fmt(price - s.cash)} more`)) : `$${fmt(price)}`) : h('span', { class: 'd done' }, '✓'));
-          })(),
-          h('p', { class: 'd' }, 'For each car. Skill saves you the money: Perfect boosts gain more than a full tune.'),
-          h('h3', {}, 'Scrap crates'),
-          h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, 'Mystery crate'), h('div', { class: 'd' }, 'One part, any family, tier by your crate level')),
-            h('button', { class: `btn sm${s.scrap < CRATE_SCRAP_COST ? ' off' : ''}`, onclick: () => { game.buyCrate('std'); build(); } }, `${CRATE_SCRAP_COST} scrap`)),
-          h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `${FAMILIES[fam].name} crate`), h('div', { class: 'd' }, `${fam === 'engine' ? 'An' : 'A'} ${FAMILIES[fam].name.toLowerCase()} part, tier by your crate level`)),
-            h('button', { class: `btn sm${s.scrap < TARGETED_CRATE_SCRAP_COST ? ' off' : ''}`, onclick: () => { game.buyCrate('targeted', fam!); build(); } }, `${TARGETED_CRATE_SCRAP_COST} scrap`)),
-          h('h3', {}, 'Upgrades'),
-          ...upgrades,
-          h('h3', {}, 'While you are away'),
-          h('p', { class: 'd' }, `Your ${s.owned.length} car${s.owned.length > 1 ? 's' : ''} earn $${away} a minute while the game is closed, for up to ${P.offlineMaxS(s) / 3600} h ($${fmt(away * P.offlineMaxS(s) / 60)}). Each new car adds to the rate.`),
-        );
-      };
-      build();
-      return body;
-    });
   }
 }

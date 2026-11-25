@@ -4,7 +4,7 @@ import type { Game } from '../core/game';
 import { MAX_TIER, nitroCapFor } from '../data/tables';
 import { fmt, h } from './dom';
 import { GarageView } from './garage';
-import { RaceView } from './race';
+import { RaceView } from './raceMenu';
 import { RevealOverlay } from './reveal';
 import { openGuide } from './guide';
 import { openSettings } from './settings';

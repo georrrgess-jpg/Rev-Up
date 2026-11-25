@@ -1,3 +1,4 @@
+import * as I from '../src/core/install';
 import { describe, expect, it } from 'vitest';
 import * as B from '../src/core/board';
 import { computeLoadout, scrapImpact } from '../src/core/loadout';
@@ -223,29 +224,50 @@ describe('full board, overflow, crates and scrap', () => {
     expect(s.scrap).toBe(20 - TARGETED_CRATE_SCRAP_COST);
   });
 
-  it('flags stat loss before scrapping an equipped part and names the next one', () => {
+  it('fitted parts are off the bench, so they cannot be scrapped or merged away', () => {
     const s = emptyGame();
     put(s, 0, 0, 'engine', 2);
     put(s, 0, 1, 'engine', 1);
-    const imp = scrapImpact(s, s.board[0]!.id);
-    expect(imp?.before.t).toBe(2);
-    expect(imp?.next?.t).toBe(1);
+    I.installPart(s, 'junker', { zone: 'board', i: 0 });
+    expect(s.board[0]).toBeNull();
+    expect(B.allParts(s).map((p) => p.t)).toEqual([1]);
     expect(scrapImpact(s, s.board[1]!.id)).toBeNull();
   });
 
-  it('auto-equips the strongest part; parts above the cap fit but run at the cap tier', () => {
+  it('recommends the strongest part; parts above the cap fit but run at the cap tier', () => {
     const s = emptyGame();
+    s.owned.push('beater');
     put(s, 0, 0, 'tires', 3);
     put(s, 0, 1, 'tires', 2);
+    expect(computeLoadout(s, 'junker').equipped.tires).toBeUndefined(); // nothing fitted yet
+    expect(I.recommendedFit(s, 'junker').tires?.part.t).toBe(2); // tie at the T2 cap: the lower part, the T3 stays free
+    I.fitRecommended(s, 'junker');
     const lo = computeLoadout(s, 'junker');
-    expect(lo.equipped.tires?.t).toBe(2); // tie at the T2 cap: the lower part is used, the T3 stays free
+    expect(lo.equipped.tires?.t).toBe(2);
     expect(lo.blocked.tires).toBeUndefined();
-    expect(computeLoadout(s, 'beater').equipped.tires?.t).toBe(3);
-    s.board[1] = null; // only the T3 left: the Tapeback runs it at T2
+    expect(I.recommendedFit(s, 'beater').tires?.part.t).toBe(3);
+    // swap the T3 in: the T2 goes back to the T3's cell, and the Tapeback runs the T3 at its T2 cap
+    I.installPart(s, 'junker', { zone: 'board', i: 0 });
     const only = computeLoadout(s, 'junker');
     expect(only.equipped.tires?.t).toBe(3);
+    expect(s.board[0]?.t).toBe(2);
     expect(only.blocked.tires?.t).toBe(3);
     expect(only.stats.grip).toBeCloseTo(lo.stats.grip, 9);
+  });
+
+  it('removing a part needs a free cell; a full bench keeps the car as it was and says how to make room', () => {
+    const s = emptyGame();
+    put(s, 0, 0, 'engine', 2);
+    I.installPart(s, 'junker', { zone: 'board', i: 0 });
+    for (let i = 0; i < s.board.length; i++) s.board[i] = { id: s.nextPartId++, f: 'turbo', t: 1, q: 'std' };
+    for (let i = 0; i < s.tray.length; i++) s.tray[i] = { id: s.nextPartId++, f: 'turbo', t: 1, q: 'std' };
+    const ev = I.removePart(s, 'junker', 'engine');
+    expect(ev[0]).toMatchObject({ type: 'invalid' });
+    expect(s.installed.junker?.engine?.t).toBe(2);
+    s.board[3] = null;
+    I.removePart(s, 'junker', 'engine');
+    expect(B.getPart(s, { zone: 'board', i: 3 })?.t).toBe(2);
+    expect(s.installed.junker?.engine).toBeUndefined();
   });
 
   it('expanding the bench keeps parts in place', () => {

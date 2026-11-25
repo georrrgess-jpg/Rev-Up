@@ -1,4 +1,7 @@
 import './ui/style.css';
+import './ui/css/garage.css';
+import './ui/css/race-hud.css';
+import './ui/css/art.css';
 import { Game } from './core/game';
 import { KV, MemoryKV } from './core/save';
 import { App } from './ui/app';

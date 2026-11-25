@@ -196,7 +196,7 @@ describe('Downtown Nights rules', () => {
   it('the Stock Cup runs every part at T4 on any car', async () => {
     const { computeLoadout } = await import('../src/core/loadout');
     const s = late();
-    s.board[0] = { id: 900, f: 'engine', t: 6, q: 'std' };
+    s.installed = { tourer: { engine: { id: 900, f: 'engine', t: 6, q: 'std' } } };
     expect(computeLoadout(s, 'tourer', undefined, 4).stats.top).toBeLessThan(computeLoadout(s, 'tourer').stats.top);
   });
 });
@@ -205,7 +205,7 @@ describe('Tune-up', () => {
   it('adds 2% per stage up to three, priced per car, and never applies in the Stock Cup', async () => {
     const { computeLoadout } = await import('../src/core/loadout');
     const s = late();
-    s.board[0] = { id: 900, f: 'engine', t: 6, q: 'std' };
+    s.installed = { tourer: { engine: { id: 900, f: 'engine', t: 6, q: 'std' } } };
     const base = computeLoadout(s, 'tourer').stats.top;
     s.cash = 100000;
     P.buyTune(s, 'tourer'); P.buyTune(s, 'tourer');

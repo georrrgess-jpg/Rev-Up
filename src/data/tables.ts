@@ -289,7 +289,7 @@ export interface Track {
   name: string;
   district: DistrictId;
   segments: Segment[];
-  theme: 'scrap' | 'suburb' | 'foundry' | 'coast' | 'night';
+  theme: 'scrap' | 'suburb' | 'foundry' | 'coast' | 'night' | 'desert' | 'summit'; // desert/summit: Overhaul endgame (docs/CONTRACTS.md)
   /** Short player-facing course type and the part family it rewards. */
   course: string;
   favours: string;

@@ -262,6 +262,7 @@ describe('race payouts', () => {
     g.state.activeCar = 'beater';
     // strong parts so the boss is beaten
     for (const f of ['engine', 'tires', 'turbo'] as const) put(g.state, 5, ['engine', 'tires', 'turbo'].indexOf(f), f, 3);
+    g.fitRecommended('beater', T0);
     let wins = 0;
     for (let k = 0; k < 4; k++) {
       const { id, out } = liveRace(g, 'rusty-ray', T0 + k * 60_000);

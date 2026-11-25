@@ -2,7 +2,6 @@ import {
   ACTIVE_FAMILIES, CarId, Family, QUALITY_BONUS, STAT_SCALE, TIER_STAT, TUNE_STEP, carById,
 } from '../data/tables';
 import type { GameState, Part } from './state';
-import { allParts } from './board';
 
 export const contribution = (p: Part) => TIER_STAT[p.t] * (p.q === 'std' ? 1 : QUALITY_BONUS);
 
@@ -25,15 +24,9 @@ export const contributionOn = (p: Part, cap: number) => TIER_STAT[Math.min(p.t, 
  */
 export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?: number, partCap?: number): Loadout {
   const cap = Math.min(carById(car).cap, partCap ?? Infinity);
+  // v2: a car runs exactly the parts fitted to its slots (see core/install.ts); nothing is auto-equipped.
   const equipped: Loadout['equipped'] = {};
-  for (const p of allParts(s)) {
-    if (p.id === exclude) continue;
-    const cur = equipped[p.f];
-    if (!cur) { equipped[p.f] = p; continue; }
-    const a = contributionOn(p, cap), b = contributionOn(cur, cap);
-    // prefer the stronger part; on a tie prefer the lower tier (keeps the higher part free for the next car), then lower id
-    if (a > b || (a === b && (p.t < cur.t || (p.t === cur.t && p.id < cur.id)))) equipped[p.f] = p;
-  }
+  for (const [f, p] of Object.entries(s.installed?.[car] ?? {}) as [Family, Part][]) if (p && p.id !== exclude) equipped[f] = p;
   const blocked: Loadout['blocked'] = {};
   for (const f of ACTIVE_FAMILIES) if (equipped[f] && equipped[f]!.t > cap) blocked[f] = equipped[f];
   // a Tune-up multiplies the car's stats; a stock-class race (partCap) runs untuned

@@ -3,6 +3,7 @@
 import * as B from '../src/core/board';
 import { Game } from '../src/core/game';
 import { computeLoadout } from '../src/core/loadout';
+import { fitRecommended as fitRec } from '../src/core/install';
 import * as P from '../src/core/progression';
 import { NitroPolicy, RaceSim } from '../src/core/race';
 import { MemoryKV } from '../src/core/save';
@@ -180,6 +181,7 @@ export function runBot(o: BotOpts): BotLog {
     const ev = P.recommendedEvent(g.state);
     // while the crew runs a Quick Race the player can race live // crew is out; keep merging as crates arrive
     if (o.quickRace !== false && !g.state.pendingQuick && P.canQuickRace(g.state, ev)) {
+      g.fitRecommended(g.state.activeCar, now);
       g.quickRace(ev.id, now);
       countEvent(ev.id);
       L.quick++;
@@ -195,7 +197,8 @@ export function runBot(o: BotOpts): BotLog {
       const raced = ev.knockout ? eventById(ev.knockout.heats[g.state.knockout?.heat ?? 0]) : ev;
       let pick = g.state.activeCar, bestT = Infinity;
       for (const car of g.state.owned.filter((c) => ['muscle', 'tourer', 'tuner', 'super'].includes(c))) {
-        const lo = computeLoadout(g.state, car, undefined, raced.partCap ?? ev.partCap);
+        const trial = structuredClone(g.state); fitRec(trial, car);
+        const lo = computeLoadout(trial, car, undefined, raced.partCap ?? ev.partCap);
         const probe = new RaceSim({ eventId: raced.id, seed: 7, player: { name: 'p', car, stats: lo.stats, paint: '#fff', perfectMul: carById(car).perfectMul }, nitroCharges: 2 });
         while (!probe.done) { const { active } = probe.windowState(); if (active && probe.charges > 0 && probe.player.nitroLeft <= 0 && !probe.usedWindows.has(active.segIndex)) probe.tapNitro(); probe.step(); }
         const tt = raced.speedTrap ? -(probe.trapSpeed ?? 0) : (probe.player.finishTime ?? 99);
@@ -203,9 +206,10 @@ export function runBot(o: BotOpts): BotLog {
       }
       if (pick !== g.state.activeCar) g.setActiveCar(pick, now);
     }
+    g.fitRecommended(g.state.activeCar, now); // the Fit Parts view's one-tap recommended fit
     const setup = g.startRace(ev.id, now);
     if (!setup) { if (sw) g.setActiveCar(best, now); L.waiting += 1; spend(1); continue; }
-    countEvent(ev.id);
+    if (!ev.knockout || (g.state.knockout?.heat ?? 0) === 0) countEvent(ev.id); // a knockout's heats are one attempt
     if (!L.firstLaunch) L.firstLaunch = Math.round(t);
     const sim = new RaceSim(setup);
     // 'mixed' models a human: every other race the boost lands just after the window instead of in it
