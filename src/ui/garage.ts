@@ -99,10 +99,10 @@ export class GarageView implements View {
     const gap = 5;
     const cellW = (Math.min(vw, 520) - 14 - gap * (s.cols - 1)) / s.cols;
     const others = [this.goalBtn, this.equipEl, this.capEl, this.hintEl, this.el.querySelector('.benchhead')!, this.el.querySelector('.actions')!]
-      .reduce((a, e) => a + (e as HTMLElement).offsetHeight, 0) + 30;
+      .reduce((a, e) => a + (e as HTMLElement).offsetHeight, 0) + (window.innerHeight < 661 ? 18 : 30);
     const H = this.el.clientHeight - others;
     const cellH = (H - 14 - gap * (s.rows - 1) - 14) / (s.rows + 0.86);
-    const cell = Math.max(38, Math.min(84, Math.floor(Math.min(cellW, cellH))));
+    const cell = Math.max(36, Math.min(84, Math.floor(Math.min(cellW, cellH))));
     this.el.style.setProperty('--cell', `${cell}px`);
     this.drawGoal();
   }
@@ -135,10 +135,10 @@ export class GarageView implements View {
     return (r.zone === 'board' ? this.cells[r.i] : this.trayCells[r.i]) ?? null;
   }
 
-  private partHtml(p: Part, equipped: boolean, overCap: boolean): string {
+  private partHtml(p: Part, equipped: boolean, overCap: boolean, match = false): string {
     const q = p.q === 'mint' ? '<span class="qtag">MINT</span>' : p.q === 'polished' ? '<span class="qtag">POL</span>' : '';
-    const label = `T${p.t} ${FAMILIES[p.f].name}${p.q !== 'std' ? `, ${p.q}` : ''}${equipped ? ', equipped' : ''}${overCap ? ', above car cap' : ''}`;
-    return `<div class="part q-${p.q}${equipped ? ' equipped' : ''}${overCap ? ' over-cap' : ''}" aria-label="${label}">${partSvg(p.f, p.t, p.q)}<span class="tier">${p.t}</span>${q}<span class="fam" style="background:${FAMILIES[p.f].color}"></span></div>`;
+    const label = `T${p.t} ${FAMILIES[p.f].name}${p.q !== 'std' ? `, ${p.q}` : ''}${equipped ? ', equipped' : ''}${overCap ? ', above car cap' : ''}${match ? ', has a match' : ''}`;
+    return `<div class="part q-${p.q}${equipped ? ' equipped' : ''}${overCap ? ' over-cap' : ''}${match ? ' has-match' : ''}" aria-label="${label}">${partSvg(p.f, p.t, p.q)}<span class="tier">${p.t}</span>${q}<span class="fam" style="background:${FAMILIES[p.f].color}"></span></div>`;
   }
 
   render(anim: Map<string, string[]> = new Map()) {
@@ -148,8 +148,11 @@ export class GarageView implements View {
     const lo = computeLoadout(s);
     const eqIds = new Set(Object.values(lo.equipped).map((p) => p!.id));
     const cap = carById(s.activeCar).cap;
+    // usable matches: any family+tier held twice below the top tier
+    const counts = new Map<string, number>();
+    for (const p of B.allParts(s)) if (p.t < MAX_TIER) counts.set(`${p.f}${p.t}`, (counts.get(`${p.f}${p.t}`) ?? 0) + 1);
     const paint = (cell: HTMLButtonElement, p: Part | null, key: string) => {
-      const html = p ? this.partHtml(p, eqIds.has(p.id), p.t > cap) : '';
+      const html = p ? this.partHtml(p, eqIds.has(p.id), p.t > cap, (counts.get(`${p.f}${p.t}`) ?? 0) > 1) : '';
       if (cell.dataset.html !== html) {
         cell.innerHTML = html;
         cell.dataset.html = html;
@@ -294,15 +297,57 @@ export class GarageView implements View {
   private renderHint() {
     const s = this.s;
     let t = '';
+    if (B.freeSlots(s) === 0 && s.stats.milestones.firstMerge) {
+      // full bench: offer the recovery action itself, not just advice
+      const pair = this.anyPair();
+      const junk = this.lowestScrap();
+      const label = pair ? 'Board full · Show a pair to merge' : junk ? `Board full · Scrap a T${B.getPart(s, junk)!.t} ${FAMILIES[B.getPart(s, junk)!.f].name} (+${B.scrapValue(B.getPart(s, junk)!)})` : 'Board full';
+      if (this.hintEl.dataset.k !== label) {
+        this.hintEl.dataset.k = label;
+        this.hintEl.replaceChildren(h('button', { class: 'btn sm recover', onclick: () => {
+          const p2 = this.anyPair();
+          if (p2) { this.setSel(p2[0]); this.cellFor(p2[1])?.firstElementChild?.classList.add('pop'); return; }
+          const j = this.lowestScrap();
+          if (j) this.requestScrap(j);
+        } }, label));
+      }
+      this.raceBtn.classList.remove('pulse');
+      return;
+    }
+    if (this.hintEl.dataset.k) { delete this.hintEl.dataset.k; this.hintEl.textContent = ''; }
     if (!s.stats.milestones.firstMerge) t = 'Drag one Engine onto the other to merge them';
     else if (s.stats.races === 0 && !s.pendingRace) t = 'Merged! Tap Race to earn cash and Rep';
-    else if (B.freeSlots(s) === 0) t = 'Board full. Merge a pair or scrap a part';
     else if (this.sel) {
       const part = B.getPart(s, this.sel);
       if (part) t = `T${part.t} ${FAMILIES[part.f].name} selected. Tap a matching part.`;
     } else if (s.nitro > 0 && !s.tips.nitro) t = `Nitro ready. Use it when the race button turns amber.`;
     if (this.hintEl.textContent !== t) this.hintEl.textContent = t;
     this.raceBtn.classList.toggle('pulse', !!s.stats.milestones.firstMerge && s.stats.races === 0);
+  }
+
+  private anyPair(): [SlotRef, SlotRef] | null {
+    const s = this.s;
+    const refs: SlotRef[] = [...s.board.map((_, i) => ({ zone: 'board' as const, i })), ...s.tray.map((_, i) => ({ zone: 'tray' as const, i }))];
+    for (let a = 0; a < refs.length; a++) for (let b = a + 1; b < refs.length; b++) {
+      if (B.canFuse(B.getPart(s, refs[a]), B.getPart(s, refs[b]))) return refs[a].zone === 'tray' ? [refs[a], refs[b]] : [refs[b], refs[a]];
+    }
+    return null;
+  }
+
+  /** Lowest-value part that is not equipped and not the current goal family. */
+  private lowestScrap(): SlotRef | null {
+    const s = this.s;
+    const eq = new Set(Object.values(computeLoadout(s).equipped).map((p) => p!.id));
+    const goal = P.goalStatus(s);
+    let best: { r: SlotRef; v: number } | null = null;
+    const refs: SlotRef[] = [...s.tray.map((_, i) => ({ zone: 'tray' as const, i })), ...s.board.map((_, i) => ({ zone: 'board' as const, i }))];
+    for (const r of refs) {
+      const p = B.getPart(s, r);
+      if (!p || eq.has(p.id)) continue;
+      const v = p.t * 10 + (goal && !goal.keystoneDone && p.f === goal.family ? 100 : 0);
+      if (!best || v < best.v) best = { r, v };
+    }
+    return best?.r ?? null;
   }
 
   // ---------------- Events → animations ----------------

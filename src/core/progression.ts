@@ -136,11 +136,29 @@ export function buyUpgrade(s: GameState, id: 'grid' | 'printer' | 'crateTier'): 
 
 // ---------------- Events & payouts ----------------
 
-export function eventUnlocked(s: GameState, e: RaceEvent): { ok: boolean; why: string } {
-  if (e.requires.car && !s.owned.includes(e.requires.car)) return { ok: false, why: `Unlock the ${carById(e.requires.car).name}` };
+export function eventUnlocked(s: GameState, e: RaceEvent): { ok: boolean; why: string; switchCar?: CarId } {
+  if (e.requires.car && !s.owned.includes(e.requires.car)) return { ok: false, why: `Unlock the ${carById(e.requires.car).model}` };
   if (e.requires.beatBoss && !s.bosses.includes(e.requires.beatBoss)) return { ok: false, why: 'Beat Rusty Ray to open the Suburbs' };
   if (e.requires.rep && s.rep < e.requires.rep) return { ok: false, why: `${e.requires.rep - s.rep} more Rep` };
+  if (e.carOnly && s.activeCar !== e.carOnly) return { ok: false, why: `${carById(e.carOnly).model} only`, switchCar: e.carOnly };
   return { ok: true, why: '' };
+}
+
+/** One short reason to run this event now, from the player's own situation. */
+export function eventReason(s: GameState, e: RaceEvent): string {
+  const u = eventUnlocked(s, e);
+  if (!u.ok) return u.why;
+  const g = goalStatus(s);
+  if (e.boss && !s.bosses.includes(e.boss.rival)) return `Beat Rusty Ray for his ${e.boss.reward.blueprint} paint and to open the Suburbs`;
+  if (!s.events[e.id]?.wins) {
+    const fam = g && !g.keystoneDone ? ` ${FAMILIES[g.family].name}` : '';
+    return `First win: +$${e.firstClear.cash} and ${e.firstClear.crates}${fam} crates${fam ? ` toward the ${g!.car.model}` : ''}`;
+  }
+  const sig = SIGNATURE_FINISHES[s.activeCar];
+  if (sig && !s.livePodiums.includes(s.activeCar)) return `A live top-3 earns the ${sig.name} finish for your ${carById(s.activeCar).model}`;
+  if (g && s.rep < g.repNeed) return `Win for ${e.payout.rep[0]} Rep · ${g.repNeed - s.rep} more unlocks the ${g.car.model}`;
+  const best = s.events[e.id]?.bestTime;
+  return best ? `Beat your record of ${best.toFixed(2)} s` : `Pays $${e.payout.cash[0]} for a win`;
 }
 
 export const canQuickRace = (s: GameState, e: RaceEvent) =>
@@ -192,11 +210,12 @@ export function adviceText(s: GameState, o: LeanOutcome): string {
   const fam = FAMILIES[a.family];
   const eq = lo.equipped[a.family];
   const have = eq ? eq.t : 0;
-  const where = a.lost > 0.05 ? `You lost ${a.lost.toFixed(1)} s on the ${a.segment}. ` : '';
-  if (have < cls.cap) return `${where}Craft a T${have + 1} ${fam.name} to improve ${fam.statLabel.toLowerCase()}.`;
+  const lost = a.lost > 0.05 ? ` — you lost ${a.lost.toFixed(1)} s there` : '';
+  if (have < cls.cap) return `Build a T${have + 1} ${fam.name} for the ${a.segment}${lost}.`;
+  if (o.perfects === 0) return `Tap nitro inside the amber windows: a Perfect boost is 1.5× stronger${lost}.`;
   const g = goalStatus(s);
-  if (g) return `${where}${fam.name} is at the ${cls.name} cap (T${cls.cap}). ${g.line}.`;
-  return `${where}Use nitro in the amber windows for a Perfect boost.`;
+  if (g) return `${fam.name} is maxed for the ${cls.model} (T${cls.cap})${lost}. ${g.line}.`;
+  return `Your ${fam.name.toLowerCase()} is maxed${lost}. Hit every amber window for Perfect boosts.`;
 }
 
 export interface CommitInput {

@@ -134,6 +134,16 @@ export class ShowroomView implements View {
         class: 'btn finish-choice', 'data-finish': item.value ?? '', onclick: () => applyFinish(item.value),
       }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), item.name));
     }
+    const lockedFinishes = [
+      ...(sig && !state.livePodiums.includes(id) ? [{ name: sig.name, paint: sig.paint, how: 'Top 3 in a live race with this car' }] : []),
+      ...(!state.blueprints.includes(RAY_FINISH.name) ? [{ name: RAY_FINISH.name, paint: RAY_FINISH.paint, how: 'Beat Rusty Ray in a live race' }] : []),
+    ];
+    for (const item of lockedFinishes) {
+      finishButtons.append(h('button', {
+        class: 'btn finish-choice locked', 'aria-disabled': 'true', 'aria-label': `${item.name}, locked: ${item.how}`,
+        onclick: () => this.app.toast(`${item.name}: ${item.how}`),
+      }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), `🔒 ${item.name}`));
+    }
     const updateFinish = () => {
       const paint = this.app.game.state.paints[id] ?? '';
       const name = options.find((option) => (option.value ?? '') === paint)?.name ?? 'Custom';
@@ -159,13 +169,19 @@ export class ShowroomView implements View {
         h('span', { class: 'chip' }, `Grip ${loadout.grip.toFixed(2)}`)),
       state.badges.length && id === 'beater' ? h('div', { class: 'badges' }, ...state.badges.map((badge) => h('span', { class: 'badge-pill' }, badge))) : null,
       finishName, finishButtons,
-      sig && !state.livePodiums.includes(id) ? h('p', { class: 'finish-goal' }, `Place in the top 3 in a live race with this car to earn ${sig.name}.`) : null,
-      h('button', { class: 'btn primary wide inspect-race', onclick: () => {
-        this.app.game.setActiveCar(id);
-        close();
-        this.app.go('race');
-      } }, active ? 'Browse races' : 'Race this car'),
+      sig && !state.livePodiums.includes(id) ? h('p', { class: 'finish-goal' }, `Earn ${sig.name}: finish top 3 in a live race with this car.`) : null,
+      h('div', { class: 'inspect-actions' },
+        h('button', { class: 'btn', onclick: () => {
+          close();
+          this.app.replayReveal(id);
+        } }, 'Replay reveal'),
+        h('button', { class: 'btn primary inspect-race', onclick: () => {
+          if (!active) { this.app.game.setActiveCar(id); this.app.toast(`Racing the ${car.model} · parts up to T${car.cap} equip`); }
+          close();
+          this.app.go('race');
+        } }, 'Race this car')),
     ));
+    void active;
     const close = () => {
       dialog.remove();
       this.closeDialog = null;

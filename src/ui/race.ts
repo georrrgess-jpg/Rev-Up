@@ -4,7 +4,7 @@ import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
 import { RaceSetup, RaceSim } from '../core/race';
 import type { LastResult } from '../core/state';
-import { DISTRICTS, EVENTS, NITRO_CAP, RACE, RIVALS, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
+import { DISTRICTS, EVENTS, NITRO_CAP, RACE, RIVALS, RaceEvent, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
 import { carLengthM, drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h, ordinal } from './dom';
@@ -52,53 +52,69 @@ export class RaceView implements View {
       { paint: paint ?? cls.paint, trim: cls.trim, livery: finishStripe(s.activeCar, paint) });
 
     const rec = P.recommendedEvent(s);
-    const out: HTMLElement[] = [];
-    const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details[open]')).map((detail) => detail.dataset.event));
+    const q = s.pendingQuick;
+    const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details[open]')).map((d) => d.dataset.event));
+    const nitroNote = s.nitro ? `${s.nitro} nitro` : s.stats.races === 0 ? 'starter nitro' : 'no nitro';
+    const details = (e: RaceEvent) => {
+      const pay = e.payout;
+      return h('details', { class: 'event-detail', 'data-event': e.id, ...(expanded.has(e.id) ? { open: '' } : {}) },
+        h('summary', {}, 'Rivals and payouts'),
+        h('p', {}, e.blurb),
+        h('div', { class: 'rivals' }, ...e.rivals.map((id) => RIVALS[id]).map((r) => h('div', {}, h('b', {}, r.name), ` · ${r.line}`))),
+        h('p', {}, `Every place pays: ${[0, 1, 2, 3].map((i) => `${ordinal(i + 1)} $${pay.cash[i]} · ${pay.rep[i]} Rep`).join(' — ')}.`),
+        e.boss ? h('p', { class: 'event-bonus' }, `First win: ${e.boss.reward.blueprint} paint, “${e.boss.reward.badge}” badge, $${e.boss.reward.cash} and ${e.boss.reward.crates} crates.`) : null);
+    };
+    const quickBtn = (e: RaceEvent, small: boolean) => {
+      if (!P.canQuickRace(s, e)) return null;
+      const here = q?.eventId === e.id;
+      return h('button', { class: `btn${small ? ' sm' : ''}${q && !here ? ' off' : ''}`, onclick: () => this.startQuick(e.id) },
+        here ? `Crew ${Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000))} s` : small ? 'Quick' : h('span', { class: 'stack' }, 'Quick Race', h('small', {}, 'base pay · keep merging')));
+    };
+    const course = (e: RaceEvent) => h('span', { class: 'course' }, TRACKS[e.track].course);
+
+    // Featured: one recommended event with a reason to run it now.
+    const fr = s.events[rec.id];
+    const featured = h('section', { class: 'featured', 'aria-label': 'Recommended event' },
+      h('div', { class: 'feat-label' }, 'Recommended'),
+      h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
+      h('div', { class: 'meta' }, course(rec), ` ${TRACKS[rec.track].favours}`),
+      h('p', { class: 'reason' }, P.eventReason(s, rec)),
+      h('div', { class: 'event-rewards' }, h('span', {}, `Win $${rec.payout.cash[0]}`), h('span', {}, `${rec.payout.rep[0]} Rep`),
+        rec.payout.crates[0] ? h('span', {}, `${rec.payout.crates[0]} crate${rec.payout.crates[0] > 1 ? 's' : ''}`) : null,
+        fr?.bestTime ? h('span', {}, `Record ${fr.bestTime.toFixed(2)} s`) : null),
+      h('div', { class: 'btns' },
+        h('button', { class: `btn primary${q ? ' off' : ''}`, onclick: () => this.startLive(rec.id) }, h('span', { class: 'stack' }, 'Race', h('small', {}, `live · ${nitroNote}`))),
+        quickBtn(rec, false)),
+      details(rec),
+      q?.eventId === rec.id ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null);
+
+    const out: HTMLElement[] = [featured];
+    if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));
     let district = '';
     for (const e of EVENTS) {
+      if (e.id === rec.id) continue;
       if (e.district !== district) {
         district = e.district;
         out.push(h('div', { class: 'district' }, DISTRICTS[e.district].name));
       }
       const u = P.eventUnlocked(s, e);
-      const rec2 = s.events[e.id];
-      const cleared = !!rec2?.wins;
-      const bossBeaten = e.boss && s.bosses.includes(e.boss.rival);
-      const canQuick = P.canQuickRace(s, e);
-      const q = s.pendingQuick;
-      const quickHere = q?.eventId === e.id;
-      const tags: HTMLElement[] = [];
-      if (e.id === rec.id && u.ok) tags.push(h('span', { class: 'tag' }, 'Next'));
-      if (e.boss) tags.push(h('span', { class: 'tag boss' }, bossBeaten ? 'Rival beaten' : 'Rival'));
-      if (cleared && !e.boss) tags.push(h('span', { class: 'tag done' }, '✓ Cleared'));
-      const rivals = e.rivals.map((id) => RIVALS[id]);
-      const pay = e.payout;
-      const bonus = !u.ok ? null
-        : e.boss && !bossBeaten ? `First win: ${e.boss.reward.blueprint} paint, “${e.boss.reward.badge}” badge, $${e.boss.reward.cash} and ${e.boss.reward.crates} crates`
-        : !cleared && !e.boss ? `First win: +$${e.firstClear.cash} and ${e.firstClear.crates} crates for your goal`
-        : null;
-      out.push(h('div', { class: `evt${e.id === rec.id && u.ok ? ' rec' : ''}${u.ok ? '' : ' locked'}` },
-        h('div', { class: 'top' }, h('span', { class: 'name' }, e.name), ...tags),
-        h('div', { class: 'meta' }, TRACKS[e.track].name, rec2 ? ` · Best ${ordinal(rec2.bestPlace)}${rec2.bestTime !== null ? ` · ${rec2.bestTime.toFixed(2)} s` : ''}` : ''),
-        u.ok ? h('div', { class: 'event-rewards' }, h('span', {}, `Win $${pay.cash[0]}`), h('span', {}, `${pay.rep[0]} Rep`),
-          pay.crates[0] ? h('span', {}, `${pay.crates[0]} ${pay.crates[0] > 1 ? 'crates' : 'crate'}`) : null,
-          e.id === 'foundry-final' && !cleared ? h('span', {}, 'Finale') : null) : null,
-        u.ok
-          ? h('div', { class: 'btns' },
-            h('button', { class: `btn primary${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, h('span', { class: 'stack' }, 'Race', h('small', {}, s.nitro ? `with ${s.nitro} nitro` : s.stats.races === 0 ? 'Starter nitro included' : 'No nitro banked'))),
-            canQuick ? h('button', { class: `btn${q ? ' off' : ''}`, onclick: () => this.startQuick(e.id) },
-              h('span', { class: 'stack' }, quickHere ? 'Crew racing' : 'Quick Race', h('small', {}, quickHere ? `${Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000))} s left` : 'base payout · keep merging'))) : null)
-          : h('div', { class: 'lock-reason' }, u.why),
-        u.ok ? h('details', { class: 'event-detail', 'data-event': e.id, ...(expanded.has(e.id) ? { open: '' } : {}) },
-          h('summary', {}, 'Event details'),
-          h('p', {}, e.blurb),
-          h('div', { class: 'rivals' }, ...rivals.map((r) => h('div', {}, h('b', {}, r.name), ` · ${r.line}`))),
-          h('p', {}, `All places pay. 4th earns $${pay.cash[3]} and ${pay.rep[3]} Rep.`),
-          bonus ? h('p', { class: 'event-bonus' }, bonus) : null) : null,
-        quickHere ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null,
-      ));
+      const r = s.events[e.id];
+      const status = !u.ok ? `🔒 ${u.why}`
+        : e.boss && s.bosses.includes(e.boss.rival) ? `Rival beaten${r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
+        : r?.wins ? `✓ Won${r.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
+        : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : `First win +$${e.firstClear.cash} · ${e.firstClear.crates} crates`;
+      const action = u.ok
+        ? h('div', { class: 'row-btns' }, quickBtn(e, true), h('button', { class: `btn sm${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
+        : u.switchCar && s.owned.includes(u.switchCar)
+          ? h('button', { class: 'btn sm', onclick: () => { this.app.game.setActiveCar(u.switchCar!); this.app.toast(`Racing the ${carById(u.switchCar!).model}`); this.render(); } }, `Use ${carById(u.switchCar).model}`)
+          : null;
+      out.push(h('div', { class: `evt-row${u.ok ? '' : ' locked'}` },
+        h('div', { class: 'row-main' },
+          h('div', { class: 'name' }, e.name, e.carOnly ? h('span', { class: 'tag' }, 'Class event') : null),
+          h('div', { class: 'meta' }, course(e), ` ${status}`)),
+        action,
+        u.ok || u.switchCar ? details(e) : null));
     }
-    if (!s.lastResult && s.stats.races === 0) out.unshift(h('p', { class: 'pay', style: 'margin:6px 2px' }, 'Every finish pays cash and Rep. Win an event live once to unlock Quick Race for it.'));
     const scroll = this.list.scrollTop;
     this.list.replaceChildren(...out);
     this.list.scrollTop = scroll;

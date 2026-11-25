@@ -160,6 +160,18 @@ export class App {
     this.root.append(this.reveal.el);
   }
 
+  /** Replay a car's unveil from the Showroom without touching the save. */
+  replayReveal(car: NonNullable<Game['state']['pendingReveal']>) {
+    if (this.reveal) return;
+    this.busy = true;
+    this.reveal = new RevealOverlay(this, car, () => {
+      this.reveal = null;
+      this.busy = false;
+      this.views[this.route].show();
+    }, true);
+    this.root.append(this.reveal.el);
+  }
+
   toast(msg: string, action?: { label: string; run: () => void }, ms = 3200) {
     this.toastEl?.remove();
     clearTimeout(this.toastTimer);

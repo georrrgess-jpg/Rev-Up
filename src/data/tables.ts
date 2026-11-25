@@ -191,11 +191,14 @@ export interface Track {
   district: DistrictId;
   segments: Segment[];
   theme: 'scrap' | 'suburb';
+  /** Short player-facing course type and the part family it rewards. */
+  course: string;
+  favours: string;
 }
 
 export const TRACKS: Record<Track['id'], Track> = {
   scrapyard: {
-    id: 'scrapyard', name: 'Scrapyard Strip', district: 'scrapyard', theme: 'scrap',
+    id: 'scrapyard', name: 'Scrapyard Strip', district: 'scrapyard', theme: 'scrap', course: 'Drag launch · one bend', favours: 'Turbo off the line',
     segments: [
       { type: 'launch', length: 80 },
       { type: 'straight', length: 150, window: [0.15, 0.5] },
@@ -204,7 +207,7 @@ export const TRACKS: Record<Track['id'], Track> = {
     ],
   },
   maple: {
-    id: 'maple', name: 'Maple Highway', district: 'suburbs', theme: 'suburb',
+    id: 'maple', name: 'Maple Highway', district: 'suburbs', theme: 'suburb', course: 'Highway · long straights', favours: 'Engine top speed',
     segments: [
       { type: 'launch', length: 70 },
       { type: 'highway', length: 230, window: [0.15, 0.45] },
@@ -213,7 +216,7 @@ export const TRACKS: Record<Track['id'], Track> = {
     ],
   },
   foundry: {
-    id: 'foundry', name: 'Foundry Circuit', district: 'suburbs', theme: 'scrap',
+    id: 'foundry', name: 'Foundry Circuit', district: 'suburbs', theme: 'scrap', course: 'Tight bends', favours: 'Tires through the bends',
     segments: [
       { type: 'launch', length: 85 },
       { type: 'bend', length: 100, radius: 49 },
@@ -238,6 +241,9 @@ export interface Rival {
 }
 
 export const RIVALS: Record<string, Rival> = {
+  nell: { id: 'nell', name: 'Nell Rivet', car: 'junker', paint: '#5e7d4a', line: 'Built her Tapeback from three others. Knows every bolt.', stats: { top: 32.0, accel: 4.45, grip: 0.8 } },
+  oz: { id: 'oz', name: 'Oz Kowalski', car: 'junker', paint: '#8c5a7a', line: 'Runs a tow truck by day and this by night.', stats: { top: 31.6, accel: 4.3, grip: 0.82 } },
+  pip: { id: 'pip', name: 'Pip Marlowe', car: 'junker', paint: '#c48a3a', line: 'Seventeen, fearless, and still on her learner plates.', stats: { top: 31.3, accel: 4.5, grip: 0.77 } },
   gus: { id: 'gus', name: 'Gus Grimm', car: 'junker', paint: '#7d8c8f', line: 'Learned to drive in a forklift. Still brakes like one.', stats: { top: 29.6, accel: 3.75, grip: 0.7 } },
   dex: { id: 'dex', name: 'Dex', car: 'junker', paint: '#6f7f5a', line: 'Drives everything like it’s stolen. It usually is.', stats: { top: 30.5, accel: 3.9, grip: 0.72 } },
   mo: { id: 'mo', name: 'Mo Patch', car: 'junker', paint: '#8a6d9e', line: 'Fixes cars with chewing gum and optimism.', stats: { top: 31.2, accel: 4.0, grip: 0.73 } },
@@ -260,6 +266,8 @@ export interface RaceEvent {
   payout: { cash: number[]; rep: number[]; crates: number[] }; // by placement 1..4
   firstClear: { cash: number; crates: number };
   requires: { rep?: number; car?: CarId; beatBoss?: string };
+  /** Class-limited invitational: only this car may enter. */
+  carOnly?: CarId;
   boss?: { rival: string; reward: { cash: number; crates: number; blueprint: string; badge: string } };
   blurb: string;
 }
@@ -291,6 +299,11 @@ export const EVENTS: RaceEvent[] = [
     id: 'maple-mile', name: 'Maple Mile', district: 'suburbs', track: 'maple', rivals: ['priya', 'hank', 'sol'],
     payout: { cash: [200, 140, 105, 80], rep: [32, 22, 16, 12], crates: [2, 1, 1, 1] }, firstClear: { cash: 180, crates: 3 },
     requires: { beatBoss: 'ray', rep: 330 }, blurb: 'Top-speed country. Engines rule the highway.',
+  },
+  {
+    id: 'tapeback-trophy', name: 'Tapeback Trophy', district: 'scrapyard', track: 'scrapyard', rivals: ['nell', 'oz', 'pip'], carOnly: 'junker',
+    payout: { cash: [120, 85, 62, 46], rep: [14, 10, 8, 6], crates: [2, 1, 1, 0] }, firstClear: { cash: 150, crates: 3 },
+    requires: { car: 'beater' }, blurb: 'Tapebacks only. Bring your first car back for a grudge match.',
   },
   {
     id: 'foundry-final', name: 'Foundry Invitational', district: 'suburbs', track: 'foundry', rivals: ['hank', 'sol', 'priya'],
