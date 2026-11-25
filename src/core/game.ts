@@ -186,6 +186,7 @@ export class Game {
         seed: d.pendingRace!.seed,
         player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: d.paints[d.activeCar] ?? cls.paint, perfectMul: cls.perfectMul },
         nitroCharges: d.nitro + CREW_NITRO,
+        rivalShift: P.rivalShiftFor(raced), // tuned per event: clean rivals from the Coastal Highway on
         windowScale: d.stats.races === 0 ? 1.6 : 1, // the first race is practice: wider windows
       };
       return [];
@@ -210,7 +211,7 @@ export class Game {
       const r = P.reserveQuick(d, eventId);
       if (!r.ok) return [{ type: 'invalid', reason: r.why }];
       const lo = computeLoadout(d, d.activeCar, undefined, eventById(eventId).partCap);
-      const sim = new RaceSim({ eventId, seed: r.seed, player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: '#fff' }, nitroCharges: 0 });
+      const sim = new RaceSim({ eventId, seed: r.seed, player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: '#fff' }, nitroCharges: 0, rivalShift: P.rivalShiftFor(eventById(eventId)) });
       const out = sim.finish();
       const dur = (out.playerTime ?? sim.t) * 1000;
       d.pendingQuick = { id: r.seed, eventId, car: d.activeCar, startedAt: now, endsAt: now + dur, outcome: leanOutcome(out) };

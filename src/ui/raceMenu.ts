@@ -17,7 +17,6 @@ import { openFitParts } from './fit';
 import { RaceScreen } from './raceScreen';
 
 /** Speed-trap thresholds and records are stored in km/h until the stage-2 tables move to mph: show them in mph. */
-const trapMph = (kmh: number) => mph(kmh / 3.6);
 
 export class RaceView implements View {
   el: HTMLElement;
@@ -114,8 +113,8 @@ export class RaceView implements View {
     const reasonFor = (e: RaceEvent) => {
       if (e.speedTrap) {
         const m = s.medals?.[e.id] ?? 0;
-        const best = s.events[e.id]?.bestSpeed;
-        return m >= 3 ? `Gold won${best ? ` · record ${trapMph(best)} mph` : ''}` : `${['Bronze', 'Silver', 'Gold'][m]} at ${trapMph([e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m])} mph through the gate${best ? ` · best ${trapMph(best)} mph` : ''}`;
+        const best = s.events[e.id] ? P.bestTrapMph(s.events[e.id]) : 0;
+        return m >= 3 ? `Gold won${best ? ` · record ${best} mph` : ''}` : `${['Bronze', 'Silver', 'Gold'][m]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m]} mph through the gate${best ? ` · best ${best} mph` : ''}`;
       }
       return P.eventReason(s, e);
     };
@@ -157,7 +156,7 @@ export class RaceView implements View {
     const openSections = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.district-sec[open]')).map((dd) => dd.dataset.district));
     const firstRender = !this.list.querySelector('details.district-sec');
     // campaign order first; any district added later (stage-2 endgame) follows in table order
-    const order: string[] = ['scrapyard', 'suburbs', 'meets', 'trials', 'coastal', 'downtown'];
+    const order: string[] = ['scrapyard', 'suburbs', 'meets', 'trials', 'coastal', 'downtown', 'desert', 'summit'];
     for (const e of EVENTS) if (!order.includes(e.district)) order.push(e.district);
     const medalName = ['', 'Bronze', 'Silver', 'Gold'];
     const sections: { el: HTMLElement; locked: boolean }[] = [];
@@ -180,7 +179,7 @@ export class RaceView implements View {
         const medal = s.medals?.[e.id] ?? 0;
         const status = !u.ok && !u.switchCar ? `🔒 ${u.why}`
           : e.knockout ? (s.knockout ? `Through to heat ${s.knockout.heat + 1} of ${e.knockout.heats.length}` : r?.wins ? `✓ Champion ×${r.wins}` : 'Three heats · knockout')
-          : e.speedTrap ? `${medal ? `${medalName[medal]} · ` : ''}${medal < 3 ? `${medalName[medal + 1]} at ${trapMph([e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][medal])} mph` : 'all medals'}${r?.bestSpeed ? ` · best ${trapMph(r.bestSpeed)} mph` : ''}`
+          : e.speedTrap ? `${medal ? `${medalName[medal]} · ` : ''}${medal < 3 ? `${medalName[medal + 1]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][medal]} mph` : 'all medals'}${r && P.bestTrapMph(r) ? ` · best ${P.bestTrapMph(r)} mph` : ''}`
           : e.timeAttack ? (medal ? `${medalName[medal]}${medal < 3 ? ` · ${medalName[medal + 1]} at ${[e.timeAttack.bronze, e.timeAttack.silver, e.timeAttack.gold][medal].toFixed(2)} s` : ' · all medals'}` : `Bronze at ${e.timeAttack.bronze.toFixed(2)} s`) + (r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : '')
           : e.boss && s.bosses.includes(e.boss.rival) ? `Rival beaten${r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
           : r?.wins ? `✓ Won · win pays $${e.payout.cash[0]} and ${e.payout.rep[0]} Rep`

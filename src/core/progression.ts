@@ -588,7 +588,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   addEffort(s, RACE_EFFORT, events);
   checkUnlocks(s, events);
   openCrates(s).forEach((ev) => events.push(ev));
-  const result: LastResult & { trapMph?: number; earnedStyle?: string[] } = {
+  const result: LastResult = {
     raceId: input.raceId, eventId: e.id, place: o.place, mode: input.mode, time: o.playerTime, gapText: o.gapText,
     cash: pay.cash + bossCash + medalCash + starPay, rep: pay.rep, crates: pay.crates + (pay.bossReward?.crates ?? 0) + medalCrates, precision: pay.precision,
     firstClear: pay.firstClear, boss: pay.boss, perfects: o.perfects, nitroUsed: input.mode === 'live' ? o.nitroUsed : 0,

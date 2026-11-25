@@ -3,8 +3,7 @@
 // now stands against the next threshold, and — separately — any craft or race win the next car still needs.
 import * as P from '../core/progression';
 import type { LastResult } from '../core/state';
-import { mph } from '../core/units';
-import { FAMILIES, MEDAL_REWARDS, RIVALS, SIGNATURE_FINISHES, carById, eventById } from '../data/tables';
+import { FAMILIES, MEDAL_REWARDS, styleItem, RIVALS, SIGNATURE_FINISHES, carById, eventById } from '../data/tables';
 import type { App } from './app';
 import { repMilestones } from './app';
 import { fitStatus } from './benefit';
@@ -14,7 +13,6 @@ import { openFitParts } from './fit';
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
 /** The speed trap reports km/h until the stage-2 sim change; players only ever see mph. */
-const trapMph = (kmh: number) => mph(kmh / 3.6);
 
 export interface ResultOpts {
   onClose: () => void;
@@ -61,11 +59,12 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
   const card = h('div', { class: `card${tierCls}`, role: 'dialog', 'aria-label': 'Race result' },
     h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, ev.speedTrap ? (r.medal ? `${MEDAL_NAMES[r.medal]} run` : 'Run complete') : ev.timeAttack ? (r.medal ? `${MEDAL_NAMES[r.medal]} time` : 'Run complete') : r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
     h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
-    r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ({ ray: ' The Suburbs are open.', vale: ' The coast road is yours.', nova: ' Downtown is yours.' } as Record<string, string>)[ev.boss.rival] ?? '', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
+    r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ({ ray: ' The Suburbs are open.', vale: ' The coast road is yours.', nova: ' Downtown is yours.', sable: ' The canyon is yours.', iver: ' The summit is yours — the whole ladder is beaten.' } as Record<string, string>)[ev.boss.rival] ?? '', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
     r.newMedals?.length ? h('div', { class: 'finish-earned medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), h('div', {}, h('strong', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal`), h('div', {}, r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ') + ' · paid once'))) : null,
-    r.nextMedal ? h('p', { class: 'explain' }, r.trapKmh ? `${r.nextMedal.name} at ${trapMph(r.nextMedal.target)} mph — ${Math.max(0, trapMph(r.nextMedal.target) - trapMph(r.trapKmh))} mph to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
+    r.nextMedal ? h('p', { class: 'explain' }, (r.trapMph ?? r.trapKmh) ? `${r.nextMedal.name} at ${r.nextMedal.target} mph — ${Math.max(0, Math.round(r.nextMedal.gap))} mph to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
     r.newStars?.length ? h('div', { class: 'finish-earned stars-earned' }, h('span', { class: 'star-ico', 'aria-hidden': 'true' }, '★'), h('div', {}, h('strong', {}, `${r.newStars.length} new goal${r.newStars.length > 1 ? 's' : ''}: ${r.newStars.join(', ')}`), h('div', {}, `${P.starsIn(s)} Downtown stars`))) : null,
-    r.trapKmh ? h('div', { class: 'trap' }, h('span', { class: 'num' }, `${trapMph(r.trapKmh)}`), h('small', {}, 'mph through the gate')) : null,
+    (r.trapMph ?? r.trapKmh) ? h('div', { class: 'trap' }, h('span', { class: 'num' }, `${r.trapMph ?? Math.round((r.trapKmh ?? 0) / 1.609344)}`), h('small', {}, 'mph through the gate')) : null,
+    r.earnedStyle?.length ? h('div', { class: 'finish-earned' }, h('span', { 'aria-hidden': 'true' }, '🎨'), h('div', {}, h('strong', {}, r.earnedStyle.map((id) => styleItem(id)?.name ?? id).join(', ')), h('div', {}, 'Earned — apply it in the Showroom Paint shop'))) : null,
     r.heat ? h('div', { class: `heat-result${r.heat.champion ? ' champ' : r.heat.advanced ? ' through' : ' out'}` },
       r.heat.champion ? `Main Event champion!` : r.heat.advanced ? `Through! Next: ${r.heat.next}` : `Knocked out in ${r.heat.name}. Change cars, build, and start again from heat 1.`) : null,
     r.trophy ? h('div', { class: 'finish-earned' }, h('span', { class: 'trophy-ico', 'aria-hidden': 'true' }, '🏆'), h('div', {}, h('strong', {}, r.trophy), h('div', {}, 'Class trophy added to the Showroom'))) : null,

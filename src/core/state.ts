@@ -40,8 +40,10 @@ export interface EventRecord {
   starts: number;
   bestPlace: number;
   bestTime: number | null;
-  /** Speed trap record (km/h). */
+  /** Speed trap record: km/h written by builds before 1.5 (read via progression.bestTrapMph). */
   bestSpeed?: number;
+  /** Speed trap record, mph. */
+  bestMph?: number;
 }
 
 export interface LastResult {
@@ -66,8 +68,12 @@ export interface LastResult {
   trophy?: string;
   /** Event goals newly met this race. */
   newStars?: string[];
-  /** Speed trap: km/h through the gate. */
+  /** Speed trap: km/h through the gate (kept for older readers). */
   trapKmh?: number;
+  /** Speed trap: mph through the gate. */
+  trapMph?: number;
+  /** Paint shop items earned by this race (e.g. a livery). */
+  earnedStyle?: string[];
   /** Knockout heat result. */
   heat?: { name: string; n: number; of: number; advance: number; advanced: boolean; champion: boolean; next?: string };
   signatureFinish?: CarId;
