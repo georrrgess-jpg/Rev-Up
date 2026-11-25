@@ -18,7 +18,9 @@ describe.skipIf(!process.env.PROBE)('rival pace tuner', () => {
       const cat = CATEGORY[t.cat];
       const tWin = Math.max(...cat.win.map((i) => playerTime(id, b, i)), ...cat.tuned.map((i) => playerTime(id, b, i, 3)));
       const tLose = cat.lose.length ? Math.min(...cat.lose.map((i) => playerTime(id, b, i))) : tWin + 0.6;
-      const target = (tWin + tLose) / 2;
+      // prefer that the `soft` inputs (ordinary shifts, no nitro) lose too, when the window allows it
+      const soft = Math.min(Infinity, ...(cat.soft ?? []).map((i) => playerTime(id, b, i)));
+      const target = Math.max(tWin + Math.min(0.15, (tLose - tWin) / 2), Math.min((tWin + tLose) / 2, soft - 0.12));
       const base = e.rivals.map((r) => ({ ...RIVALS[r].stats }));
       const apply = (m: number) => e.rivals.forEach((r, i) => { RIVALS[r].stats = { top: base[i].top * m, accel: base[i].accel * m, grip: base[i].grip * m }; });
       let lo = 0.6, hi = 1.6;

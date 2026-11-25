@@ -91,12 +91,12 @@ export const LADDER_BUILDS: Record<string, Build[]> = {
 export type Input = [ShiftPolicy, Nitro];
 // `tuned`: inputs that must win once the car has all three Tune-up stages (the cash route for players who miss
 // shifts and boosts), so nobody is stuck for good.
-export const CATEGORY: Record<'open' | 'early' | 'late' | 'stock' | 'boss', { win: Input[]; lose: Input[]; tuned: Input[] }> = {
+export const CATEGORY: Record<'open' | 'early' | 'late' | 'stock' | 'boss', { win: Input[]; lose: Input[]; tuned: Input[]; soft?: Input[] }> = {
   open: { win: [['ordinary', 'late']], lose: [['missed', 'none'], ['ordinary', 'none']], tuned: [['missed', 'none']] },
   early: { win: [['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'none']], tuned: [['missed', 'none']] },
-  late: { win: [['clean', 'perfect'], ['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none']] },
+  late: { win: [['clean', 'perfect'], ['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none']], soft: [['ordinary', 'none']] },
   stock: { win: [['clean', 'perfect'], ['missed', 'none']], lose: [], tuned: [] }, // the base car decides it (see the class test)
-  boss: { win: [['clean', 'perfect']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none'], ['ordinary', 'perfect']] },
+  boss: { win: [['clean', 'perfect']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none'], ['ordinary', 'perfect']], soft: [['ordinary', 'none'], ['ordinary', 'late']] },
 };
 export const TARGETS: Record<string, { cat: keyof typeof CATEGORY; ref: number }> = {
   'yard-sprint': { cat: 'open', ref: 0 },

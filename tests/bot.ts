@@ -187,7 +187,7 @@ export function runBot(o: BotOpts): BotLog {
   };
 
   /** For an open course, race the owned car that is fastest there (a player reads the course type). */
-  const pickCar = (ev: RaceEvent) => {
+  const pickCar = (ev: RaceEvent, shift: ShiftPolicy, policy: NitroPolicy) => {
     const raced = ev.knockout ? eventById(ev.knockout.heats[g.state.knockout?.heat ?? 0]) : ev;
     const topCap = Math.max(...g.state.owned.map((c) => carById(c).cap));
     const cands = g.state.owned.filter((c) => carById(c).cap >= topCap - 2);
@@ -196,8 +196,8 @@ export function runBot(o: BotOpts): BotLog {
     for (const car of cands) {
       const trial = structuredClone(g.state); fitRec(trial, car);
       const lo = computeLoadout(trial, car, undefined, raced.partCap ?? ev.partCap);
-      const probe = new RaceSim({ eventId: raced.id, seed: 7, player: { name: 'p', car, stats: lo.stats, paint: '#fff', perfectMul: carById(car).perfectMul }, nitroCharges: 2, shift: 'clean', rivalShift: P.rivalShiftFor(raced), analysis: false });
-      drive(probe, 'perfect');
+      const probe = new RaceSim({ eventId: raced.id, seed: 7, player: { name: 'p', car, stats: lo.stats, paint: '#fff', perfectMul: carById(car).perfectMul }, nitroCharges: 2, shift, rivalShift: P.rivalShiftFor(raced), analysis: false });
+      drive(probe, policy);
       const tt = raced.speedTrap ? -(probe.trapSpeed ?? 0) : (probe.player.finishTime ?? 99);
       if (tt < bestT) { bestT = tt; pick = car; }
     }
@@ -261,7 +261,7 @@ export function runBot(o: BotOpts): BotLog {
     const sw = P.eventUnlocked(g.state, ev).switchCar;
     const home = g.state.activeCar;
     if (sw) g.setActiveCar(sw, now);
-    else if (!ev.carOnly) pickCar(ev);
+    else if (!ev.carOnly) pickCar(ev, o.shift === 'missed' ? 'missed' : 'clean', o.policy === 'none' ? 'none' : 'perfect'); // a player picks by how they drive
     g.fitRecommended(g.state.activeCar, now); // the Fit Parts view's one-tap recommended fit
     const setup = g.startRace(ev.id, now);
     if (!setup) { g.setActiveCar(home, now); L.waiting += 1; spend(1); continue; }
