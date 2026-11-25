@@ -409,7 +409,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
   .goal .gt { display: none; }
   .goal .gl { font-size: var(--fs-2xs); }
   .goal .bar { margin-top: 3px; height: 4px; }
-  .equip, .capnote, .benchhead { display: none !important; }
+  .equip:not(.fitstrip), .capnote, .benchhead { display: none !important; }
   .hint { font-size: var(--fs-2xs); min-height: 0; margin-top: 2px; }
   .trayrow { margin-top: 4px; }
   .actions { padding-top: 4px; }

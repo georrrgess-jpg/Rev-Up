@@ -93,7 +93,8 @@ export class Coach {
 
 const SEL = {
   goal: '[data-coach="goal"], .view.on .goal',
-  fit: '[data-coach="fit"], .view.on .equip',
+  fit: '[data-coach="fit"], .view.on .fitstrip, .view.on .equip',
+  fitNow: '.view.on .hint .fitnow',
   race: '[data-coach="race"], .view.on .actions .race',
   shop: '[data-coach="shop"], .view.on .actions button[aria-label^="Shop"]',
   mergeAll: '[data-coach="merge-all"]',
@@ -104,7 +105,7 @@ const SEL = {
   raceFit: '.view.on [data-coach="race-fit"]',
   raceQuick: '.view.on [data-coach="race-quick"], .view.on .btn.quick:not(.off)',
   shopPick: '.sheet [data-coach="shop-pick"]',
-  fitRecommended: '.sheet [data-coach="fit-recommended"]',
+  fitRecommended: '.sheet [data-coach="fit-recommended"], .sheet .fit-confirm .btn.primary:not(.off)',
 };
 
 const visible = (el: Element | null | undefined): el is HTMLElement => !!el && (el as HTMLElement).getClientRects().length > 0;
@@ -217,9 +218,9 @@ export class GuideCoach {
       }
       case 'fit': {
         const fitText = `Parts don't fit themselves. Your ${car.model} has empty slots — fit your parts so they power the car. A fitted part leaves the bench.`;
-        if (sheet) return one(this.find(SEL.fitRecommended) ?? this.find('.sheet button', /fit recommended|fit best/i), 'Fit the recommended parts, or pick each slot yourself. Fitted parts power this car and free their bench cells.');
+        if (sheet) return one(this.find(SEL.fitRecommended) ?? this.find('.sheet button', /recommended fit|fit recommended|fit best/i), 'Fit the recommended parts, or pick each slot yourself. Fitted parts power this car and free their bench cells.');
         if (route === 'race') return one(this.find(SEL.raceFit), fitText);
-        return route === 'garage' ? one(this.find(SEL.fit), `${fitText} Tap here.`) : null;
+        return route === 'garage' ? one(this.find(SEL.fitNow) ?? this.find(SEL.fit), `${fitText} Tap here.`) : null;
       }
       case 'race1': {
         if (sheet) return null;
@@ -252,7 +253,7 @@ export class GuideCoach {
       case 'betterPart':
         if (sheet) return null;
         if (route === 'race') return one(this.find(SEL.raceFit), `A better part is on your bench. Fit it to your ${car.model} before you race.`, true);
-        return route === 'garage' ? one(this.find(SEL.fit), `A better part is on your bench. Parts only help once fitted: tap here to fit it to your ${car.model}.`, true) : null;
+        return route === 'garage' ? one(this.find(SEL.fitNow) ?? this.find(SEL.fit), `A better part is on your bench. Nothing fits itself — parts only help once fitted: tap here to fit it to your ${car.model}.`, true) : null;
       case 'nitroBank':
         return sheet ? null : one(this.find(SEL.nitro), 'You banked nitro: three quick merges in a row add a charge. Banked charges add to your free crew nitro in live races.', true);
       case 'overflow':
@@ -262,7 +263,7 @@ export class GuideCoach {
       case 'mergeAll':
         return sheet || route !== 'garage' ? null : one(this.find(SEL.mergeAll) ?? this.find('.view.on .actions button', /merge all/i), 'Merge All is unlocked: one tap merges every pair on the bench. Quick manual merges still bank nitro.', true);
       case 'cap':
-        return sheet || route !== 'garage' ? null : one(this.find(SEL.fit), `Parts above the ${car.model}'s T${car.cap} limit still fit but run at T${car.cap}. Your next car gets their full power.`, true);
+        return sheet || route !== 'garage' ? null : one(this.find(SEL.fit), `Parts above the ${car.model}'s T${car.cap} limit still fit but run at T${car.cap}. Nothing fits itself: fit them to a car that takes their tier for full power.`, true);
       case 'shop':
         return null;
     }
