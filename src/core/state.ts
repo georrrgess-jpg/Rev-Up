@@ -59,6 +59,7 @@ export interface LeanOutcome {
   gapText: string;
   perfects: number;
   nitroUsed: number;
+  nitroLeft?: number;
   standings: { name: string; time: number | null; isPlayer: boolean }[];
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
 }

@@ -6,6 +6,7 @@ import { fmt, h } from './dom';
 import { GarageView } from './garage';
 import { RaceView } from './race';
 import { RevealOverlay } from './reveal';
+import { openGuide } from './guide';
 import { openSettings } from './settings';
 import { ShowroomView } from './showroom';
 import { maybeOfflineClaim } from './offline';
@@ -51,6 +52,7 @@ export class App {
       chip('scrap', 'scrap', '⚙', 'Scrap', 'Scrap'),
       chip('nitro', 'nitro', '⚡', 'Nitro', 'Banked nitro charges'),
       h('span', { class: 'spacer' }),
+      h('button', { class: 'iconbtn', 'aria-label': 'How to play', title: 'How to play', onclick: () => openGuide(this) }, '?'),
       h('button', { class: 'iconbtn', 'aria-label': 'Settings', onclick: () => openSettings(this) }, '⚙'),
     );
 

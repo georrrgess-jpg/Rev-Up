@@ -9,6 +9,8 @@ export interface RaceSetup {
   seed: number;
   player: { name: string; car: CarId; stats: RacerStats; paint: string };
   nitroCharges: number;
+  /** Practice runs widen each nitro window (1 = normal). */
+  windowScale?: number;
 }
 
 export interface Racer {
@@ -33,6 +35,8 @@ export interface RaceOutcome {
   gapText: string;
   perfects: number;
   nitroUsed: number;
+  /** Charges still unused at the finish. */
+  nitroLeft: number;
   cutoff: boolean;
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
 }
@@ -49,11 +53,11 @@ export function segmentAt(track: Track, x: number): { seg: Segment; index: numbe
 
 export interface NitroWindow { start: number; end: number; segIndex: number }
 
-export function nitroWindows(track: Track): NitroWindow[] {
+export function nitroWindows(track: Track, scale = 1): NitroWindow[] {
   const out: NitroWindow[] = [];
   let start = 0;
   track.segments.forEach((s, i) => {
-    if (s.window) out.push({ start: start + s.length * s.window[0], end: start + s.length * s.window[1], segIndex: i });
+    if (s.window) out.push({ start: start + s.length * s.window[0], end: Math.min(start + s.length, start + s.length * (s.window[0] + (s.window[1] - s.window[0]) * scale)), segIndex: i });
     start += s.length;
   });
   return out;
@@ -78,7 +82,7 @@ export class RaceSim {
     const ev = eventById(setup.eventId);
     this.track = TRACKS[ev.track];
     this.length = trackLength(this.track);
-    this.windows = nitroWindows(this.track);
+    this.windows = nitroWindows(this.track, setup.windowScale ?? 1);
     this.charges = setup.nitroCharges;
     const rng = makeRng(setup.seed);
     const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean): Racer => ({
@@ -90,6 +94,24 @@ export class RaceSim {
       const vary = () => 1 + (rng() * 2 - 1) * RACE.rivalVariance;
       this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false));
     }
+    // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured.
+    this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false);
+  }
+
+  ghost!: Racer;
+  /** Seconds gained by the most recent boost, measured against the no-nitro ghost (set when it ends). */
+  lastBoostGain: { seconds: number; perfect: boolean } | null = null;
+  private boostStart: { gap: number; perfect: boolean } | null = null;
+
+  /** Independent copy (for finishing the race off-screen while the visible one keeps running). */
+  clone(): RaceSim {
+    const c = Object.create(RaceSim.prototype) as RaceSim;
+    Object.assign(c, this);
+    const cp = (r: Racer): Racer => ({ ...r, stats: { ...r.stats }, splits: [...r.splits] });
+    (c as unknown as { racers: Racer[] }).racers = this.racers.map(cp);
+    (c as unknown as { ghost: Racer }).ghost = cp(this.ghost);
+    c.usedWindows = new Set(this.usedWindows);
+    return c;
   }
 
   get player() { return this.racers[0]; }
@@ -119,6 +141,8 @@ export class RaceSim {
     p.nitroLeft = RACE.nitroDurationS;
     p.nitroMul = perfect ? RACE.perfectMul : 1;
     if (perfect) this.perfects++;
+    this.boostStart = { gap: p.x - this.ghost.x, perfect };
+    this.lastBoostGain = null;
     return perfect ? 'perfect' : 'boost';
   }
 
@@ -175,7 +199,15 @@ export class RaceSim {
 
   step(dt = RACE.dt) {
     if (this.done) return;
+    const boosting = this.player.nitroLeft > 0;
     for (const r of this.racers) this.stepRacer(r, dt);
+    if (this.ghost.finishTime === null) this.stepRacer(this.ghost, dt);
+    if (boosting && this.player.nitroLeft <= 0 && this.boostStart) {
+      const p = this.player;
+      const metres = p.x - this.ghost.x - this.boostStart.gap;
+      this.lastBoostGain = { seconds: p.v > 1 ? metres / p.v : 0, perfect: this.boostStart.perfect };
+      this.boostStart = null;
+    }
     this.t += dt;
     if (this.racers.every((r) => r.finishTime !== null)) this.done = true;
     else if (this.t >= RACE.safetyCutoffS) {
@@ -216,7 +248,7 @@ export class RaceSim {
       else gapText = `${Math.round(first.x - p.x)} m behind first`;
     }
     return {
-      place, standings: st, playerTime: p.finishTime, gapText, perfects: this.perfects, nitroUsed: this.nitroUsed,
+      place, standings: st, playerTime: p.finishTime, gapText, perfects: this.perfects, nitroUsed: this.nitroUsed, nitroLeft: this.charges,
       cutoff: this.cutoff, advice: place === 1 ? null : this.advice(st[place - 2]),
     };
   }
@@ -260,7 +292,7 @@ export function runRace(setup: RaceSetup, policy: NitroPolicy = 'none'): RaceOut
 
 export function leanOutcome(o: RaceOutcome): LeanOutcome {
   return {
-    place: o.place, playerTime: o.playerTime, gapText: o.gapText, perfects: o.perfects, nitroUsed: o.nitroUsed,
+    place: o.place, playerTime: o.playerTime, gapText: o.gapText, perfects: o.perfects, nitroUsed: o.nitroUsed, nitroLeft: o.nitroLeft,
     standings: o.standings.map((r) => ({ name: r.name, time: r.finishTime, isPlayer: r.isPlayer })), advice: o.advice,
   };
 }

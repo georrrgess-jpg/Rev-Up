@@ -228,7 +228,8 @@ export function adviceText(s: GameState, o: LeanOutcome): string {
   const fam = FAMILIES[a.family];
   const eq = lo.equipped[a.family];
   const have = eq ? eq.t : 0;
-  const lost = a.lost > 0.05 ? ` — you lost ${a.lost.toFixed(1)} s there` : '';
+  if ((o.nitroLeft ?? 0) > 0 && o.perfects === 0) return `You finished with ${o.nitroLeft} nitro unused. Tap NITRO inside the amber zones: a Perfect boost is 1.5× stronger.`;
+  const lost = a.lost > 0.05 ? ` — you lost ${a.lost.toFixed(1)} s on the ${a.segment}` : '';
   if (have < cls.cap) return `Build a T${have + 1} ${fam.name} for the ${a.segment}${lost}.`;
   if (o.perfects === 0) return `Tap nitro inside the amber windows: a Perfect boost is 1.5× stronger${lost}.`;
   const g = goalStatus(s);

@@ -150,6 +150,7 @@ export class Game {
         seed: d.pendingRace!.seed,
         player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: d.paints[d.activeCar] ?? cls.paint },
         nitroCharges: d.nitro + CREW_NITRO,
+        windowScale: d.stats.races === 0 ? 1.6 : 1, // the first race is practice: wider windows
       };
       return [];
     }, now);
@@ -232,6 +233,10 @@ export class Game {
   }
   setSetting<K extends keyof GameState['settings']>(k: K, v: GameState['settings'][K]) {
     this.transact((d) => { d.settings[k] = v; return []; });
+  }
+  /** Replay the guide: contextual tips show again; progress-based beats stay derived from state. */
+  resetTips(now = Date.now()) {
+    this.transact((d) => { d.tips = { crates: !!d.tips.crates }; return []; }, now);
   }
   markTip(id: string) {
     if (this.state.tips[id]) return;

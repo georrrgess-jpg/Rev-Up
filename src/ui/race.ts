@@ -183,6 +183,8 @@ export class RaceView implements View {
 
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number }
 
+const sim0Launch = (sim: RaceSim) => sim.player.x < (sim.track.segments[0]?.length ?? 0) && sim.player.x > 0.5;
+
 function hash(n: number) {
   const x = Math.sin(n * 127.1) * 43758.5453;
   return x - Math.floor(x);
@@ -218,6 +220,18 @@ class RaceScreen {
   private dpr = 1;
   private reduced: boolean;
   private zoom = 0;
+  private ticker!: HTMLElement;
+  private flash!: HTMLElement;
+  private tickerTimer = 0;
+  private lastOrder = '';
+  private shake = 0;
+  private kick = 0;
+  private finishHold = 0; // real seconds shown after the player crosses the line
+  private result: LastResult | null = null;
+  private prevV: number[] = [];
+  private slowWindows = 0;
+  private goodWindows = 0;
+  private gainShown: object | null = null;
   private eventName: string;
 
   constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
@@ -247,6 +261,8 @@ class RaceScreen {
       return d;
     });
     this.callout = h('div', { class: 'callout', role: 'status', 'aria-live': 'assertive' });
+    this.ticker = h('div', { class: 'ticker', role: 'status' });
+    this.flash = h('div', { class: 'race-flash', 'aria-hidden': 'true' });
     this.nitroBtn = h('button', { class: 'nitrobtn', 'aria-label': 'Nitro' });
     this.nitroBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.tapNitro(); });
     this.nitroBtn.addEventListener('click', (e) => { if ((e as PointerEvent).pointerType === '' || e.detail === 0) this.tapNitro(); });
@@ -258,6 +274,8 @@ class RaceScreen {
         h('div', { class: 'row1' }, h('div', {}, this.posEl, this.standEl), h('div', {}, this.timeEl, h('div', { style: 'margin-top:6px;text-align:right' }, pauseBtn))),
         this.progEl),
       this.callout,
+      this.ticker,
+      this.flash,
       h('div', { class: 'nitrobar' }, this.hintEl, this.nitroBtn),
     );
     this.onKey = this.onKey.bind(this);
@@ -327,9 +345,17 @@ class RaceScreen {
 
   private tapNitro() {
     if (this.countdown > 0 || this.paused || this.finished) return;
+    const inLaunch = this.sim.track.segments[0] && this.sim.player.x < this.sim.track.segments[0].length;
     const r = this.sim.tapNitro();
-    if (r === 'perfect') { sfx.nitro(true); this.showCallout('Perfect Nitro', 'perfect'); this.burst(40, '#ffd75e'); }
-    else if (r === 'boost') { sfx.nitro(false); this.showCallout('Nitro', 'boost'); this.burst(20, '#8fd3ff'); }
+    if (r === 'perfect') {
+      sfx.nitro(true); this.showCallout('PERFECT NITRO', 'perfect'); this.burst(46, '#ffd75e');
+      if (!this.reduced) { this.kick = 1.6; this.flash.className = 'race-flash on'; setTimeout(() => (this.flash.className = 'race-flash'), 260); }
+      this.nitroBtn.classList.add('perfect-run');
+    } else if (r === 'boost') {
+      sfx.nitro(false); this.burst(20, '#8fd3ff');
+      this.showCallout(inLaunch ? 'Wheelspin — boosts work best on straights' : 'Nitro', inLaunch ? 'small' : 'boost', inLaunch ? 1400 : 900);
+      if (!this.reduced) this.kick = 0.8;
+    }
     else if (r === 'empty') this.showCallout('No nitro left', 'small');
     this.updateHud(true);
   }
@@ -351,14 +377,16 @@ class RaceScreen {
     if (this.frameTimes.length >= 60) {
       const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
       this.frameTimes = [];
-      if (avg > 0.024 && this.quality === 1) { this.quality = 0; this.resize(); }
+      if (avg > 0.024) { this.slowWindows++; this.goodWindows = 0; } else if (avg < 0.019) { this.goodWindows++; this.slowWindows = 0; }
+      if (this.slowWindows >= 2 && this.quality === 1) { this.quality = 0; this.resize(); }
+      if (this.goodWindows >= 3 && this.quality === 0) { this.quality = 1; this.resize(); }
     }
     if (!this.paused) {
       if (this.countdown > 0) {
         const before = Math.ceil(this.countdown / (this.reduced ? 0.4 : 0.8));
         this.countdown -= dt;
         const after = Math.ceil(this.countdown / (this.reduced ? 0.4 : 0.8));
-        if (this.countdown <= 0) { this.showCallout('GO!', 'perfect', 600); sfx.countdown(true); }
+        if (this.countdown <= 0) { this.showCallout('GO!', 'perfect', 600); sfx.countdown(true); if (!this.reduced) this.shake = 0.35; this.burst(24, '#c9c2b8'); }
         else if (after !== before) { this.showCallout(String(after), 'countdown'); sfx.countdown(false); }
       } else if (!this.finished) {
         this.acc += dt;
@@ -368,23 +396,69 @@ class RaceScreen {
           if (this.sim.player.finishTime !== null || this.sim.done) this.onPlayerFinish();
         }
         this.telegraph();
+        this.boostFeedback();
+      } else if (this.finishHold > 0) {
+        // rivals keep driving across the line while the result settles
+        this.acc += dt;
+        while (this.acc >= RACE.dt) { this.sim.step(RACE.dt); this.acc -= RACE.dt; }
+        this.finishHold -= dt;
+        if (this.finishHold <= 0) this.showResult(this.result);
       }
+      this.shake = Math.max(0, this.shake - dt);
+      this.kick = Math.max(0, this.kick - dt);
+      if (!this.finished && this.countdown <= 0 && sim0Launch(this.sim) && !this.reduced && Math.random() < 0.5) this.burst(2, '#bdb6ab');
       this.stepParticles(dt);
     }
     this.draw();
     if (t - this.lastHud > 100) { this.lastHud = t; this.updateHud(); }
   }
 
+  /** After each boost, show what it actually gained against the no-nitro ghost. */
+  private boostFeedback() {
+    const g = this.sim.lastBoostGain;
+    if (!g || g === this.gainShown) return;
+    this.gainShown = g;
+    this.nitroBtn.classList.remove('perfect-run');
+    if (g.seconds >= 0.01) this.tick(`${g.perfect ? 'Perfect boost' : 'Boost'}: +${g.seconds.toFixed(2)} s on the field`, g.perfect ? 'gold' : 'blue');
+  }
+
+  private tick(text: string, cls = '') {
+    this.ticker.textContent = text;
+    this.ticker.className = `ticker on ${cls}`;
+    clearTimeout(this.tickerTimer);
+    this.tickerTimer = window.setTimeout(() => { this.ticker.className = 'ticker'; }, 1500);
+  }
+
   private telegraph() {
     const { active, next } = this.sim.windowState();
     const p = this.sim.player;
     const canUse = this.sim.charges > 0 && p.nitroLeft <= 0;
-    this.nitroBtn.classList.toggle('window', !!active && canUse && !this.sim.usedWindows.has(active.segIndex));
+    const inWindow = !!active && canUse && !this.sim.usedWindows.has(active.segIndex);
+    this.nitroBtn.classList.toggle('window', inWindow);
+    const eta = !active && next && canUse && p.v > 1 ? (next.start - p.x) / p.v : Infinity;
+    const approaching = eta < 2.2;
+    this.nitroBtn.classList.toggle('approach', approaching);
+    if (approaching) {
+      this.nitroBtn.style.setProperty('--eta', String(Math.max(0, Math.min(1, 1 - eta / 2.2))));
+      this.nitroBtn.dataset.label = `WINDOW IN ${eta.toFixed(1)} s`;
+    } else if (inWindow) this.nitroBtn.dataset.label = '▲ PERFECT WINDOW';
+    // overtakes, called out once they settle (after the launch)
+    if (this.sim.t > 2) {
+      const order = this.sim.standings().map((r) => r.id).join('|');
+      if (this.lastOrder && order !== this.lastOrder) {
+        const before = this.lastOrder.split('|');
+        const now = order.split('|');
+        const me = now.indexOf('player'), was = before.indexOf('player');
+        if (me < was) this.tick(`Passed ${this.sim.racers.find((r) => r.id === before[me])?.name ?? 'a rival'} · ${ordinal(me + 1)}`, 'gold');
+        else if (me > was) this.tick(`${this.sim.racers.find((r) => r.id === now[me - 1])?.name ?? 'A rival'} passed you · ${ordinal(me + 1)}`);
+      }
+      this.lastOrder = order;
+    }
     if (active && canUse && !this.sim.usedWindows.has(active.segIndex) && !this.cueDone.has(active.segIndex)) {
       this.cueDone.add(active.segIndex);
       if (this.app.game.state.settings.nitroCue) sfx.windowCue();
       this.showCallout('TAP NITRO NOW', 'window', 700);
-    } else if (!active && next && canUse && p.v > 0 && (next.start - p.x) / p.v < 1.3 && (next.start - p.x) / p.v > 1.2) {
+    } else if (!active && next && canUse && eta < 2.0 && eta > 1.9) {
       this.showCallout('Nitro window ahead', 'window', 900);
     }
     this.hum.set(Math.min(1, p.v / (p.stats.top * 1.1)), p.nitroLeft > 0);
@@ -394,12 +468,14 @@ class RaceScreen {
     if (this.finished) return;
     this.finished = true;
     this.nitroBtn.classList.remove('window');
-    const outcome = this.sim.finish(); // fast-forward rivals
-    // Commit immediately so closing the page right now cannot lose or double the payout.
-    const res = this.app.game.commitRace(this.raceId, outcome) ?? this.app.game.state.lastResult;
+    // Finish an off-screen copy for the real result, and commit now so closing the page cannot lose or
+    // double the payout. The visible race keeps running so the crossing and the rivals' arrival are seen.
+    const outcome = this.sim.clone().finish();
+    this.result = this.app.game.commitRace(this.raceId, outcome) ?? this.app.game.state.lastResult;
     if (outcome.place === 1) sfx.win(); else sfx.lose();
-    this.showCallout(outcome.place === 1 ? 'WIN!' : `${ordinal(outcome.place)}`, outcome.place === 1 ? 'perfect' : 'small', 1200);
-    setTimeout(() => this.showResult(res), this.reduced ? 200 : 1100);
+    const gap = outcome.gapText.replace(/ of .*$/, '').replace(' behind first', ' behind');
+    this.showCallout(outcome.place === 1 ? `WIN! ${gap}` : `${ordinal(outcome.place)} · ${gap}`, outcome.place === 1 ? 'perfect' : 'small', 1600);
+    this.finishHold = this.reduced ? 0.3 : 1.6;
     this.updateHud(true);
   }
 
@@ -427,6 +503,7 @@ class RaceScreen {
       h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
       r.boss ? h('div', { class: 'boss' }, h('b', {}, 'Rusty Ray is beaten.'), ` The Suburbs are open. Ray hands over his signature blueprint: ${ev.boss!.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss!.reward.badge}” badge.`) : null,
       h('div', { class: 'pays' }, ...pills),
+      s.stats.races <= 1 ? h('p', { class: 'explain' }, 'Cash buys upgrades and crates · Rep unlocks new cars · Crates drop parts onto your bench.') : null,
       finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
       ev.id === 'foundry-final' && r.firstClear ? h('div', { class: 'finish-earned' }, 'Campaign finale won') : null,
       h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),
@@ -456,8 +533,8 @@ class RaceScreen {
     const sim = this.sim;
     const st = sim.standings();
     const me = st.findIndex((r) => r.isPlayer) + 1;
-    this.posEl.innerHTML = `${me}<small>/4</small>`;
-    this.timeEl.textContent = `${Math.max(0, sim.t).toFixed(1)} s`;
+    this.posEl.innerHTML = this.countdown > 0 ? '–' : `${me}<small>/${sim.racers.length}</small>`;
+    this.timeEl.textContent = `${Math.max(0, sim.player.finishTime ?? sim.t).toFixed(sim.player.finishTime !== null ? 2 : 1)} s`;
     this.standEl.innerHTML = st.map((r, i) => `<div class="${r.isPlayer ? 'me' : ''}">${i + 1}. ${r.isPlayer ? 'You' : r.name}</div>`).join('');
     const L = sim.length;
     sim.racers.forEach((r, i) => { this.dots[i].style.left = `${Math.min(100, (r.x / L) * 100)}%`; });
@@ -496,24 +573,38 @@ class RaceScreen {
     const theme = sim.track.theme;
     const player = sim.player;
     // Camera frames the pack: zoom out when rivals spread, keep the player between 22% and 70% of the width.
+    // Camera: frame the player with the nearest rival (or the whole pack if it fits); before a nitro window,
+    // shift to show more road ahead; a short shake at the launch and a kick when a boost fires.
     const ppm0 = Math.min(W * 0.34, H * 0.24) / 4.3;
+    const rivals = sim.racers.filter((r) => !r.isPlayer);
+    const nearest = rivals.reduce((b, r) => (Math.abs(r.x - player.x) < Math.abs(b.x - player.x) ? r : b), rivals[0] ?? player);
     const xs = sim.racers.map((r) => r.x);
-    const span = Math.max(...xs) - Math.min(...xs);
-    const target = Math.max(ppm0 * 0.6, Math.min(ppm0, (W * 0.8) / (span + 9)));
+    const packSpan = Math.max(...xs) - Math.min(...xs);
+    const span = packSpan * ppm0 * 0.45 < W * 0.8 ? packSpan : Math.abs(nearest.x - player.x);
+    const target = Math.max(ppm0 * 0.45, Math.min(ppm0, (W * 0.78) / (span + 9)));
     this.zoom = this.zoom ? this.zoom + (target - this.zoom) * 0.06 : target;
-    const ppm = this.zoom;
-    const mid = (Math.max(...xs) + Math.min(...xs)) / 2;
-    let camX = mid - (W * 0.48) / ppm;
-    camX = Math.min(camX, player.x - (W * 0.22) / ppm);
-    camX = Math.max(camX, player.x - (W * 0.7) / ppm);
-    const horizon = H * 0.46;
-    const roadTop = H * 0.55;
-    const roadBot = H * 0.83;
+    const ppm = this.zoom * (1 - 0.05 * Math.min(1, this.kick));
+    const focus = packSpan * ppm < W * 0.8 ? xs : [player.x, nearest.x];
+    const mid = (Math.max(...focus) + Math.min(...focus)) / 2;
+    const ahead = sim.windowState().next;
+    const lookAhead = ahead && player.v > 1 && (ahead.start - player.x) / player.v < 2.5 ? 0.12 : 0;
+    let camX = mid - (W * (0.48 - lookAhead)) / ppm;
+    camX = Math.min(camX, player.x - (W * 0.18) / ppm);
+    camX = Math.max(camX, player.x - (W * (0.62 - lookAhead)) / ppm);
+    if (this.finished) camX = Math.min(camX, sim.length - (W * 0.55) / ppm); // hold on the finish line
+    const shakeY = this.shake > 0 ? Math.sin(sim.t * 90) * 3 * this.dpr * (this.shake / 0.35) : 0;
+    ctx.setTransform(1, 0, 0, 1, 0, shakeY);
+    // Lanes sit just above the nitro button area and grow with tall screens.
+    const buttonArea = 168 * this.dpr;
+    const roadBot = Math.min(H * 0.84, H - buttonArea);
+    const roadTop = roadBot - Math.min(H * 0.36, W * 0.8);
+    const horizon = roadTop - H * 0.09;
 
     // sky
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
     if (sim.track.id === 'foundry') { sky.addColorStop(0, '#10182c'); sky.addColorStop(.65, '#47324b'); sky.addColorStop(1, '#b3614c'); }
     else if (theme === 'scrap') { sky.addColorStop(0, '#2b1d2e'); sky.addColorStop(0.6, '#7a3f2a'); sky.addColorStop(1, '#d9813f'); }
+    else if (theme === 'coast') { sky.addColorStop(0, '#0f2a44'); sky.addColorStop(0.6, '#3f7fa3'); sky.addColorStop(1, '#f0c189'); }
     else { sky.addColorStop(0, '#16233d'); sky.addColorStop(0.6, '#3d5a7a'); sky.addColorStop(1, '#e0a165'); }
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, horizon + 2);
@@ -572,14 +663,22 @@ class RaceScreen {
       far(0.08, '#4a2c2a', horizon, 40, 160, 'pile');
       far(0.18, '#2e1d1a', horizon + 6, 46, 120, 'crane');
       far(0.35, '#201513', roadTop - 2, 34, 90, 'pile');
+    } else if (theme === 'coast') {
+      ctx.fillStyle = '#1f5f7d'; ctx.fillRect(0, horizon - 10 * this.dpr, W, roadTop - horizon + 10 * this.dpr); // the sea
+      ctx.fillStyle = 'rgba(255,236,200,0.25)';
+      for (let k = 0; k < 6; k++) ctx.fillRect(((k * 211 - camX * ppm * 0.05) % W + W) % W, horizon - 4 * this.dpr + k * 3 * this.dpr, 50 * this.dpr, 1.5 * this.dpr);
+      far(0.1, '#2c3b33', horizon - 10 * this.dpr, 46, 220, 'pile');
+      far(0.38, '#1b2a22', roadTop - 2, 46, 110, 'tree');
     } else {
       far(0.08, '#2e3a4f', horizon, 34, 150, 'tree');
       far(0.2, '#2a2730', horizon + 8, 40, 130, 'house');
       far(0.38, '#1d2b22', roadTop - 2, 40, 70, 'tree');
     }
     // ground strip
-    ctx.fillStyle = theme === 'scrap' ? '#3a2a1f' : '#263526';
-    ctx.fillRect(0, horizon, W, roadTop - horizon);
+    if (theme !== 'coast') {
+      ctx.fillStyle = theme === 'scrap' ? '#3a2a1f' : '#263526';
+      ctx.fillRect(0, horizon, W, roadTop - horizon);
+    }
 
     // road
     const segInfo = (x: number) => {
@@ -679,13 +778,18 @@ class RaceScreen {
         ctx.fillRect(tx - 12 * this.dpr, gy - 18 * this.dpr, tw + 18 * this.dpr, 20 * this.dpr);
         ctx.fillStyle = r.paint;
         ctx.beginPath(); ctx.arc(tx - 5 * this.dpr, gy - 8 * this.dpr, 4 * this.dpr, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 * this.dpr; ctx.stroke();
         ctx.fillStyle = '#fff';
         ctx.fillText(label, tx + 2 * this.dpr, gy - 4 * this.dpr);
         continue;
       }
       const livery = r.isPlayer ? this.app.game.state.paints[r.car] : null;
+      const idx = sim.racers.indexOf(r);
+      const braking = this.prevV[idx] !== undefined && r.v < this.prevV[idx] - 0.03 && r.finishTime === null;
+      this.prevV[idx] = r.v;
       drawCar(ctx, r.car, sx, gy, len, {
-        paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, wheelAngle: r.x / 0.33,
+        paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, wheelAngle: r.x / 0.31,
+        blur: this.reduced ? 0 : Math.max(0, Math.min(1, (r.v - 7) / 10)), brake: braking,
         livery: finishStripe(r.car, livery ?? undefined), detail: false, cache: true,
         nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: theme === 'scrap' ? 0.25 : 0.55,
       });
@@ -693,7 +797,7 @@ class RaceScreen {
         ctx.fillStyle = '#ffc457';
         ctx.beginPath();
         const ax = sx + len * 0.5;
-        const ay = gy - len * 0.52;
+        const ay = gy - (len / carLengthM(r.car)) * 1.62; // just above this car's roof
         ctx.moveTo(ax - 7 * this.dpr, ay - 10 * this.dpr); ctx.lineTo(ax + 7 * this.dpr, ay - 10 * this.dpr); ctx.lineTo(ax, ay); ctx.fill();
         // particles anchor at the exhaust
         for (const p of this.particles) {
@@ -706,20 +810,26 @@ class RaceScreen {
     }
     // speed lines
     if (!this.reduced && this.quality && player.v > 18) {
-      ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.25, (player.v - 18) / 80 + (player.nitroLeft > 0 ? 0.12 : 0))})`;
-      ctx.lineWidth = 2 * this.dpr;
-      for (let k = 0; k < 10; k++) {
-        const y = hash(k * 7.3 + Math.floor(sim.t * 8)) * H * 0.9;
-        const x = ((k * 197 - camX * ppm * 1.6) % W + W) % W;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 60 * this.dpr, y); ctx.stroke();
+      const perfectBoost = player.nitroLeft > 0 && player.nitroMul > 1;
+      ctx.strokeStyle = perfectBoost ? 'rgba(255,214,94,0.35)' : `rgba(255,255,255,${Math.min(0.22, (player.v - 18) / 80 + (player.nitroLeft > 0 ? 0.1 : 0))})`;
+      ctx.lineWidth = (perfectBoost ? 3 : 2) * this.dpr;
+      const n = perfectBoost ? 16 : 10;
+      const cell = W / 3;
+      for (let k = 0; k < n; k++) {
+        const world = camX * ppm * 1.6 + k * cell * 0.37;
+        const slot = Math.floor(world / cell);
+        const y = horizon * 0.3 + hash(slot * 13.1 + k) * (roadBot - horizon * 0.3);
+        const x = ((k * cell * 0.37 - camX * ppm * 1.6) % (W + cell) + W + cell) % (W + cell) - cell * 0.5;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (perfectBoost ? 90 : 60) * this.dpr, y); ctx.stroke();
       }
     }
     // foreground
     ctx.fillStyle = theme === 'scrap' ? '#1a120d' : '#142016';
-    ctx.fillRect(0, roadBot + 5 * this.dpr, W, H - roadBot);
+    ctx.fillRect(0, roadBot, W, H - roadBot + 8 * this.dpr); // no unpainted strip under the road
     ctx.fillStyle = theme === 'scrap' ? '#2a1d14' : '#1d2d1f';
     const fsp = 140 * this.dpr;
     const foff = (camX * ppm * 1.25) % fsp;
     for (let x = -foff; x < W; x += fsp) ctx.fillRect(x, roadBot + 8 * this.dpr, 6 * this.dpr, 40 * this.dpr);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 }

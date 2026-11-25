@@ -262,6 +262,8 @@ export interface CarDrawOpts {
   brake?: boolean;
   livery?: string | null; // signature-finish stripe colour
   detail?: boolean;
+  /** 0..1 rotational motion blur for fast wheels (stops spokes aliasing). */
+  blur?: number;
   /** Race mode: cache the body as bitmaps and draw only wheels, lights and nitro live. */
   cache?: boolean;
 }
@@ -281,7 +283,7 @@ function tireAt(ctx: CanvasRenderingContext2D, d: CarDef, cx: number, cy: number
   ctx.closePath(); ctx.fill();
 }
 
-function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number, rear: boolean, angle: number, detail: boolean, D: P) {
+function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number, rear: boolean, angle: number, detail: boolean, D: P, blur = 0) {
   const r = d.r;
   const cy = r;
   tireAt(ctx, d, wx, cy, D, rear ? d.rearTireW : d.tireW, false);
@@ -422,6 +424,17 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
     }
     ctx.fillStyle = '#e8eaec';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2); ctx.fill();
+  }
+  if (blur > 0) {
+    // spinning fast: spokes smear into a disc with soft concentric streaks
+    ctx.globalAlpha = 0.75 * blur;
+    const bg = ctx.createRadialGradient(0, 0, R * 0.15, 0, 0, R * 0.95);
+    bg.addColorStop(0, 'rgba(200,205,210,0.9)'); bg.addColorStop(0.6, 'rgba(120,126,132,0.85)'); bg.addColorStop(1, 'rgba(70,74,78,0.9)');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = R * 0.04;
+    for (const k of [0.45, 0.7]) { ctx.beginPath(); ctx.arc(0, 0, R * k, angle % 6, (angle % 6) + 2.2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 }
@@ -1093,7 +1106,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
   }
   ctx.drawImage(s.back, Math.round(x - s.pad), Math.round(y - oy));
   ctx.save(); setupCtx(ctx, x, y, W, id);
-  for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, false, g.D);
+  for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, false, g.D, o.blur ?? 0);
   ctx.restore();
   ctx.drawImage(s.front, Math.round(x - s.pad), Math.round(y - oy));
   if (o.headlights || o.brake) {
