@@ -1,1 +1,71 @@
 /* race-hud workstream styles (see docs/CONTRACTS.md). Loaded after style.css. */
+
+/* Bottom bar: SHIFT under the left thumb, the gauge cluster in the middle, NITRO under the right thumb. */
+.racescreen .nitrobar.racebar { align-items: flex-end; gap: 8px; }
+.racescreen .racebar .gauge { flex: 1 1 auto; min-width: 0; max-width: 176px; height: 118px; align-self: flex-end; pointer-events: none; }
+.racescreen .shiftwrap { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; }
+
+.shiftbtn {
+  position: relative; width: 104px; height: 104px; border-radius: 26px; flex: none; touch-action: none;
+  background: linear-gradient(180deg, #3b4350, #1f252e); border: 3px solid #8a96a8; color: #f3f6fa;
+  box-shadow: 0 6px 0 #10141a, 0 10px 26px rgba(0,0,0,.55);
+  font-weight: var(--w-heavy); font-size: var(--fs-md); letter-spacing: .04em; line-height: 1.05;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.shiftbtn .g { font-size: var(--fs-xl); }
+.shiftbtn:active { transform: translateY(3px); box-shadow: 0 3px 0 #10141a, 0 6px 18px rgba(0,0,0,.5); }
+.shiftbtn.soon { border-color: #ffc457; }
+.shiftbtn.green { background: linear-gradient(180deg, #4fe07d, #1f8f47); border-color: #c9ffd9; color: #04210f; animation: shiftgo .28s ease-in-out infinite alternate; }
+.shiftbtn.late { background: linear-gradient(180deg, #ff6a5a, #a8261c); border-color: #ffd0c9; color: #2a0502; }
+.shiftbtn.top { opacity: .55; }
+@keyframes shiftgo { from { box-shadow: 0 6px 0 #0d3d20, 0 0 0 0 rgba(93,255,138,.6); } to { box-shadow: 0 6px 0 #0d3d20, 0 0 0 10px rgba(93,255,138,0); } }
+
+.shiftgrade {
+  position: absolute; bottom: calc(100% + 10px); left: 0; white-space: nowrap; pointer-events: none;
+  padding: 4px 10px; border-radius: 999px; background: rgba(8,10,14,.82); font-size: var(--fs-xs); font-weight: var(--w-heavy);
+  opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+}
+.shiftgrade.on { opacity: 1; transform: none; }
+.shiftgrade.good { color: #5dff8a; }
+.shiftgrade.warn { color: var(--amber2); }
+.shiftgrade.bad { color: #ff7d6e; }
+
+/* The teaching hint sits above the bar, centred, so it never covers either thumb control. */
+.racescreen > .racehint {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--safe-b) + 18px + 150px);
+  max-width: min(86vw, 360px); text-align: center; pointer-events: none;
+  padding: 4px 10px; border-radius: 10px; background: rgba(0,0,0,.42);
+}
+.racescreen > .racehint:empty { display: none; }
+
+@media (max-width: 400px) {
+  .shiftbtn { width: 92px; height: 92px; border-radius: 22px; }
+  .racescreen .racebar .gauge { height: 108px; }
+}
+@media (max-width: 340px) {
+  .shiftbtn { width: 80px; height: 80px; font-size: var(--fs-sm); }
+  .racescreen .nitrobar.racebar { padding-left: calc(var(--safe-l) + 10px); padding-right: calc(var(--safe-r) + 10px); gap: 4px; }
+}
+/* short landscape screens: keep the controls in the corners and the cluster small */
+@media (max-height: 500px) {
+  .racescreen .racebar .gauge { height: 92px; max-width: 140px; }
+  .shiftbtn { width: 84px; height: 84px; }
+  .racescreen > .racehint { bottom: calc(var(--safe-b) + 12px + 110px); }
+}
+@media (prefers-reduced-motion: reduce) { .shiftbtn.green { animation: none; } }
+.reduced-motion .shiftbtn.green { animation: none; }
+
+/* Result card telemetry (rows returned by RaceScreen.resultExtras) */
+.race-telemetry { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
+.race-telemetry .tm { background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-width: 0; }
+.race-telemetry .tm span { display: block; font-size: var(--fs-2xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.race-telemetry .tm b { font-size: var(--fs-md); }
+.shift-strip { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.shift-strip .sg { display: inline-flex; align-items: baseline; gap: 3px; padding: 2px 8px; border-radius: 999px; font-weight: var(--w-heavy); font-size: var(--fs-xs); background: rgba(255,255,255,.06); }
+.shift-strip .sg small { font-weight: var(--w-strong); }
+.shift-strip .sg.clean { color: #5dff8a; }
+.shift-strip .sg.early, .shift-strip .sg.late { color: var(--amber2); }
+.shift-strip .sg.missed { color: #ff7d6e; }
+.race-coach { margin: 0 0 10px; font-size: var(--fs-sm); line-height: 1.35; padding: 8px 10px; border-radius: 10px; background: rgba(255,196,87,.08); border: 1px solid rgba(255,196,87,.25); }
+.race-coach.shift b { color: #5dff8a; }
+.race-coach.boost b { color: var(--amber2); }

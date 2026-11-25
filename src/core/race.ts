@@ -1,8 +1,20 @@
-import { RACE, RIVALS, Segment, Track, TRACKS, eventById, trackLength, CarId } from '../data/tables';
+import { RACE, RIVALS, STAT_SCALE, Segment, TIER_STAT, Track, TRACKS, carById, eventById, trackLength, CarId } from '../data/tables';
+import { Drivetrain, drivetrainFor } from '../data/drivetrain';
 import { makeRng } from './rng';
 import type { LeanOutcome } from './state';
+import { mph } from './units';
 
 export interface RacerStats { top: number; accel: number; grip: number }
+
+/**
+ * Who shifts, and how well.
+ * - `manual`: the player's SHIFT input (live races). Without a tap the box shifts itself on the limiter (`missed`).
+ * - `clean`: always in the green band. `ordinary`: a beat late, on the limiter (Quick Race, bots, the default).
+ * - `early`: short-shifts below the band. `missed`: never taps; every shift is the automatic fallback.
+ */
+export type ShiftPolicy = 'manual' | 'clean' | 'ordinary' | 'early' | 'missed';
+/** How one upshift landed. `assist`: the practice race shifted for you inside a boost zone (not counted). */
+export type ShiftGrade = 'clean' | 'early' | 'late' | 'missed' | 'assist';
 
 export interface RaceSetup {
   eventId: string;
@@ -11,6 +23,14 @@ export interface RaceSetup {
   nitroCharges: number;
   /** Practice runs widen each nitro window (1 = normal). */
   windowScale?: number;
+  /** Player shifting (default `ordinary`: Quick Race and the simulation bot). The live race screen uses `manual`. */
+  shift?: ShiftPolicy;
+  /** Rival shifting (default `clean`, the reference acceleration). Tuning hook for stage 2. */
+  rivalShift?: ShiftPolicy;
+  /** The first (tutorial) race: shift cues never overlap a boost zone. Defaults to windowScale > 1. */
+  practice?: boolean;
+  /** Internal: counterfactual runs skip their own analysis. */
+  analysis?: boolean;
 }
 
 export interface Racer {
@@ -26,7 +46,22 @@ export interface Racer {
   nitroLeft: number; // seconds
   nitroMul: number;
   splits: number[]; // time at end of each segment
+  /** Gear index (0 = first). */
+  gear: number;
+  /** Seconds of torque cut left from the current shift. */
+  cut: number;
+  /** Seconds spent on the rev limiter waiting for a shift. */
+  limiterT: number;
+  policy: ShiftPolicy;
+  /** Fastest speed before the line (m/s). */
+  peak: number;
+  /** Braking for a bend or held at its grip limit this step (the box may blip down a gear). */
+  braking: boolean;
 }
+
+export interface ShiftRecord { t: number; into: number; grade: ShiftGrade; rpm: number; cost: number }
+
+export interface Coach { kind: 'shift' | 'boost' | 'build'; text: string; lost: number }
 
 export interface RaceOutcome {
   place: number; // 1..4
@@ -41,6 +76,18 @@ export interface RaceOutcome {
   trapSpeed: number | null;
   cutoff: boolean;
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
+  /** Timed shifting: upshifts the player made (assists excluded), clean ones, and the log. */
+  // (optional so hand-built outcomes in older tests still type-check; the sim always fills them)
+  shifts?: number;
+  shiftsClean?: number;
+  shiftLog?: ShiftRecord[];
+  /** Player's top speed before the line (m/s). */
+  topSpeed?: number;
+  /** Seconds lost to shifting against the same run with clean shifts, and to boost timing against Perfect boosts. */
+  shiftLoss?: number | null;
+  boostLoss?: number | null;
+  /** The single most useful reason for this result: a missed shift, a late boost, or the build. */
+  coach?: Coach | null;
 }
 
 export function segmentAt(track: Track, x: number): { seg: Segment; index: number; start: number } {
@@ -67,38 +114,88 @@ export function nitroWindows(track: Track, scale = 1): NitroWindow[] {
 
 const bendCap = (grip: number, radius: number) => Math.sqrt(grip * 9.81 * radius);
 
+/** A car's top-speed stat with a cap-tier engine fitted (what its gearbox is built around). */
+const fullTopCache = new Map<CarId, number>();
+export function fullTop(car: CarId): number {
+  let v = fullTopCache.get(car);
+  if (v === undefined) {
+    const c = carById(car);
+    v = c.base.top + TIER_STAT[Math.min(c.cap, TIER_STAT.length - 1)] * STAT_SCALE.top;
+    fullTopCache.set(car, v);
+  }
+  return v;
+}
+
+/** Shift tuning (race workstream). */
+export const SHIFT = {
+  /** Extra torque-cut seconds by grade, on top of the car's clean shift time. */
+  cutExtra: { clean: 0, early: 0.16, late: 0.14, missed: 0.3, assist: 0 } as Record<ShiftGrade, number>,
+  /** Seconds on the limiter before the box shifts itself (the forgiving fallback). */
+  autoDelay: 0.28,
+  /** `ordinary` shifting: this long on the limiter, then a late shift. */
+  ordinaryDelay: 0.05,
+  /** Taps below this fraction of the redline are ignored (too early to mean a shift). */
+  minTap: 0.45,
+  /** No second shift within this many seconds. */
+  debounce: 0.25,
+  /** Practice race: the green band opens this much lower. */
+  practiceWiden: 0.08,
+  /** Auto downshift (rev-matched, free) while braking for a bend drags the revs below this. */
+  downshiftBelow: 0.62,
+};
+
+/** Engine pull at a fraction of the redline: lugs low, full in the power band, nothing on the limiter. */
+export function torqueAt(f: number, bandTop = 0.95): number {
+  if (f >= 1) return 0;
+  if (f > bandTop) return 1 - (0.25 * (f - bandTop)) / (1 - bandTop); // past peak power: the pull fades toward the limiter
+  if (f >= 0.6) return 1;
+  if (f >= 0.25) return 0.5 + (0.5 * (f - 0.25)) / 0.35;
+  return 0.5;
+}
+
 export class RaceSim {
   readonly track: Track;
   readonly length: number;
   readonly racers: Racer[];
   readonly windows: NitroWindow[];
+  readonly practice: boolean;
   t = 0;
+  steps = 0;
   charges: number;
   nitroUsed = 0;
   perfects = 0;
   usedWindows = new Set<number>();
   done = false;
   cutoff = false;
+  /** Player's upshifts in order. */
+  shiftLog: ShiftRecord[] = [];
+  /** Step indices of the player's nitro taps (replayed by the counterfactual runs). */
+  nitroTaps: number[] = [];
+  private pendingCost = 0;
+  private lastShiftT = -1;
+  private nitroStart: number;
 
-  constructor(setup: RaceSetup) {
+  constructor(readonly setup: RaceSetup) {
     const ev = eventById(setup.eventId);
     this.track = TRACKS[ev.track];
     this.length = trackLength(this.track);
     this.windows = nitroWindows(this.track, setup.windowScale ?? 1);
     this.charges = setup.nitroCharges;
+    this.nitroStart = setup.nitroCharges;
+    this.practice = setup.practice ?? (setup.windowScale ?? 1) > 1;
     this.perfectMul = setup.player.perfectMul ?? RACE.perfectMul;
     const rng = makeRng(setup.seed);
-    const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean): Racer => ({
-      id, name, car, paint, isPlayer, stats, x: 0, v: 0, finishTime: null, nitroLeft: 0, nitroMul: 1, splits: [],
+    const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean, policy: ShiftPolicy): Racer => ({
+      id, name, car, paint, isPlayer, stats, x: 0, v: 0, finishTime: null, nitroLeft: 0, nitroMul: 1, splits: [], gear: 0, cut: 0, limiterT: 0, policy, peak: 0, braking: false,
     });
-    this.racers = [mk('player', setup.player.name, setup.player.car, setup.player.paint, { ...setup.player.stats }, true)];
+    this.racers = [mk('player', setup.player.name, setup.player.car, setup.player.paint, { ...setup.player.stats }, true, setup.shift ?? 'ordinary')];
     for (const rid of ev.rivals) {
       const r = RIVALS[rid];
       const vary = () => 1 + (rng() * 2 - 1) * RACE.rivalVariance;
-      this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false));
+      this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false, setup.rivalShift ?? 'clean'));
     }
-    // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured.
-    this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false);
+    // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured. It shifts clean.
+    this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false, 'clean');
   }
 
   ghost!: Racer;
@@ -106,6 +203,8 @@ export class RaceSim {
   trapSpeed: number | null = null;
   /** Seconds gained by the most recent boost, measured against the no-nitro ghost (set when it ends). */
   lastBoostGain: { seconds: number; perfect: boolean } | null = null;
+  /** The player's most recent shift (for the HUD); a new object each time. */
+  lastShift: ShiftRecord | null = null;
   private boostStart: { gap: number; perfect: boolean } | null = null;
 
   /** Independent copy (for finishing the race off-screen while the visible one keeps running). */
@@ -116,10 +215,43 @@ export class RaceSim {
     (c as unknown as { racers: Racer[] }).racers = this.racers.map(cp);
     (c as unknown as { ghost: Racer }).ghost = cp(this.ghost);
     c.usedWindows = new Set(this.usedWindows);
+    c.shiftLog = this.shiftLog.map((s) => ({ ...s }));
+    c.nitroTaps = [...this.nitroTaps];
     return c;
   }
 
   get player() { return this.racers[0]; }
+
+  /** The player's drivetrain. */
+  get drivetrain(): Drivetrain { return drivetrainFor(this.player.car); }
+
+  /** Calibrated physical top speed of a racer (m/s, before highway and nitro). */
+  vTop(r: Racer) { return r.stats.top * drivetrainFor(r.car).topScale; }
+
+  /** Speed (m/s) the gearing is cut for: the car's full-build top speed (or this racer's, if higher), so an engine
+   *  upgrade adds pull without stretching the gears. */
+  gearTop(r: Racer) { return drivetrainFor(r.car).topScale * Math.max(r.stats.top, fullTop(r.car)); }
+
+  /** Engine speed as a fraction of the redline (clutch slip holds it up off the line). */
+  rpmFrac(r: Racer): number {
+    const d = drivetrainFor(r.car);
+    const f = r.v / (this.gearTop(r) * d.gears[r.gear]);
+    return Math.max(r.gear === 0 ? 0.62 : 0.2, f);
+  }
+
+  /** Engine rpm for the tach and the sound. */
+  rpm(r: Racer = this.player): number {
+    const d = drivetrainFor(r.car);
+    return Math.round(Math.max(d.idle, Math.min(1.02, this.rpmFrac(r)) * d.redline));
+  }
+
+  /** The green band, widened in the practice race. */
+  band(r: Racer = this.player): [number, number] {
+    const b = drivetrainFor(r.car).band;
+    return this.practice && r.isPlayer ? [b[0] - SHIFT.practiceWiden, b[1]] : b;
+  }
+
+  topGear(r: Racer = this.player) { return r.gear >= drivetrainFor(r.car).gears.length - 1; }
 
   /** Upcoming or current nitro window relative to the player. */
   windowState(): { active: NitroWindow | null; next: NitroWindow | null } {
@@ -133,6 +265,26 @@ export class RaceSim {
     return { active, next };
   }
 
+  /** Practice race: a fresh boost zone is here or under ~1.4 s away, so shift cues stay out of its way. */
+  boostZoneNear(): boolean {
+    if (!this.practice || this.charges <= 0) return false;
+    const p = this.player;
+    const { active, next } = this.windowState();
+    if (active && !this.usedWindows.has(active.segIndex)) return true;
+    return !!next && !this.usedWindows.has(next.segIndex) && p.v > 1 && (next.start - p.x) / p.v < 1.4;
+  }
+
+  /** Shift light state for the HUD: off, approaching the band, in the green, or past it. */
+  shiftCue(): 'off' | 'soon' | 'green' | 'late' {
+    const p = this.player;
+    if (this.topGear(p) || p.cut > 0 || p.finishTime !== null || this.boostZoneNear()) return 'off';
+    const f = this.rpmFrac(p);
+    const [lo, hi] = this.band(p);
+    if (f > hi) return 'late';
+    if (f >= lo) return 'green';
+    return f >= lo - 0.12 ? 'soon' : 'off';
+  }
+
   tapNitro(): 'perfect' | 'boost' | 'empty' | 'busy' {
     const p = this.player;
     if (this.done || p.finishTime !== null) return 'busy';
@@ -140,6 +292,7 @@ export class RaceSim {
     if (p.nitroLeft > 0) return 'busy';
     this.charges--;
     this.nitroUsed++;
+    this.nitroTaps.push(this.steps);
     const { active } = this.windowState();
     const perfect = !!active && !this.usedWindows.has(active.segIndex);
     if (active) this.usedWindows.add(active.segIndex);
@@ -151,16 +304,63 @@ export class RaceSim {
     return perfect ? 'perfect' : 'boost';
   }
 
+  /** The player's SHIFT input. Ignored when it cannot mean a shift (top gear, mid-shift, revs far too low). */
+  tapShift(): ShiftGrade | 'top' | 'busy' | 'wait' {
+    const p = this.player;
+    if (this.done || p.finishTime !== null || p.cut > 0 || this.t - this.lastShiftT < SHIFT.debounce) return 'busy';
+    if (this.topGear(p)) return 'top';
+    const f = this.rpmFrac(p);
+    if (f < SHIFT.minTap) return 'wait';
+    const [lo, hi] = this.band(p);
+    const grade: ShiftGrade = f < lo ? 'early' : f <= hi ? 'clean' : 'late';
+    this.upshift(p, grade);
+    return grade;
+  }
+
+  private upshift(r: Racer, grade: ShiftGrade) {
+    const d = drivetrainFor(r.car);
+    const f = this.rpmFrac(r);
+    r.gear = Math.min(d.gears.length - 1, r.gear + 1);
+    r.cut = d.shiftS + SHIFT.cutExtra[grade];
+    r.limiterT = 0;
+    if (!r.isPlayer) return;
+    this.lastShiftT = this.t;
+    const rec: ShiftRecord = { t: this.t, into: r.gear, grade, rpm: f, cost: this.pendingCost + r.cut - d.shiftS };
+    this.pendingCost = 0;
+    this.shiftLog.push(rec);
+    this.lastShift = rec;
+  }
+
+  /** Automatic shifting for bots, tests, Quick Race, and the fallback when a live player misses the shift. */
+  private autoShift(r: Racer) {
+    if (r.cut > 0 || this.topGear(r)) return;
+    const d = drivetrainFor(r.car);
+    const f = this.rpmFrac(r);
+    // a bend dragged the revs down: the box blips down a gear for free
+    if (r.gear > 0 && f < SHIFT.downshiftBelow && r.braking && r.v / (this.gearTop(r) * d.gears[r.gear - 1]) < 0.9) { r.gear--; return; }
+    const [lo, hi] = this.band(r);
+    if (r.isPlayer && this.practice && r.policy === 'manual' && this.boostZoneNear() && f >= (lo + hi) / 2) return this.upshift(r, 'assist');
+    switch (r.policy) {
+      case 'clean': if (f >= lo + (hi - lo) * 0.6) this.upshift(r, 'clean'); break;
+      case 'early': if (f >= lo - 0.1) this.upshift(r, 'early'); break;
+      case 'ordinary': if (r.limiterT >= SHIFT.ordinaryDelay) this.upshift(r, 'late'); break;
+      default: if (r.limiterT >= SHIFT.autoDelay) this.upshift(r, 'missed');
+    }
+  }
+
   private stepRacer(r: Racer, dt: number) {
     if (r.finishTime !== null) {
       r.x += r.v * dt; // coast past the line for rendering
       r.v = Math.max(0, r.v - 6 * dt);
       return;
     }
+    this.autoShift(r);
     const { seg, index, start } = segmentAt(this.track, r.x);
     const st = r.stats;
-    let top = st.top * (seg.type === 'highway' || seg.type === 'hwbend' ? RACE.highwayTopMul : 1);
-    let accel = st.accel;
+    const d = drivetrainFor(r.car);
+    let top = this.vTop(r) * (seg.type === 'highway' || seg.type === 'hwbend' ? RACE.highwayTopMul : 1);
+    const engine = st.accel * d.accelScale;
+    let accel = engine;
     if (r.nitroLeft > 0) {
       accel += RACE.nitroAccel * r.nitroMul;
       top *= 1 + RACE.nitroTopMul * r.nitroMul;
@@ -169,20 +369,37 @@ export class RaceSim {
     let a: number;
     if (seg.type === 'launch') {
       const raw = accel * RACE.launchTurboMul;
-      const traction = st.grip * RACE.tractionG;
+      const traction = st.grip * RACE.tractionG * d.accelScale; // the calibration scales the whole launch, so grip still matters off the line
       a = raw > traction ? traction + (raw - traction) * RACE.wheelspinKeep : raw;
     } else a = accel;
     a *= Math.max(0, 1 - (r.v / top) ** (seg.type === 'launch' ? 4 : 2)); // launch is traction- and turbo-bound
+    // the gearbox: no engine pull while the clutch is in, lugging below the power band, nothing on the limiter
+    // (nitro thrust keeps pushing through a shift, so a boost is never wasted by one)
+    const share = engine / accel;
+    const f = this.rpmFrac(r);
+    let pull: number;
+    if (r.cut > 0) { pull = 0; r.cut = Math.max(0, r.cut - dt); }
+    else pull = torqueAt(f, d.band[1]);
+    if (f >= 0.999 && !this.topGear(r)) r.limiterT += dt;
+    else r.limiterT = 0;
+    if (r.isPlayer && pull < 1 && a > 0) {
+      // seconds of lost pull, charged to the shift that caused it (limiter time goes to the shift that ends it)
+      const lost = (1 - pull) * share * dt;
+      if (r.limiterT > 0) this.pendingCost += lost;
+      else if (r.cut <= 0 && this.shiftLog.length) this.shiftLog[this.shiftLog.length - 1].cost += lost;
+    }
+    a *= share * pull + (1 - share);
     const brake = st.grip * 9.81 * 0.9;
     let cap = Infinity;
     if (seg.radius) cap = bendCap(st.grip, seg.radius);
     // look ahead to the next bend
     const nextSeg = this.track.segments[index + 1];
     if (nextSeg?.radius) {
-      const d = start + seg.length - r.x;
+      const dd = start + seg.length - r.x;
       const vc = bendCap(st.grip, nextSeg.radius);
-      cap = Math.min(cap, Math.sqrt(vc * vc + 2 * brake * Math.max(0, d)));
+      cap = Math.min(cap, Math.sqrt(vc * vc + 2 * brake * Math.max(0, dd)));
     }
+    r.braking = r.v >= cap - 1e-6; // braking for, or held at, a bend's limit
     if (r.v > cap) r.v = Math.max(cap, r.v - brake * dt);
     else r.v = Math.min(cap, r.v + a * dt);
     const prevX = r.x;
@@ -199,7 +416,7 @@ export class RaceSim {
     if (r.x >= this.length) {
       const frac = (this.length - prevX) / Math.max(1e-9, r.x - prevX);
       r.finishTime = this.t + dt * frac;
-    }
+    } else r.peak = Math.max(r.peak, r.v);
   }
 
   step(dt = RACE.dt) {
@@ -215,6 +432,7 @@ export class RaceSim {
       this.boostStart = null;
     }
     this.t += dt;
+    this.steps++;
     if (this.racers.every((r) => r.finishTime !== null)) this.done = true;
     else if (this.t >= RACE.safetyCutoffS) {
       this.done = true;
@@ -253,10 +471,47 @@ export class RaceSim {
       if (p.finishTime !== null && first.finishTime !== null) gapText = `${(p.finishTime - first.finishTime).toFixed(1)} s behind first`;
       else gapText = `${Math.round(first.x - p.x)} m behind first`;
     }
-    return {
+    const counted = this.shiftLog.filter((s) => s.grade !== 'assist');
+    const advice = place === 1 ? null : this.advice(st[place - 2]);
+    const out: RaceOutcome = {
       place, standings: st, playerTime: p.finishTime, gapText, perfects: this.perfects, nitroUsed: this.nitroUsed, nitroLeft: this.charges, trapSpeed: this.trapSpeed,
-      cutoff: this.cutoff, advice: place === 1 ? null : this.advice(st[place - 2]),
+      cutoff: this.cutoff, advice,
+      shifts: counted.length, shiftsClean: counted.filter((s) => s.grade === 'clean').length, shiftLog: this.shiftLog.map((s) => ({ ...s })),
+      topSpeed: p.peak, shiftLoss: null, boostLoss: null, coach: null,
     };
+    if (this.setup.analysis !== false && p.finishTime !== null) this.analyse(out, place > 1 ? st[place - 2] : null);
+    return out;
+  }
+
+  /** Re-run the same race (same seed, rivals and build) with clean shifts, then also with Perfect boosts. */
+  private counterfactual(nitro: 'replay' | 'perfect'): number | null {
+    const sim = new RaceSim({ ...this.setup, shift: 'clean', analysis: false });
+    let k = 0;
+    while (!sim.done && sim.player.finishTime === null) {
+      if (nitro === 'replay') { while (k < this.nitroTaps.length && this.nitroTaps[k] <= sim.steps) { sim.tapNitro(); k++; } }
+      else if (sim.charges > 0 && sim.player.nitroLeft <= 0) {
+        const { active } = sim.windowState();
+        if (active && !sim.usedWindows.has(active.segIndex)) sim.tapNitro();
+      }
+      sim.step();
+    }
+    return sim.player.finishTime;
+  }
+
+  private analyse(out: RaceOutcome, ahead: Racer | null) {
+    const pt = out.playerTime!;
+    const tClean = this.counterfactual('replay');
+    const tBest = this.nitroStart > 0 ? this.counterfactual('perfect') : tClean;
+    out.shiftLoss = tClean === null ? null : Math.max(0, pt - tClean);
+    out.boostLoss = tClean === null || tBest === null ? null : Math.max(0, tClean - tBest);
+    // spread the measured shift loss over the shifts in proportion to their extra cost, to name the worst one
+    const log = out.shiftLog ?? [];
+    const extra = log.filter((s) => s.grade !== 'assist').map((s) => Math.max(0, s.cost));
+    const sum = extra.reduce((a, b) => a + b, 0);
+    let worst: ShiftRecord | null = null;
+    log.forEach((s) => { if (s.grade !== 'assist' && (!worst || s.cost > worst.cost)) worst = s; });
+    if (sum > 0 && out.shiftLoss !== null) for (const s of log) s.cost = s.grade === 'assist' ? 0 : (Math.max(0, s.cost) / sum) * out.shiftLoss;
+    out.coach = coachFor(out, ahead && ahead.finishTime !== null ? pt - ahead.finishTime : null, worst);
   }
 
   /** Where did the player lose the most time to the racer directly ahead? */
@@ -280,10 +535,43 @@ export class RaceSim {
   }
 }
 
-/** Quick Race / tests: run with an optional nitro policy. */
+const GEAR_NAME = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+const PART_NAME = { engine: 'Engine', tires: 'Tires', turbo: 'Turbo' } as const;
+
+/** One actionable reason: the biggest of shifting, boost timing, or the build (when skill would not have closed it). */
+export function coachFor(o: RaceOutcome, behind: number | null, worst: ShiftRecord | null): Coach | null {
+  const shift = o.shiftLoss ?? 0;
+  const boost = o.boostLoss ?? 0;
+  const shiftText = () => {
+    const w = worst as ShiftRecord | null;
+    const gear = w ? GEAR_NAME[w.into] ?? `gear ${w.into + 1}` : '';
+    const how = !w ? '' : w.grade === 'missed' ? `you missed the shift into ${gear} and the box shifted on the limiter` : w.grade === 'early' ? `the shift into ${gear} came early and bogged` : w.grade === 'late' ? `the shift into ${gear} came late, on the limiter` : '';
+    return `Shifting cost ${shift.toFixed(1)} s${how ? ` — ${how}` : ''}. Tap SHIFT when the light turns green.`;
+  };
+  const boostText = () => o.perfects === 0 && o.nitroUsed === 0 ? `Unused nitro cost ${boost.toFixed(1)} s. Fire it inside a boost zone for a Perfect boost.`
+    : `Boost timing cost ${boost.toFixed(1)} s. Fire nitro inside the boost zone, once per zone, for a Perfect boost.`;
+  const buildText = () => o.advice ? `Lost most time on the ${o.advice.segment}: a better ${PART_NAME[o.advice.family]} part helps there.` : 'A stronger build closes this gap.';
+  if (o.place === 1) {
+    // a win: point at the bigger skill gain if there is a real one
+    if (shift >= 0.2 && shift >= boost) return { kind: 'shift', text: shiftText(), lost: shift };
+    if (boost >= 0.2) return { kind: 'boost', text: boostText(), lost: boost };
+    return null;
+  }
+  const skill = shift + boost;
+  // when clean shifts and Perfect boosts together would not have caught the car ahead, the build is the reason
+  if (behind !== null && skill < behind * 0.6 && o.advice) return { kind: 'build', text: buildText(), lost: o.advice.lost };
+  if (shift >= 0.12 && shift >= boost) return { kind: 'shift', text: shiftText(), lost: shift };
+  if (boost >= 0.12) return { kind: 'boost', text: boostText(), lost: boost };
+  return o.advice ? { kind: 'build', text: buildText(), lost: o.advice.lost } : null;
+}
+
+/** The speedometer reading for a racer: simulated velocity converted once to mph (the HUD shows exactly this). */
+export const speedMph = (r: Racer) => mph(r.v);
+
+/** Quick Race / tests: run with an optional nitro policy and shift policy. */
 export type NitroPolicy = 'none' | 'perfect' | 'early' | 'late';
-export function runRace(setup: RaceSetup, policy: NitroPolicy = 'none'): RaceOutcome {
-  const sim = new RaceSim(setup);
+export function runRace(setup: RaceSetup, policy: NitroPolicy = 'none', shift?: ShiftPolicy): RaceOutcome {
+  const sim = new RaceSim(shift ? { ...setup, shift } : setup);
   while (!sim.done) {
     if (policy !== 'none' && sim.charges > 0 && sim.player.nitroLeft <= 0 && sim.player.finishTime === null) {
       const { active } = sim.windowState();
@@ -299,6 +587,7 @@ export function runRace(setup: RaceSetup, policy: NitroPolicy = 'none'): RaceOut
 export function leanOutcome(o: RaceOutcome): LeanOutcome {
   return {
     place: o.place, playerTime: o.playerTime, gapText: o.gapText, perfects: o.perfects, nitroUsed: o.nitroUsed, nitroLeft: o.nitroLeft, trapSpeed: o.trapSpeed ?? undefined,
+    shifts: o.shifts, shiftsClean: o.shiftsClean, topSpeed: o.topSpeed,
     standings: o.standings.map((r) => ({ name: r.name, time: r.finishTime, isPlayer: r.isPlayer })), advice: o.advice,
   };
 }

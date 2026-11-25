@@ -94,6 +94,14 @@ export const sfx = {
     tone(perfect ? 180 : 140, 0.7, 'sawtooth', 0.08, 0, perfect ? 520 : 360);
     if (perfect) tone(1046, 0.25, 'sine', 0.12, 0.02);
   },
+  /** An upshift: a crisp clack when clean, a heavier clunk early or late, a buzz when the box had to shift itself. */
+  shift(grade: string) {
+    if (grade === 'clean' || grade === 'assist') { noise(0.05, 0.16, 0, 3200, 'highpass'); tone(660, 0.05, 'triangle', 0.07, 0.01); }
+    else if (grade === 'missed') { tone(110, 0.18, 'sawtooth', 0.09, 0, 80); noise(0.12, 0.18, 0, 500, 'lowpass'); }
+    else { noise(0.09, 0.2, 0, 900, 'bandpass'); tone(200, 0.08, 'square', 0.05, 0.01, 150); }
+  },
+  /** The shift light reaches the green band (cue for players who listen rather than look). */
+  shiftCue() { tone(1320, 0.04, 'sine', 0.06); },
   windowCue() { tone(988, 0.06, 'sine', 0.12); tone(988, 0.06, 'sine', 0.12, 0.1); },
   countdown(go: boolean) { tone(go ? 880 : 440, go ? 0.3 : 0.12, 'square', 0.1); },
   cash() { tone(1400, 0.05, 'triangle', 0.08); tone(1800, 0.08, 'triangle', 0.08, 0.05); },
@@ -167,11 +175,18 @@ export class EngineHum {
     this.o.connect(this.f).connect(this.g).connect(master);
     this.o.start();
   }
-  set(speedFrac: number, boost: boolean) {
+  /**
+   * Follow the engine: `rpmFrac` is engine speed as a fraction of the redline (not road speed), so the pitch climbs
+   * through each gear and drops on every upshift. A shift (`cut`) dips the volume; the limiter stutters.
+   */
+  set(rpmFrac: number, boost: boolean, cut = false, limiter = false) {
     if (!this.o || !ctx) return;
     const now = ctx.currentTime;
-    this.o.frequency.setTargetAtTime(this.idle + speedFrac * (this.redline - this.idle) + (boost ? 32 : 0), now, 0.05);
-    this.f!.frequency.setTargetAtTime(500 + speedFrac * 1200 + (boost ? 260 : 0), now, 0.05);
+    const f = Math.max(0, Math.min(1.05, rpmFrac));
+    const stutter = limiter ? (Math.floor(now * 28) % 2 ? 0.94 : 1) : 1;
+    this.o.frequency.setTargetAtTime((this.idle + f * (this.redline - this.idle) + (boost ? 32 : 0)) * stutter, now, cut ? 0.03 : 0.04);
+    this.f!.frequency.setTargetAtTime(500 + f * 1300 + (boost ? 260 : 0), now, 0.05);
+    this.g!.gain.setTargetAtTime(cut ? 0.025 : limiter ? 0.045 : 0.05 + f * 0.015, now, 0.03);
   }
   stop() {
     if (!this.o || !ctx) return;

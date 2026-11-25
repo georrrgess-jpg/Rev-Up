@@ -3,13 +3,34 @@ import { resultCard } from './results';
 import type { RaceView } from './raceMenu';
 import { carStyle } from '../core/style';
 import { EngineHum, resumeAudio, sfx, suspendAudio } from '../audio';
-import { RaceSetup, RaceSim } from '../core/race';
+import { RaceOutcome, RaceSetup, RaceSim, ShiftRecord, speedMph } from '../core/race';
+import { mph } from '../core/units';
+import { Gauge, ShiftCue } from './raceGauge';
 import type { LastResult } from '../core/state';
 import { RACE, carById, eventById, finishStripe, trackLength } from '../data/tables';
 import { carLengthM, drawCar, fitCanvas } from '../render/car';
 import type { App } from './app';
 import { h, ordinal } from './dom';
 
+
+const desktop = () => typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches;
+
+/** Post-race telemetry rows for the result card: speed, shifting, boosts, and the one thing to fix. */
+export function telemetryRows(o: RaceOutcome, windows: number): HTMLElement[] {
+  const shifts = o.shifts ?? 0;
+  const clean = o.shiftsClean ?? 0;
+  const log = (o.shiftLog ?? []).filter((s) => s.grade !== 'assist');
+  const mark = { clean: '✓', early: 'early', late: 'late', missed: 'missed', assist: '' } as const;
+  const rows: HTMLElement[] = [
+    h('div', { class: 'race-telemetry', 'aria-label': 'Race telemetry' },
+      h('div', { class: 'tm' }, h('span', {}, 'Top speed'), h('b', { class: 'num' }, `${mph(o.topSpeed ?? 0)} mph`)),
+      h('div', { class: 'tm' }, h('span', {}, 'Clean shifts'), h('b', { class: 'num' }, `${clean}/${shifts}`)),
+      h('div', { class: 'tm' }, h('span', {}, 'Perfect boosts'), h('b', { class: 'num' }, `${o.perfects}/${windows}`))),
+  ];
+  if (log.length) rows.push(h('div', { class: 'shift-strip', 'aria-label': 'Shifts' }, ...log.map((s) => h('span', { class: `sg ${s.grade}` }, `${s.into + 1}`, h('small', {}, mark[s.grade])))));
+  if (o.coach) rows.push(h('p', { class: `race-coach ${o.coach.kind}` }, h('b', {}, o.coach.kind === 'shift' ? 'Shifting · ' : o.coach.kind === 'boost' ? 'Boost · ' : 'Build · '), o.coach.text));
+  return rows;
+}
 
 const sim0Launch = (sim: RaceSim) => sim.player.x < (sim.track.segments[0]?.length ?? 0) && sim.player.x > 0.5;
 
@@ -59,9 +80,20 @@ export class RaceScreen {
   private slowWindows = 0;
   private gainShown: object | null = null;
   private eventName: string;
+  private shiftBtn: HTMLButtonElement;
+  private gradeEl: HTMLElement;
+  private gauge: Gauge;
+  private cue: ShiftCue = 'off';
+  private shiftShown: ShiftRecord | null = null;
+  private gradeTimer = 0;
+  private assistTold = false;
+  private missTold = false;
+  private outcome: RaceOutcome | null = null;
+  private lastFrameDt = 0;
 
   constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
-    this.sim = new RaceSim(setup);
+    // the live race takes the player's SHIFT input; Quick Race and the bots shift for themselves
+    this.sim = new RaceSim({ ...setup, shift: 'manual' });
     const rev = carById(setup.player.car).rev;
     this.hum = new EngineHum(rev.base, rev.peak, setup.player.car);
     this.reduced = app.game.state.settings.reducedMotion;
@@ -93,6 +125,11 @@ export class RaceScreen {
     this.nitroBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.tapNitro(); });
     this.nitroBtn.addEventListener('click', (e) => { if ((e as PointerEvent).pointerType === '' || e.detail === 0) this.tapNitro(); });
     this.hintEl = h('div', { class: 'racehint' });
+    this.shiftBtn = h('button', { class: 'shiftbtn', 'aria-label': 'Shift up' });
+    this.shiftBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.tapShift(); });
+    this.shiftBtn.addEventListener('click', (e) => { if ((e as PointerEvent).pointerType === '' || e.detail === 0) this.tapShift(); });
+    this.gradeEl = h('div', { class: 'shiftgrade', role: 'status', 'aria-live': 'polite' });
+    this.gauge = new Gauge(setup.player.car, this.reduced, this.sim.band());
     const pauseBtn = h('button', { class: 'iconbtn pausebtn', 'aria-label': 'Pause', onclick: () => this.setPaused(true) }, 'Ⅱ');
     this.el = h('div', { class: 'racescreen', role: 'dialog', 'aria-label': `Race: ${this.eventName}` },
       this.canvas,
@@ -102,7 +139,8 @@ export class RaceScreen {
       this.callout,
       this.ticker,
       this.flash,
-      h('div', { class: 'nitrobar' }, this.hintEl, this.nitroBtn),
+      this.hintEl,
+      h('div', { class: 'nitrobar racebar' }, h('div', { class: 'shiftwrap' }, this.gradeEl, this.shiftBtn), this.gauge.el, this.nitroBtn),
     );
     this.onKey = this.onKey.bind(this);
     this.onVis = this.onVis.bind(this);
@@ -123,9 +161,11 @@ export class RaceScreen {
   private resize() {
     const fit = fitCanvas(this.canvas, this.quality ? 2 : 1);
     this.dpr = fit.dpr;
+    this.gauge.resize();
   }
 
   private onKey(e: KeyboardEvent) {
+    if (e.key === 'Shift' || e.key === 's' || e.key === 'S' || e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); if (!e.repeat && !this.finished) this.tapShift(); return; }
     if (e.key === ' ' || e.key === 'n' || e.key === 'N' || e.key === 'ArrowUp') { e.preventDefault(); if (!this.finished) this.tapNitro(); }
     if (e.key === 'Escape' || e.key === 'p') { if (!this.finished) this.setPaused(!this.paused); }
   }
@@ -186,6 +226,52 @@ export class RaceScreen {
     this.updateHud(true);
   }
 
+  private tapShift() {
+    if (this.countdown > 0 || this.paused || this.finished) return;
+    const r = this.sim.tapShift();
+    if (r === 'wait') this.showGrade('Wait for green', 'warn');
+  }
+
+  /** A shift happened (tapped or automatic): grade it on the HUD, in sound, and teach the first miss. */
+  private onShift(rec: ShiftRecord) {
+    sfx.shift(rec.grade);
+    const label = { clean: 'Clean shift', early: 'Early', late: 'Late', missed: 'Auto shift', assist: 'Crew shift' }[rec.grade];
+    this.showGrade(label, rec.grade === 'clean' || rec.grade === 'assist' ? 'good' : rec.grade === 'missed' ? 'bad' : 'warn');
+    if (rec.grade === 'missed' && !this.missTold) { this.missTold = true; this.tick('Missed shift — tap SHIFT when the light turns green'); }
+    if (rec.grade === 'assist' && !this.assistTold) { this.assistTold = true; this.tick('Boost zone ahead — the crew shifted for you', 'gold'); }
+  }
+
+  private showGrade(text: string, cls: string) {
+    this.gradeEl.textContent = text;
+    this.gradeEl.className = `shiftgrade on ${cls}`;
+    clearTimeout(this.gradeTimer);
+    this.gradeTimer = window.setTimeout(() => { this.gradeEl.className = 'shiftgrade'; }, 700);
+  }
+
+  /** Shift light, button state and tach, every frame (cheap: only changes touch the DOM or the gauge canvas). */
+  private shiftHud(t: number) {
+    const sim = this.sim;
+    const p = sim.player;
+    const cue: ShiftCue = this.countdown > 0 || this.finished ? 'off' : sim.shiftCue();
+    if (cue !== this.cue) {
+      if (cue === 'green' && this.cue !== 'late' && this.app.game.state.settings.nitroCue) sfx.shiftCue();
+      this.cue = cue;
+      this.shiftBtn.classList.toggle('soon', cue === 'soon');
+      this.shiftBtn.classList.toggle('green', cue === 'green');
+      this.shiftBtn.classList.toggle('late', cue === 'late');
+    }
+    const gearKey = `${p.gear}:${sim.topGear()}`;
+    if (this.shiftBtn.dataset.key !== gearKey) {
+      this.shiftBtn.dataset.key = gearKey;
+      this.shiftBtn.replaceChildren(h('span', { class: 'g num' }, sim.topGear() ? 'TOP' : `${p.gear + 1}›${p.gear + 2}`), 'SHIFT');
+      this.shiftBtn.setAttribute('aria-label', sim.topGear() ? `Top gear` : `Shift up, gear ${p.gear + 1}`);
+      this.shiftBtn.classList.toggle('top', sim.topGear());
+    }
+    const ls = sim.lastShift;
+    if (ls && ls !== this.shiftShown) { this.shiftShown = ls; this.onShift(ls); }
+    this.gauge.draw(this.countdown > 0 ? 0.14 : sim.rpmFrac(p), p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt);
+  }
+
   private showCallout(text: string, cls: string, ms = 900) {
     this.callout.textContent = text;
     this.callout.className = `callout ${cls}`;
@@ -198,6 +284,7 @@ export class RaceScreen {
     let dt = (t - this.last) / 1000;
     this.last = t;
     if (dt > 0.1) dt = 0.1; // long frames never jump the simulation
+    this.lastFrameDt = dt;
     // adaptive effects: drop resolution/particles before touching sim timing
     this.frameTimes.push(dt);
     if (this.frameTimes.length >= 60) {
@@ -237,6 +324,7 @@ export class RaceScreen {
       this.stepParticles(dt);
     }
     this.draw();
+    this.shiftHud(t);
     if (t - this.lastHud > 100) { this.lastHud = t; this.updateHud(); }
   }
 
@@ -290,16 +378,18 @@ export class RaceScreen {
     } else if (!active && next && canUse && eta < 2.0 && eta > 1.9) {
       this.showCallout('Boost zone ahead', 'window', 900);
     }
-    this.hum.set(Math.min(1, p.v / (p.stats.top * 1.1)), p.nitroLeft > 0);
+    this.hum.set(this.sim.rpmFrac(p), p.nitroLeft > 0, p.cut > 0, p.limiterT > 0);
   }
 
   private onPlayerFinish() {
     if (this.finished) return;
     this.finished = true;
     this.nitroBtn.classList.remove('window');
+    this.shiftBtn.classList.remove('soon', 'green', 'late');
     // Finish an off-screen copy for the real result, and commit now so closing the page cannot lose or
     // double the payout. The visible race keeps running so the crossing and the rivals' arrival are seen.
     const outcome = this.sim.clone().finish();
+    this.outcome = outcome;
     this.result = this.app.game.commitRace(this.raceId, outcome) ?? this.app.game.state.lastResult;
     const big = !!(this.result?.boss || this.result?.heat?.champion || this.app.game.state.pendingReveal);
     if (big) sfx.fanfare(); else if (outcome.place === 1) sfx.win(); else sfx.lose();
@@ -319,7 +409,11 @@ export class RaceScreen {
   }
 
   /** Rows the race screen adds to the result card (owned by the race workstream). */
-  private resultExtras(): HTMLElement[] { return []; }
+  private resultExtras(): HTMLElement[] {
+    const o = this.outcome;
+    if (!o) return [];
+    return telemetryRows(o, this.sim.windows.length);
+  }
 
   private retry(eventId: string) {
     const app = this.app;
@@ -349,7 +443,10 @@ export class RaceScreen {
     }
     this.nitroBtn.classList.toggle('empty', c === 0);
     this.nitroBtn.setAttribute('aria-label', `Nitro, ${c} left`);
-    this.hintEl.textContent = this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : this.app.game.state.stats.races < 6 || this.sim.perfects === 0 && this.sim.t < 4 && this.app.game.state.stats.races < 20 ? 'Tap NITRO in a boost zone for a Perfect boost.' : '';
+    const races = this.app.game.state.stats.races;
+    const shiftHint = !this.finished && races < 6 && (sim.shiftLog.length === 0 || this.cue === 'green') && !sim.topGear() && !sim.boostZoneNear()
+      ? (desktop() ? 'Shift in the green: tap SHIFT or press S.' : 'Tap SHIFT when the light turns green.') : '';
+    this.hintEl.textContent = shiftHint || (this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : this.app.game.state.stats.races < 6 || this.sim.perfects === 0 && this.sim.t < 4 && this.app.game.state.stats.races < 20 ? (desktop() ? 'Press Space in a boost zone for a Perfect boost.' : 'Tap NITRO in a boost zone for a Perfect boost.') : '');
   }
 
   // ---------------- Drawing ----------------
