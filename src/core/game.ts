@@ -126,7 +126,7 @@ export class Game {
     this.input(now);
     return this.transact((d) => S.buyStyle(d, itemId, car), now);
   }
-  applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material', now = Date.now()) {
+  applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material' | 'livery', now = Date.now()) {
     return this.transact((d) => S.applyStyle(d, itemId, car, kind), now);
   }
   installPart(car: CarId, from: SlotRef, now = Date.now()) {

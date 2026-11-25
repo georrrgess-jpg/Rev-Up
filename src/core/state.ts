@@ -136,7 +136,7 @@ export interface GameState {
   stars: Record<string, number>;
   /** The Main Event in progress: the next heat to race (0-based), or null. */
   knockout: { heat: number } | null;
-  style: Partial<Record<CarId, { wheel?: string; material?: string; restore?: number }>>;
+  style: Partial<Record<CarId, { wheel?: string; material?: string; restore?: number; livery?: string }>>;
   livePodiums: CarId[];
   /** last two events raced (live or quick), for the Fresh route Rep bonus */
   recentEvents: string[];

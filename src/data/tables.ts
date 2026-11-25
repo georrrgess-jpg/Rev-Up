@@ -134,7 +134,7 @@ export const tunePrice = (car: CarId, stage: number) => Math.round((TUNE_PRICE[c
 
 /** Paint shop: cosmetic only, never performance. Colours and wheel sets are bought once and fit any car;
  *  premium paint is bought per car; the Tapeback restoration is three staged jobs. `opens`: cars owned. */
-export type StyleKind = 'paint' | 'wheel' | 'material' | 'restore';
+export type StyleKind = 'paint' | 'wheel' | 'material' | 'restore' | 'livery';
 export interface StyleItem { id: string; kind: StyleKind; name: string; price: number; value: string; opens: number; blurb: string }
 export const STYLE_ITEMS: StyleItem[] = [
   { id: 'paint:safety', kind: 'paint', name: 'Safety Yellow', price: 250, value: '#f0b92a', opens: 1, blurb: 'Scrapyard crane yellow.' },
