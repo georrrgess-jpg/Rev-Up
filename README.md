@@ -4,7 +4,30 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~74 KB JS + 10 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~116 KB JS + 15 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.5 · Garage and Racing Overhaul
+
+Made for a player who liked the core loop but found the first ten minutes confusing (parts hard to read, the goal unclear, Shop and Race menus hard to use), races too easy and the cars short on personality. Five workstreams ran in parallel against one contract (`docs/CONTRACTS.md`: file owners, roster ids, units, money rules), then an integration pass and an independent review.
+
+### Garage: parts you can read, fitting you control
+- **Parts** have a distinct silhouette per family, the tier number on the tile, a quality marker, and geometry that grows per tier (T1–T9). Merges highlight compatible parts, preview the result and its stat change, and work by drag or tap.
+- **Fit Parts** (new): the car with labelled Engine / Tires / Turbo slots; install, swap or remove; before → after stats for each candidate; a **Recommended fit** in one tap. A part lives in exactly one place (bench, spare rack, or one car's slot); swaps are atomic. A newly unlocked car arrives with your best parts fitted, and an older car that gave one up gets the best bench part back.
+- **Saves move to v2** (`installed` per car, per-car mastery). Older saves keep the active car's build fitted; nothing is downgraded.
+
+### First session and menus
+- **Taught by doing:** the goal car → merge a pair → fit it → race → spend → what is still needed. Each cue appears once, on the control it teaches.
+- **Shop:** grouped tabs, exact costs and effects, and one **Best buy** that matches the goal. **Race menu:** a recommended event card (track, difficulty, reward, what it needs, one button), with Live and Quick Race explained. **Rep vs cash** has its own sheet: cash is spent, Rep is never spent and opens races and cars.
+
+### Racing
+- **Timed shifting:** a tach with a shift light; tap SHIFT on green. Missed shifts cost 0.6–1.1 s, ordinary 0.2–0.5 s; auto-shift steps in if you do nothing. Nitro inside a boost zone is a Perfect boost.
+- **Rivals shift too,** tuned per event, so clean driving matters from the Coastal Highway on. Results explain losses ("Shifting cost 0.9 s… / 3 nitro unused").
+- **Real mph** everywhere (m/s × 2.23694), with full-build speeds from ~85 mph (Tapeback) to ~225 mph (Halcyon X on a long straight).
+
+### Ladder, economy, cars and scenery
+- **New endgame:** the Desert (Corvo Rally, boss Sable Dunn) and the Summit (Strata GTR, Halcyon X, boss Iver Kaas), tiers up to T9, engine upgrades that change look, sound and stats, per-car milestones and class events that bring older cars back.
+- **Cash on sensible steps** everywhere a price or payout appears: $5 up to $100, $10 up to $1,000, $50 above.
+- **Customization:** paint, wheels (now gravel and race sets) and liveries, previewed live and shown in races, the Showroom and the unveil. **Tracks** got brighter palettes and landmarks. **The unveil** is a round platform with a spotlight and a slow turn (Skip and reduced motion kept; ownership is saved first).
 
 ## Update 1.4 · Main Event
 
@@ -177,10 +200,10 @@ The data model already carries Transmission and Aero, T6–T10, all ten classes 
 
 ## Saves
 
-- Stored in `localStorage` under `revup:<base path>:save` (so other Pages projects on the same origin never collide), versioned (`v: 1`), checksummed, validated on load, and migrated forward. A corrupted or malformed save is copied to a backup key and the game starts fresh with a notice; saves from a newer build are refused rather than damaged.
+- Stored in `localStorage` under `revup:<base path>:save` (so other Pages projects on the same origin never collide), versioned (now `v: 2`: fitted parts per car), checksummed, validated on load, and migrated forward. A corrupted or malformed save is copied to a backup key and the game starts fresh with a notice; saves from a newer build are refused rather than damaged.
 - Every successful action saves once. Race payouts, quick races and reveals are guarded by single-use ids, so rapid taps and reloads cannot repeat them. A race in progress at reload is abandoned with no charges spent.
 - Two tabs: a new tab asks before taking over, the old tab freezes, and writes from a stale tab are refused (revision check).
-- Offline time is clamped for clock rollback, capped at 8 hours, and stored together with its timestamp so repeated reloads never multiply a claim.
+- Offline time is clamped for clock rollback, capped at 8 hours (12 with the Lock-up), and stored together with its timestamp so repeated reloads never multiply a claim.
 - **Settings → Move your save** exports a text code (or a file) and imports it, for moving between Safari and the Home Screen app.
 
 ## Installing on a phone
