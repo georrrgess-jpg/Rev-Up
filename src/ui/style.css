@@ -446,8 +446,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 @media (max-width: 359px) {
   .chip .w { display: none; }
   .chip .g { display: inline; }
-  .chip.cash .g { display: none; }
-  .chip.cash .w { display: inline; }
+  .chip.cash .g, .chip.rep .g { display: none; }
+  .chip.cash .w, .chip.rep .w { display: inline; }
 }
 .part .tier { font-size: max(var(--fs-2xs), calc(var(--cell) * .3)); }
 .part.over-cap::before { content: 'CAP'; bottom: 1px; left: 1px; padding: 0 3px; border-radius: 4px; background: rgba(10,12,16,.82); line-height: 1.25; }
@@ -761,4 +761,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 @media (max-height: 480px) and (orientation: landscape) {
   .sheet { max-height: calc(100dvh - var(--safe-t) - 8px); padding-top: 8px; }
   .segs { top: -8px; }
+}
+.coach.offscreen { visibility: hidden; }
+@media (max-height: 660px) {
+  .racehead canvas { width: 80px; height: 38px; }
+  .fitbar { padding: 4px 8px; font-size: var(--fs-xs); }
 }

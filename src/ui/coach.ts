@@ -67,6 +67,10 @@ export class Coach {
     if (!rects.length) { this.el.hidden = true; return; }
     const top = Math.min(...rects.map((r) => r.top)) - host.top;
     const bottom = Math.max(...rects.map((r) => r.bottom)) - host.top;
+    // target scrolled out of sight (a list or sheet): wait, rather than point at nothing
+    const scroller = this.step.targets[0].closest('.scroll, .sheet');
+    const view = scroller ? scroller.getBoundingClientRect() : host;
+    this.el.classList.toggle('offscreen', bottom + host.top < view.top + 8 || top + host.top > view.bottom - 8);
     const cx = (Math.min(...rects.map((r) => r.left)) + Math.max(...rects.map((r) => r.right))) / 2 - host.left;
     const w = this.el.offsetWidth;
     const hgt = this.el.offsetHeight;
@@ -141,7 +145,7 @@ export class GuideCoach {
     const isNew = cue && cue.id !== this.coach.current?.id;
     this.coach.show(cue);
     // a cue on a control scrolled out of view (inside a sheet or a list): bring it into view once
-    if (isNew && cue) cue.targets[0]?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    if (isNew && cue && (!cue.ack || cue.targets[0]?.closest(".sheet"))) cue.targets[0]?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }
 
   private topSheet(): HTMLElement | null {
