@@ -3,3 +3,4 @@ dist/
 .pages-worktree/
 *.log
 .DS_Store
+.smoke/

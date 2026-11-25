@@ -62,6 +62,7 @@ export class Game {
       return events;
     }
     P.checkUnlocks(draft, events);
+    autoOpen(draft, events);
     this.state = draft;
     this.persist(now);
     this.emit(events);
@@ -121,6 +122,7 @@ export class Game {
     const ev: GameEvent[] = [];
     const draft = structuredClone(this.state);
     P.tick(draft, dtS, now, this.lastInputAt, ev);
+    if (ev.some((e) => e.type === "printer")) autoOpen(draft, ev);
     if (ev.length) {
       P.checkUnlocks(draft, ev);
       this.state = draft;
@@ -247,4 +249,10 @@ export class Game {
     if (this.conflict) return;
     this.transact((d) => { P.accrueOffline(d, now); return []; }, now);
   }
+}
+
+/** Crates unpack themselves whenever there is room, once the player has made a first merge. */
+function autoOpen(d: GameState, events: GameEvent[]) {
+  if (!d.stats.milestones.firstMerge || !d.crates.length || !B.firstFree(d)) return;
+  events.push(...B.openCrates(d).filter((e) => e.type !== 'crateBlocked'));
 }
