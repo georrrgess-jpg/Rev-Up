@@ -9,7 +9,7 @@ import { join } from 'node:path';
 const BRANCH = 'gh-pages';
 const WT = '.pages-worktree';
 const push = !process.argv.includes('--no-push');
-const sh = (cmd, opts = {}) => execSync(cmd, { stdio: 'pipe', encoding: 'utf8', ...opts }).trim();
+const sh = (cmd, opts = {}) => (execSync(cmd, { stdio: 'pipe', encoding: 'utf8', ...opts }) ?? '').trim();
 
 sh('npm run build', { stdio: 'inherit' });
 const { version } = JSON.parse(readFileSync('dist/version.json', 'utf8'));
