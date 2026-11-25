@@ -303,3 +303,11 @@ export function runBot(o: BotOpts): BotLog {
 
 export const fmtMin = (s: number | undefined) => (s ? `${(s / 60).toFixed(1)}m` : '—');
 export type { CarId };
+
+/** The player types used by the ladder tests and the economy audit. */
+export const PLAYERS: Record<string, Omit<BotOpts, 'seed'>> = {
+  clean: { shift: 'clean', policy: 'perfect' },
+  mixed: { shift: 'mixed', policy: 'mixed' },
+  ordinary: { shift: 'ordinary', policy: 'perfect' },
+  weak: { shift: 'missed', policy: 'none' },
+};

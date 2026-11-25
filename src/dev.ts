@@ -42,6 +42,29 @@ export function applyPreset(game: Game, preset: string) {
         for (const id of ['yard-sprint', 'crusher-run', 'rusty-ray', 'cul-de-sac', 'maple-mile']) s.events[id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 18 };
         fill(s, [['engine', 5], ['tires', 5], ['turbo', 5], ['engine', 3], ['engine', 3], ['tires', 1], ['turbo', 2]]);
         break;
+      // Endgame states (the Overhaul ladder): parts fitted to the newest car at its cap, Rep just short of the next car.
+      case 'desert':
+      case 'summit':
+      case 'finale': {
+        const ladder = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto'] as const;
+        const upTo = { desert: 'super', summit: 'gt', finale: 'proto' }[preset as 'desert' | 'summit' | 'finale'];
+        s.owned = ladder.slice(0, ladder.indexOf(upTo as never) + 1) as never;
+        s.activeCar = upTo as never; s.revealed = [...s.owned];
+        const cap = { desert: 7, summit: 8, finale: 9 }[preset as 'desert'];
+        s.rep = { desert: 5400, summit: 9000, finale: 14200 }[preset as 'desert'];
+        s.bosses = ['ray', 'vale', 'nova', ...(preset !== 'desert' ? ['sable'] : [])];
+        s.blueprints = ['Ray’s Rust-Red', 'Crown Teal', 'Main Event Neon', ...(preset !== 'desert' ? ['Canyon Ochre'] : [])];
+        s.badges = ['Scrapyard King', 'Coastal Crown', 'Main Event Champion', ...(preset !== 'desert' ? ['Canyon Rally Champion'] : [])];
+        s.crafted = ['tires:3', 'turbo:4', 'engine:5', 'engine:6', 'tires:6', 'turbo:7', ...(preset !== 'desert' ? ['tires:8', 'engine:8'] : []), ...(preset === 'finale' ? ['turbo:9'] : [])];
+        s.cash = 20000; s.activeS = 3600; s.nitro = 3; s.stats.races = 150;
+        for (const id of ['yard-sprint', 'crusher-run', 'rusty-ray', 'cul-de-sac', 'maple-mile', 'foundry-final', 'harbor-launch', 'cliff-esses', 'coast-crown', 'neon-mile', 'skyline-run', 'stock-cup', 'main-event', 'midnight-run',
+          ...(preset !== 'desert' ? ['canyon-qualifier', 'dust-stage', 'canyon-stage', 'rally-final'] : []), ...(preset === 'finale' ? ['glacier-pass', 'summit-1000'] : [])]) s.events[id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
+        s.stars = { 'neon-mile': 7, 'skyline-run': 7, 'stock-cup': 7 };
+        const fam: Family[] = ['engine', 'tires', 'turbo'];
+        s.installed = { [upTo]: Object.fromEntries(fam.map((f) => [f, { id: s.nextPartId++, f, t: cap, q: 'std' }])) };
+        fill(s, [['engine', cap - 1], ['tires', cap - 1], ['turbo', cap - 2], ['turbo', cap - 2]]);
+        break;
+      }
       case 'fullx':
       case 'full': {
         if (preset === 'fullx') expandBoard(s);
