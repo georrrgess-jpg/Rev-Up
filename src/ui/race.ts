@@ -95,7 +95,12 @@ export class RaceView implements View {
       details(rec),
       q?.eventId === rec.id ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null);
 
-    const out: HTMLElement[] = [featured];
+    // A second choice beside the recommendation: a different route with its own reward.
+    const alts = P.alternatives(s, rec);
+    const altBox = alts.length ? h('section', { class: 'alts', 'aria-label': 'Also worth racing' }, h('div', { class: 'feat-label' }, 'Or try'),
+      ...alts.map(({ e, why }) => h('div', { class: 'alt' }, h('div', { class: 'grow' }, h('b', {}, e.name), h('div', { class: 'd' }, why)),
+        h('button', { class: `btn sm${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
+    const out: HTMLElement[] = altBox ? [featured, altBox] : [featured];
     if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));
     // Catalogue: one collapsible section per district, with a progress summary; the recommended one opens.
     const openSections = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.district-sec[open]')).map((d) => d.dataset.district));

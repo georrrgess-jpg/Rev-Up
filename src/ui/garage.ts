@@ -302,15 +302,18 @@ export class GarageView implements View {
       this.goalLine.replaceChildren(
         h('span', { class: g.keystoneDone ? 'met' : '' }, `${g.keystoneDone ? '✓' : 'Craft'} T${g.tier} ${FAMILIES[g.family].name}`),
         ...(g.event ? [h('span', { class: g.eventDone ? 'met' : '' }, `${g.eventDone ? '✓' : 'Win'} ${eventById(g.event).name}`)] : []),
+        ...(g.car.unlock?.stars ? [h('span', { class: P.starsIn(s) >= g.car.unlock.stars ? 'met' : '' }, `★ ${Math.min(P.starsIn(s), g.car.unlock.stars)}/${g.car.unlock.stars}`)] : []),
         h('span', { class: s.rep >= g.repNeed ? 'met' : '' }, s.rep >= g.repNeed ? '✓ Rep' : `${s.rep}/${g.repNeed} Rep`));
 
       this.goalBar.style.width = `${Math.round(g.progress * 100)}%`;
       this.goalBtn.setAttribute('aria-label', `Next car: ${g.line}`);
     } else {
-      this.goalTitle.textContent = 'Showroom';
-      this.goalBtn.setAttribute('aria-label', 'Open the Showroom');
-      this.goalLine.textContent = 'Collection complete';
-      this.goalBar.style.width = '100%';
+      // every car owned: the card follows the long collection instead of claiming it is complete
+      const c = P.collection(s);
+      this.goalTitle.textContent = `Collection · ${Math.round((c.have / c.total) * 100)}%`;
+      this.goalBtn.setAttribute('aria-label', `Collection ${c.have} of ${c.total}. Next: ${c.next}`);
+      this.goalLine.textContent = c.next;
+      this.goalBar.style.width = `${Math.round((c.have / c.total) * 100)}%`;
     }
     this.drawGoal();
   }

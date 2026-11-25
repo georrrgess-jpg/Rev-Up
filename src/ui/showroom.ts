@@ -117,7 +117,8 @@ export class ShowroomView implements View {
       h('div', { class: 'carcard-info' },
         h('div', { class: 'cn' }, car.model),
         h('div', { class: 'cm' }, `${car.name} · T${car.cap} parts`),
-        h('div', { class: 'car-status' }, label)));
+        h('div', { class: 'car-status' }, label),
+        isNext && next ? h('div', { class: 'car-need' }, h('div', { class: 'need-line' }, next.line.replace(/ to unlock the .*$/, '')), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(next.progress * 100)}%` }))) : null));
       this.redrawCards.push(() => studio(canvas, car.id, state.paints[car.id], 0, pending || isNext, !owned && !isNext, owned ? carStyle(state, car.id) : undefined));
       return card;
     });
@@ -131,7 +132,7 @@ export class ShowroomView implements View {
     const sigTotal = ENABLED_CARS.filter((c) => SIGNATURE_FINISHES[c.id]).length;
     const sigHave = ENABLED_CARS.filter((c) => SIGNATURE_FINISHES[c.id] && s.livePodiums.includes(c.id)).length;
     const bpHave = BLUEPRINT_FINISHES.filter((b) => s.blueprints.includes(b.name)).length;
-    const ta = EVENTS.filter((e) => e.timeAttack);
+    const ta = EVENTS.filter((e) => e.timeAttack || e.speedTrap);
     const medals = ta.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0);
     const trophies = EVENTS.filter((e) => e.trophy);
     const trophyHave = trophies.filter((e) => s.badges.includes(e.trophy!)).length;
@@ -140,13 +141,16 @@ export class ShowroomView implements View {
         h('span', { class: 'bar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round((have / Math.max(1, total)) * 100)}%` })));
     const all = s.owned.length + sigHave + bpHave + medals + trophyHave;
     const total = ENABLED_CARS.length + sigTotal + BLUEPRINT_FINISHES.length + ta.length * 3 + trophies.length;
+    const next = P.collection(s).next;
     this.milestones.replaceChildren(
       h('div', { class: 'ms-head' }, h('strong', {}, 'Collection'), h('span', { class: 'num' }, `${Math.round((all / total) * 100)}%`)),
       h('div', { class: 'ms-grid' },
         row('Cars', s.owned.length, ENABLED_CARS.length),
         row('Finishes', sigHave + bpHave, sigTotal + BLUEPRINT_FINISHES.length),
-        row('Time medals', medals, ta.length * 3),
-        row('Class trophies', trophyHave, trophies.length)),
+        row('Medals', medals, ta.length * 3),
+        row('Class trophies', trophyHave, trophies.length),
+        row('Event goals', EVENTS.filter((e) => e.goals).reduce((n, e) => n + [1, 2, 4].filter((b) => (s.stars?.[e.id] ?? 0) & b).length, 0), EVENTS.filter((e) => e.goals).length * 3)),
+      h('p', { class: 'ms-next' }, `Next: ${next}`),
       ...(s.badges.length ? [h('div', { class: 'badges' }, ...s.badges.map((badge) => h('span', { class: 'badge-pill' }, badge)))] : []),
     );
   }

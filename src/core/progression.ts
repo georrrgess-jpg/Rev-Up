@@ -153,6 +153,45 @@ export function buyUpgrade(s: GameState, id: UpgradeId): GameEvent[] {
   return openCrates(s);
 }
 
+/** Other good next steps beside the recommendation — a different route each (goal, trophy, medal, new event),
+ *  so a player who keeps losing one race always has a parallel goal. */
+export function alternatives(s: GameState, rec: RaceEvent): { e: RaceEvent; why: string }[] {
+  const ok = (e: RaceEvent) => e.id !== rec.id && !e.heatOf && (eventUnlocked(s, e).ok || !!eventUnlocked(s, e).switchCar);
+  const picks: RaceEvent[] = [];
+  const add = (e?: RaceEvent) => { if (e && !picks.includes(e) && picks.length < 2) picks.push(e); };
+  add(EVENTS.find((e) => ok(e) && !e.boss && !(s.events[e.id]?.wins) && !e.timeAttack && !e.speedTrap));
+  add(EVENTS.find((e) => ok(e) && e.goals && (s.stars?.[e.id] ?? 0) !== 7));
+  add(EVENTS.find((e) => ok(e) && e.trophy && !s.badges.includes(e.trophy)));
+  add(EVENTS.find((e) => ok(e) && (e.timeAttack || e.speedTrap) && (s.medals?.[e.id] ?? 0) < 3));
+  return picks.map((e) => ({ e, why: eventReason(s, e) }));
+}
+
+/** Long-run collection: everything earnable after the cars, and the next thing worth chasing. */
+export function collection(s: GameState): { have: number; total: number; next: string } {
+  const sig = ENABLED_CARS.filter((c) => SIGNATURE_FINISHES[c.id]);
+  const medalEvs = EVENTS.filter((e) => e.timeAttack || e.speedTrap);
+  const trophies = EVENTS.filter((e) => e.trophy);
+  const starEvs = EVENTS.filter((e) => e.goals);
+  const parts = [
+    [s.owned.length, ENABLED_CARS.length],
+    [sig.filter((c) => s.livePodiums.includes(c.id)).length, sig.length],
+    [medalEvs.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0), medalEvs.length * 3],
+    [trophies.filter((e) => s.badges.includes(e.trophy!)).length, trophies.length],
+    [starEvs.reduce((n, e) => n + bitCount(s.stars?.[e.id] ?? 0), 0), starEvs.length * 3],
+  ];
+  const have = parts.reduce((a, p) => a + p[0], 0), total = parts.reduce((a, p) => a + p[1], 0);
+  let next = 'Every goal met. Chase your records and dress your cars in the Paint shop.';
+  const star = starEvs.find((e) => eventUnlocked(s, e).ok && (s.stars?.[e.id] ?? 0) !== 7);
+  const medal = medalEvs.find((e) => eventUnlocked(s, e).ok && (s.medals?.[e.id] ?? 0) < 3);
+  const trophy = trophies.find((e) => !s.badges.includes(e.trophy!) && (eventUnlocked(s, e).ok || eventUnlocked(s, e).switchCar));
+  const finish = sig.find((c) => s.owned.includes(c.id) && !s.livePodiums.includes(c.id));
+  if (star) next = `Goals left on ${star.name}`;
+  else if (trophy) next = `Win the ${trophy.trophy} trophy at ${trophy.name}`;
+  else if (medal) { const m = s.medals?.[medal.id] ?? 0; next = `${['Bronze', 'Silver', 'Gold'][m]} at ${medal.name}`; }
+  else if (finish) next = `A live top 3 in the ${finish.model} earns ${SIGNATURE_FINISHES[finish.id]!.name}`;
+  return { have, total, next };
+}
+
 /** Tune-up the active car one stage. */
 export function buyTune(s: GameState, car: CarId): GameEvent[] {
   const stage = s.tune?.[car] ?? 0;

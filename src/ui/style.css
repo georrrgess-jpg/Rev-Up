@@ -616,3 +616,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 
 .head-stats { display: flex; flex-wrap: wrap; gap: 0 10px; }
 .head-stats span { white-space: nowrap; }
+
+.carcard .car-need { margin-top: 4px; font-size: var(--fs-2xs); color: var(--muted); }
+.carcard .car-need .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; margin-top: 3px; }
+.carcard .car-need .bar i { display: block; height: 100%; background: var(--amber2); }
+
+.alts { margin: 10px 0 4px; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.alts .alt { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.06); }
+.alts .alt:first-of-type { border-top: 0; }
+.alts .alt .d { font-size: var(--fs-xs); color: var(--muted); }
+.milestones .ms-next { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--amber2); }
