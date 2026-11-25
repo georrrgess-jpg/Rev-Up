@@ -572,7 +572,7 @@ class RaceScreen {
     const card = h('div', { class: `card${tierCls}`, role: 'dialog', 'aria-label': 'Race result' },
       h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, ev.speedTrap ? (r.medal ? `${['', 'Bronze', 'Silver', 'Gold'][r.medal]} run` : 'Run complete') : ev.timeAttack ? (r.medal ? `${['', 'Bronze', 'Silver', 'Gold'][r.medal]} time` : 'Run complete') : r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
       h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
-      r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ev.boss.rival === 'ray' ? ' The Suburbs are open.' : ' The coast road is yours.', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
+      r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ({ ray: ' The Suburbs are open.', vale: ' The coast road is yours.', nova: ' Downtown is yours.' } as Record<string, string>)[ev.boss.rival] ?? '', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
       r.newMedals?.length ? h('div', { class: 'finish-earned medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), h('div', {}, h('strong', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal`), h('div', {}, r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ') + ' · paid once'))) : null,
       r.nextMedal ? h('p', { class: 'explain' }, r.trapKmh ? `${r.nextMedal.name} at ${r.nextMedal.target} km/h — ${Math.max(0, r.nextMedal.gap)} km/h to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
       r.newStars?.length ? h('div', { class: 'finish-earned stars-earned' }, h('span', { class: 'star-ico', 'aria-hidden': 'true' }, '★'), h('div', {}, h('strong', {}, `${r.newStars.length} new goal${r.newStars.length > 1 ? 's' : ''}: ${r.newStars.join(', ')}`), h('div', {}, `${P.starsIn(s)} Downtown stars`))) : null,
@@ -605,7 +605,7 @@ class RaceScreen {
     const app = this.app;
     this.close();
     if (app.game.state.pendingReveal) return; // reveal takes priority
-    (app.views.race as RaceView).startLive(eventId);
+    (app.views.race as RaceView).startLive(eventById(eventId).heatOf ?? eventId); // a knockout heat restarts through its event
   }
 
   private updateHud(force = false) {

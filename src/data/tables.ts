@@ -233,7 +233,7 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'super', name: 'Hypercar', model: 'Lumen RS', district: 'downtown', cap: 7,
-    base: { top: 50, accel: 6.8, grip: 0.95 }, unlock: { rep: 3800, family: 'turbo', tier: 7, event: 'main-event' }, enabled: true, perfectMul: 1.7,
+    base: { top: 50, accel: 6.8, grip: 0.95 }, unlock: { rep: 2800, family: 'turbo', tier: 7, event: 'main-event' }, enabled: true, perfectMul: 1.7,
     paint: '#1a1430', trim: '#b9a6ff', blurb: 'A low, hybrid hypercar with a light-bar face and a violet Surge trail. Won, not bought.',
     offlineRate: 9, rev: { base: 85, peak: 300 }, handling: 'Fastest car on any highway; its Surge makes Perfect boosts 1.7× instead of 1.5×. Heavier in tight corners than the Kestrel.',
   },

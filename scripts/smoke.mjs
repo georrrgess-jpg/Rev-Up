@@ -55,7 +55,10 @@ try {
   await page.waitForFunction(() => navigator.serviceWorker?.controller !== null, null, { timeout: 15000 });
   const cacheKeys = await page.evaluate(() => caches.keys());
   ok('service worker controls the page with a scoped, revisioned cache', cacheKeys.some((k) => k.startsWith(`revup:${PREFIX}:`)), cacheKeys.join(', '));
-  await page.waitForSelector('.toast >> text=Offline play is ready', { timeout: 10000 }).then(() => ok('player is told offline play is ready', true), () => ok('player is told offline play is ready', false));
+  // A brand-new player isn't interrupted by the notice (it covered the goal card); Settings always states it.
+  await page.click('[aria-label="Settings"]');
+  await page.waitForSelector('text=Offline play is ready', { timeout: 10000 }).then(() => ok('player is told offline play is ready (Settings)', true), () => ok('player is told offline play is ready (Settings)', false));
+  await page.keyboard.press('Escape');
 
   // --- drag merge
   const a = await page.locator('[data-zone=board][data-i="11"]').boundingBox();
