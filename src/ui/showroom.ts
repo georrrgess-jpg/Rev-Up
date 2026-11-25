@@ -11,20 +11,30 @@ import type { App, View } from './app';
 import { h } from './dom';
 import { fmt } from './dom';
 
+const STAGES: Record<string, { wall: [string, string, string, string]; light: string; floor?: string }> = {
+  junker: { wall: ['#10161e', '#243442', '#19212b', '#0c111a'], light: '#b2d3e046' },
+  muscle: { wall: ['#140f0c', '#3a2a1d', '#211812', '#0e0a08'], light: '#ffcf8a3a', floor: 'rgba(255,190,120,0.10)' },
+  tourer: { wall: ['#06181c', '#14454c', '#0c2a2f', '#051214'], light: '#ffd7a04a', floor: 'rgba(255,215,160,0.12)' },
+  tuner: { wall: ['#0e0e10', '#2a2618', '#17150f', '#09090a'], light: '#ffc85a46', floor: 'rgba(255,200,90,0.12)' },
+  super: { wall: ['#07051a', '#2a1555', '#140a2e', '#050312'], light: '#c08cff55', floor: 'rgba(200,140,255,0.20)' },
+};
+
 function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined, lit = 0, covered = false, locked = false, style?: CarStyle) {
   const { w, h: height } = fitCanvas(canvas, 1.5);
   if (w < 2 || height < 2) return;
   const ctx = canvas.getContext('2d')!;
   const car = carById(id);
+  // stages: a plain garage bay for the early cars; prize cars get their own light (owned ones only)
+  const st = locked || covered ? STAGES.junker : STAGES[id] ?? STAGES.junker;
   const wall = ctx.createLinearGradient(0, 0, 0, height);
-  wall.addColorStop(0, '#10161e');
-  wall.addColorStop(.63, '#243442');
-  wall.addColorStop(.64, '#19212b');
-  wall.addColorStop(1, '#0c111a');
+  wall.addColorStop(0, st.wall[0]);
+  wall.addColorStop(.63, st.wall[1]);
+  wall.addColorStop(.64, st.wall[2]);
+  wall.addColorStop(1, st.wall[3]);
   ctx.fillStyle = wall;
   ctx.fillRect(0, 0, w, height);
   const light = ctx.createRadialGradient(w * .56, height * .38, 0, w * .56, height * .38, w * .58);
-  light.addColorStop(0, lit ? '#d8b58972' : '#b2d3e046');
+  light.addColorStop(0, lit ? '#d8b58972' : st.light);
   light.addColorStop(1, '#212e4000');
   ctx.fillStyle = light;
   ctx.fillRect(0, 0, w, height);
@@ -37,8 +47,9 @@ function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined,
     ctx.lineTo(w * (.5 + (x - .5) * 1.9), height);
     ctx.stroke();
   }
-  const length = Math.min(w * .86, height * 1.7, 740);
-  drawCar(ctx, id, (w - length * 1.09) / 2, height * (height > w * .8 ? .73 : .82), length, {
+  if (st.floor) { const fl = ctx.createRadialGradient(w * .5, height * .78, 0, w * .5, height * .78, w * .5); fl.addColorStop(0, st.floor); fl.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = fl; ctx.fillRect(0, height * .6, w, height * .4); }
+  const length = Math.min(w * .8, height * 1.7, 740); // room for bumpers, wings and the far side
+  drawCar(ctx, id, (w - length * 1.12) / 2 + length * 0.02, height * (height > w * .8 ? .73 : .82), length, {
     paint: paint ?? car.paint,
     trim: car.trim,
     livery: finishStripe(id, paint),

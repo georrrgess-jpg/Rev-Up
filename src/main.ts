@@ -121,7 +121,8 @@ async function start() {
       if (e.data?.type === 'READY' || e.data?.type === 'VERSION') {
         if (!app.offlineReady) {
           app.offlineReady = true;
-          if (!game.state.tips.offline) { game.markTip('offline'); app.toast('Offline play is ready'); }
+          // said once, and not over a brand-new player's first screen (Settings always shows it)
+          if (!game.state.tips.offline && game.state.stats.races > 0) { game.markTip('offline'); app.toast('Offline play is ready'); }
         }
       }
     });

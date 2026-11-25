@@ -49,7 +49,7 @@ export class App {
     const top = h('header', { class: 'topbar' },
       chip('cash', 'cash', '$', '$', 'Cash'),
       chip('rep', 'rep', '★', 'Rep', 'Reputation'),
-      chip('scrap', 'scrap', '⚙', 'Scrap', 'Scrap'),
+      chip('scrap', 'scrap', '♻', 'Scrap', 'Scrap'),
       chip('nitro', 'nitro', '⚡', 'Nitro', 'Banked nitro charges'),
       h('span', { class: 'spacer' }),
       h('button', { class: 'iconbtn', 'aria-label': 'How to play', title: 'How to play', onclick: () => openGuide(this) }, '?'),

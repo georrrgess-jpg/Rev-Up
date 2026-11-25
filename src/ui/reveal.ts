@@ -191,7 +191,11 @@ export class RevealOverlay {
     if (key !== this.bgKey) {
       this.bgKey = key;
       const spot = (0.08 + 0.4 * q).toFixed(2);
-      this.el.style.background = this.car === 'tourer'
+      this.el.style.background = this.car === 'super'
+        ? `radial-gradient(42% 30% at 50% 60%, rgba(200,150,255,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #06030f 64%), linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(255,63,164,${(0.28 * q).toFixed(2)}) 62%, rgba(0,0,0,0) 64%), radial-gradient(90% 70% at 50% 30%, rgb(${20 + 40 * q},${10 + 20 * q},${40 + 90 * q}), #030208 75%)`
+        : this.car === 'tuner'
+        ? `radial-gradient(42% 30% at 50% 60%, rgba(255,200,90,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #0a0906 64%), radial-gradient(90% 70% at 50% 30%, rgb(${30 + 70 * q},${26 + 55 * q},${14 + 20 * q}), #050403 75%)`
+        : this.car === 'tourer'
         // the marquee car gets its own stage: a dusk-teal room with a warm horizon behind it
         ? `radial-gradient(42% 30% at 50% 60%, rgba(255,214,160,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #06100f 64%), linear-gradient(to bottom, rgba(0,0,0,0) 46%, rgba(240,170,110,${(0.35 * q).toFixed(2)}) 62%, rgba(0,0,0,0) 64%), radial-gradient(90% 70% at 50% 30%, rgb(${14 + 30 * q},${40 + 90 * q},${48 + 92 * q}), #020606 75%)`
         : `radial-gradient(42% 30% at 50% 60%, rgba(255,228,186,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #0c0907 64%), radial-gradient(90% 70% at 50% 30%, rgb(${40 + 120 * q},${30 + 85 * q},${24 + 40 * q}), #050403 75%)`;
@@ -218,7 +222,7 @@ export class RevealOverlay {
       ctx.globalAlpha = 1;
     }
     const headlights = this.phase === 'lights' ? Math.min(1, this.t * 2) * (0.6 + 0.4 * Math.sin(this.t * 14)) : this.phase === 'camera' || this.phase === 'done' ? 0.85 : 0;
-    if (this.car === 'tourer' && (this.phase === 'camera' || this.phase === 'done') && !this.reduced) {
+    if ((this.car === 'tourer' || this.car === 'super') && (this.phase === 'camera' || this.phase === 'done') && !this.reduced) {
       // a slow highlight runs nose to tail along the paint (source-atop keeps it on the car)
       const k = this.phase === 'camera' ? Math.min(1, this.t / 1.2) : 1;
       if (k < 1) {

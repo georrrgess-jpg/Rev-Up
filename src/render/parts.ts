@@ -3,8 +3,10 @@ import { FAMILIES, Family, Quality } from '../data/tables';
 // Original part illustrations as inline SVG. Tier changes the metal finish so tiers read at a glance
 // even before the numeral; the numeral stays large for legibility on a five-column phone grid.
 
-const METAL = ['#000', '#8d8478', '#b0703e', '#c9ced3', '#e5b94c', '#e9edf2', '#9ad', '#b9e', '#f9a', '#fd6', '#fff'];
-const METAL_DARK = ['#000', '#4c463f', '#6a3d1d', '#6d7580', '#8a6418', '#7b8796', '#456', '#546', '#734', '#863', '#999'];
+// A distinct metal per tier — iron, copper, blue steel, gold, chrome, teal titanium, violet — so neighbouring
+// tiers never share a colour (the art review found T3, T5 and T6 all read as pale silver).
+const METAL = ['#000', '#8d8478', '#c0763e', '#7fa7c9', '#e5b94c', '#eef1f4', '#4fd1ad', '#c58cff', '#f9a', '#fd6', '#fff'];
+const METAL_DARK = ['#000', '#4c463f', '#6a3d1d', '#33536e', '#8a6418', '#6f7c8c', '#1d6b56', '#5a2f8f', '#734', '#863', '#999'];
 
 function engine(m: string, d: string, acc: string) {
   return `<rect x="14" y="22" width="36" height="26" rx="4" fill="${m}" stroke="${d}" stroke-width="2.5"/>

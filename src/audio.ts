@@ -63,11 +63,22 @@ function noise(dur: number, vol = 0.2, when = 0, filterFreq = 2000, type: Biquad
 
 export const sfx = {
   /** Ordinary merge: quick snap and mechanical click. */
-  merge(chain = 1) {
+  merge(chain = 1, tier = 2) {
     const step = Math.min(chain - 1, 8);
     noise(0.04, 0.25, 0, 3500, 'highpass');
     tone(220 * 2 ** (step / 6), 0.07, 'square', 0.12, 0.01);
     if (chain > 1) tone(330 * 2 ** (step / 6), 0.09, 'triangle', 0.14, 0.04); // rising cascade rhythm
+    // heavier metal for high tiers: a low thud and a ringing overtone that grows with the tier
+    if (tier >= 4) { tone(70 + tier * 6, 0.22, 'sine', 0.16, 0.0, 45); tone(660 + tier * 110, 0.35 + tier * 0.04, 'sine', 0.05 + tier * 0.01, 0.03); }
+  },
+  /** A keystone (a car's part) is crafted: a rising chord and an air-wrench burst. */
+  keystone() {
+    noise(0.18, 0.3, 0, 2600, 'bandpass');
+    [392, 523, 659, 784, 1046].forEach((f, i) => tone(f, 0.4, 'triangle', 0.11, 0.05 + i * 0.07));
+  },
+  /** A headline result (a rival beaten, a knockout won): a longer brass-like fanfare. */
+  fanfare() {
+    [[392, 0], [523, 0.12], [659, 0.24], [784, 0.36], [1046, 0.5], [1318, 0.62]].forEach(([f, d]) => { tone(f, 0.45, 'sawtooth', 0.06, d); tone(f / 2, 0.5, 'triangle', 0.08, d); });
   },
   mint() {
     [880, 1175, 1568, 2093].forEach((f, i) => tone(f, 0.35, 'sine', 0.12, i * 0.06));
@@ -140,6 +151,11 @@ const VOICES: Record<string, Voice> = {
   beater: { layers: [['sawtooth', 1, 0], ['triangle', 2, 5]], filter: 'lowpass', cut: 1600, q: 1, lope: 0.15, lopeHz: 9, hum: 1 },
   hothatch: { layers: [['sawtooth', 1, 0], ['sawtooth', 2, 9], ['square', 3, -6]], filter: 'bandpass', cut: 2400, q: 1.6, lope: 0.08, lopeHz: 14, blips: true, hum: 1.25 },
   muscle: { layers: [['sawtooth', 1, 0], ['sawtooth', 1, 22], ['square', 0.5, 0]], filter: 'lowpass', cut: 900, q: 3, lope: 0.4, lopeHz: 7.5, hum: 0.7 },
+  tourer: { layers: [['sawtooth', 1, 0], ['triangle', 2, 4], ['sawtooth', 1.5, 11]], filter: 'lowpass', cut: 1500, q: 1.2, lope: 0.06, lopeHz: 16, hum: 0.85 },
+  // Kestrel 1600: a thin, high-revving four with a raspy intake
+  tuner: { layers: [['square', 1, 0], ['sawtooth', 2, 7], ['square', 4, -9]], filter: 'bandpass', cut: 3200, q: 2.2, lope: 0.05, lopeHz: 22, blips: true, hum: 1.5 },
+  // Lumen RS: a smooth V12 under an electric whine
+  super: { layers: [['sawtooth', 1, 0], ['sawtooth', 1.5, 3], ['sine', 6, 0], ['triangle', 3, -4]], filter: 'lowpass', cut: 2600, q: 0.9, lope: 0.03, lopeHz: 28, hum: 1.1 },
 };
 
 /** Continuous engine hum for the race. */

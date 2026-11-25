@@ -462,6 +462,7 @@ export class GarageView implements View {
         fuseCount++;
         if (fuseCount > FX_CAP) { anim.set(key(e.at), ['pop']); continue; }
         const cls = ['pop'];
+        if (e.tier >= 5) cls.push('flash-high');
         if (e.q === 'mint') cls.push('flash-mint');
         if (e.q === 'polished') cls.push('flash-pol');
         anim.set(key(e.at), cls);
@@ -472,7 +473,7 @@ export class GarageView implements View {
         const tier = e.tier;
         const skipped = e.skipped;
         setTimeout(() => {
-          sfx.merge(chain);
+          sfx.merge(chain, tier);
           if (q === 'mint') { sfx.mint(); this.floater(at, skipped ? `MINT · jumped to T${tier}` : 'MINT', 'gold'); }
           else if (q === 'polished') { sfx.polished(); this.floater(at, 'Polished +15%', ''); }
           if (chain > 1) this.floater(at, `Cascade ×${chain}`, '');
@@ -489,6 +490,10 @@ export class GarageView implements View {
         const g = P.goalStatus(this.s);
         const car = P.nextCar(this.s);
         if (car?.unlock && car.unlock.family === e.family && car.unlock.tier === e.tier) {
+          // the next car's part: the biggest Garage moment, so it gets its own sound, a flash and the goal card pulses
+          sfx.keystone();
+          this.goalBtn.classList.remove('keystone-hit'); void this.goalBtn.offsetWidth; this.goalBtn.classList.add('keystone-hit');
+          this.floaterTop(`★ T${e.tier} ${FAMILIES[e.family].name} crafted`, 'gold');
           this.app.toast(g?.keystoneDone && this.s.rep < g.repNeed ? `T${e.tier} ${FAMILIES[e.family].name} crafted — the ${car.model}'s part is done. ${g.repNeed - this.s.rep} more Rep to unlock it` : `T${e.tier} ${FAMILIES[e.family].name} crafted for the ${car.model}`);
         }
       }

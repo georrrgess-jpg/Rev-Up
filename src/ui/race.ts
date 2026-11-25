@@ -44,7 +44,7 @@ export class RaceView implements View {
     const s = this.app.game.state;
     const cls = carById(s.activeCar);
     const lo = computeLoadout(s);
-    this.head.replaceChildren(h('strong', {}, cls.model), h('div', {}, `${kmh(lo.stats.top)} km/h · Nitro ${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`));
+    this.head.replaceChildren(h('strong', {}, cls.model), h('div', { class: 'head-stats' }, h('span', {}, `${kmh(lo.stats.top)} km/h`), h('span', {}, `Nitro ${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`)));
     const { w, h: hh } = fitCanvas(this.headCanvas);
     const ctx = this.headCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, hh);
@@ -536,7 +536,8 @@ class RaceScreen {
     // double the payout. The visible race keeps running so the crossing and the rivals' arrival are seen.
     const outcome = this.sim.clone().finish();
     this.result = this.app.game.commitRace(this.raceId, outcome) ?? this.app.game.state.lastResult;
-    if (outcome.place === 1) sfx.win(); else sfx.lose();
+    const big = !!(this.result?.boss || this.result?.heat?.champion || this.app.game.state.pendingReveal);
+    if (big) sfx.fanfare(); else if (outcome.place === 1) sfx.win(); else sfx.lose();
     const gap = outcome.gapText.replace(/ of .*$/, '').replace(' behind first', ' behind');
     this.showCallout(outcome.place === 1 ? `WIN! ${gap}` : `${ordinal(outcome.place)} · ${gap}`, outcome.place === 1 ? 'perfect' : 'small', 1600);
     this.finishHold = this.reduced ? 0.3 : 1.6;
@@ -562,7 +563,8 @@ class RaceScreen {
     if (r.freshRep) pills.push(h('span', { class: 'chip rep' }, `Fresh route +${r.freshRep} Rep`));
     const nextLabel = s.pendingReveal ? 'Car unlocked' : 'Next step';
     const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).model} is ready to reveal.` : r.advice;
-    const card = h('div', { class: 'card', role: 'dialog', 'aria-label': 'Race result' },
+    const tierCls = r.boss || r.heat?.champion ? ' big' : s.pendingReveal ? ' big car' : r.newMedals?.length || r.trophy || r.newStars?.length || r.signatureFinish ? ' reward' : '';
+    const card = h('div', { class: `card${tierCls}`, role: 'dialog', 'aria-label': 'Race result' },
       h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, ev.speedTrap ? (r.medal ? `${['', 'Bronze', 'Silver', 'Gold'][r.medal]} run` : 'Run complete') : ev.timeAttack ? (r.medal ? `${['', 'Bronze', 'Silver', 'Gold'][r.medal]} time` : 'Run complete') : r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
       h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
       r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ev.boss.rival === 'ray' ? ' The Suburbs are open.' : ' The coast road is yours.', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
