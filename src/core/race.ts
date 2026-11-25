@@ -587,7 +587,7 @@ export function runRace(setup: RaceSetup, policy: NitroPolicy = 'none', shift?: 
 export function leanOutcome(o: RaceOutcome): LeanOutcome {
   return {
     place: o.place, playerTime: o.playerTime, gapText: o.gapText, perfects: o.perfects, nitroUsed: o.nitroUsed, nitroLeft: o.nitroLeft, trapSpeed: o.trapSpeed ?? undefined,
-    shifts: o.shifts, shiftsClean: o.shiftsClean, topSpeed: o.topSpeed,
+    shifts: o.shifts, shiftsClean: o.shiftsClean, topSpeed: o.topSpeed, coach: o.coach ?? null,
     standings: o.standings.map((r) => ({ name: r.name, time: r.finishTime, isPlayer: r.isPlayer })), advice: o.advice,
   };
 }

@@ -91,6 +91,8 @@ export interface LeanOutcome {
   shifts?: number;
   shiftsClean?: number;
   topSpeed?: number;
+  /** The race's one actionable reason (a missed shift, boost timing, or the build). */
+  coach?: { kind: 'shift' | 'boost' | 'build'; text: string; lost: number } | null;
   standings: { name: string; time: number | null; isPlayer: boolean }[];
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
 }
