@@ -76,7 +76,7 @@ describe('install, swap and remove', () => {
     g.installPart('junker', { zone: 'board', i: 0 }, T0);
     fillBench(g.state);
     const snap = JSON.stringify(g.state.installed);
-    const ev = g.removePart('junker', 'engine', T0);
+    const ev = g.removePart('junker', 'engine', undefined, T0);
     expect(ev[0].type).toBe('invalid');
     expect(JSON.stringify(g.state.installed)).toBe(snap);
     expect(B.freeSlots(g.state)).toBe(0);
