@@ -47,8 +47,8 @@ export class Gauge {
     const s = this.dpr;
     ctx.clearRect(0, 0, W, H);
     const cx = W / 2;
-    const cy = H * 0.6;
-    const R = Math.min(W * 0.44, H * 0.52);
+    const R = Math.min(W * 0.42, H * 0.44);
+    const cy = H - R * 0.92 - 6 * this.dpr; // the arc's open bottom carries the mph readout
     const a0 = Math.PI * 0.8;
     const sweep = Math.PI * 1.4;
     const maxF = 1.08;

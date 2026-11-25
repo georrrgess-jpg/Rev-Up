@@ -129,7 +129,7 @@ export function fullTop(car: CarId): number {
 /** Shift tuning (race workstream). */
 export const SHIFT = {
   /** Extra torque-cut seconds by grade, on top of the car's clean shift time. */
-  cutExtra: { clean: 0, early: 0.16, late: 0.14, missed: 0.3, assist: 0 } as Record<ShiftGrade, number>,
+  cutExtra: { clean: 0, early: 0.16, late: 0.18, missed: 0.3, assist: 0 } as Record<ShiftGrade, number>,
   /** Seconds on the limiter before the box shifts itself (the forgiving fallback). */
   autoDelay: 0.28,
   /** `ordinary` shifting: this long on the limiter, then a late shift. */
@@ -147,10 +147,10 @@ export const SHIFT = {
 /** Engine pull at a fraction of the redline: lugs low, full in the power band, nothing on the limiter. */
 export function torqueAt(f: number, bandTop = 0.95): number {
   if (f >= 1) return 0;
-  if (f > bandTop) return 1 - (0.25 * (f - bandTop)) / (1 - bandTop); // past peak power: the pull fades toward the limiter
-  if (f >= 0.6) return 1;
-  if (f >= 0.25) return 0.5 + (0.5 * (f - 0.25)) / 0.35;
-  return 0.5;
+  if (f > bandTop) return 1 - (0.4 * (f - bandTop)) / (1 - bandTop); // past peak power: the pull fades toward the limiter
+  if (f >= 0.55) return 1;
+  if (f >= 0.25) return 0.72 + (0.28 * (f - 0.25)) / 0.3;
+  return 0.72;
 }
 
 export class RaceSim {
@@ -192,7 +192,7 @@ export class RaceSim {
     for (const rid of ev.rivals) {
       const r = RIVALS[rid];
       const vary = () => 1 + (rng() * 2 - 1) * RACE.rivalVariance;
-      this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false, setup.rivalShift ?? 'clean'));
+      this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false, setup.rivalShift ?? 'ordinary'));
     }
     // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured. It shifts clean.
     this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false, 'clean');
@@ -277,7 +277,7 @@ export class RaceSim {
   /** Shift light state for the HUD: off, approaching the band, in the green, or past it. */
   shiftCue(): 'off' | 'soon' | 'green' | 'late' {
     const p = this.player;
-    if (this.topGear(p) || p.cut > 0 || p.finishTime !== null || this.boostZoneNear()) return 'off';
+    if (this.topGear(p) || p.cut > 0 || p.finishTime !== null || p.v < 2 || this.boostZoneNear()) return 'off';
     const f = this.rpmFrac(p);
     const [lo, hi] = this.band(p);
     if (f > hi) return 'late';
@@ -307,7 +307,7 @@ export class RaceSim {
   /** The player's SHIFT input. Ignored when it cannot mean a shift (top gear, mid-shift, revs far too low). */
   tapShift(): ShiftGrade | 'top' | 'busy' | 'wait' {
     const p = this.player;
-    if (this.done || p.finishTime !== null || p.cut > 0 || this.t - this.lastShiftT < SHIFT.debounce) return 'busy';
+    if (this.done || p.finishTime !== null || p.cut > 0 || p.v < 1 || this.t - this.lastShiftT < SHIFT.debounce) return 'busy';
     if (this.topGear(p)) return 'top';
     const f = this.rpmFrac(p);
     if (f < SHIFT.minTap) return 'wait';
@@ -341,7 +341,7 @@ export class RaceSim {
     const [lo, hi] = this.band(r);
     if (r.isPlayer && this.practice && r.policy === 'manual' && this.boostZoneNear() && f >= (lo + hi) / 2) return this.upshift(r, 'assist');
     switch (r.policy) {
-      case 'clean': if (f >= lo + (hi - lo) * 0.6) this.upshift(r, 'clean'); break;
+      case 'clean': if (f >= lo + (hi - lo) * 0.8) this.upshift(r, 'clean'); break;
       case 'early': if (f >= lo - 0.1) this.upshift(r, 'early'); break;
       case 'ordinary': if (r.limiterT >= SHIFT.ordinaryDelay) this.upshift(r, 'late'); break;
       default: if (r.limiterT >= SHIFT.autoDelay) this.upshift(r, 'missed');
@@ -372,7 +372,7 @@ export class RaceSim {
       const traction = st.grip * RACE.tractionG * d.accelScale; // the calibration scales the whole launch, so grip still matters off the line
       a = raw > traction ? traction + (raw - traction) * RACE.wheelspinKeep : raw;
     } else a = accel;
-    a *= Math.max(0, 1 - (r.v / top) ** (seg.type === 'launch' ? 4 : 2)); // launch is traction- and turbo-bound
+    a *= Math.max(0, 1 - (r.v / top) ** (seg.type === 'launch' ? 4 : d.pullExp ?? 2)); // launch is traction- and turbo-bound
     // the gearbox: no engine pull while the clutch is in, lugging below the power band, nothing on the limiter
     // (nitro thrust keeps pushing through a shift, so a boost is never wasted by one)
     const share = engine / accel;

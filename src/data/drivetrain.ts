@@ -22,6 +22,9 @@ export interface Drivetrain {
    *  roster benchmarks (docs/CONTRACTS.md) while races keep their length (~12–25 s). */
   topScale: number;
   accelScale: number;
+  /** How the pull fades toward top speed (aero drag against power): higher keeps pulling hard until close to the
+   *  top. Default 2. */
+  pullExp?: number;
 }
 
 /** Display / reference values for the roster at full build (docs/CONTRACTS.md). */
@@ -31,27 +34,27 @@ export const BENCHMARK_MPH: Partial<Record<CarId, number>> = {
 
 export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Tapeback 1.1: a tired four-speed. Slow shifts, narrow band, it bogs if you short-shift.
-  junker: { gears: [0.36, 0.58, 0.82, 1.3], idle: 850, redline: 6200, band: [0.8, 0.95], shiftS: 0.06, gaugeMph: 100, topScale: 0.925, accelScale: 1.275 },
+  junker: { gears: [0.36, 0.58, 0.82, 1.3], idle: 850, redline: 6200, band: [0.8, 0.95], shiftS: 0.06, gaugeMph: 100, topScale: 0.925, accelScale: 1.225 },
   // Corsa Rojo: five-speed sedan box, honest and forgiving.
-  beater: { gears: [0.3, 0.48, 0.66, 0.86, 1.3], idle: 800, redline: 6500, band: [0.78, 0.95], shiftS: 0.055, gaugeMph: 120, topScale: 1.075, accelScale: 0.975 },
+  beater: { gears: [0.3, 0.48, 0.66, 0.86, 1.3], idle: 800, redline: 6500, band: [0.78, 0.95], shiftS: 0.055, gaugeMph: 120, topScale: 1.075, accelScale: 0.95 },
   // Vexa GTi: short-geared five-speed that wants to live near the limiter.
   hothatch: { gears: [0.29, 0.46, 0.63, 0.82, 1.3], idle: 900, redline: 7400, band: [0.82, 0.96], shiftS: 0.045, gaugeMph: 150, topScale: 1.225, accelScale: 0.875 },
   // Ironhorse 455: big V8, long gears, low redline. Fewer shifts, each one matters.
-  muscle: { gears: [0.33, 0.54, 0.77, 1.3], idle: 700, redline: 5800, band: [0.76, 0.94], shiftS: 0.06, gaugeMph: 170, topScale: 1.225, accelScale: 0.925 },
+  muscle: { gears: [0.33, 0.54, 0.77, 1.3], idle: 700, redline: 5800, band: [0.76, 0.94], shiftS: 0.06, gaugeMph: 170, topScale: 1.225, accelScale: 0.9 },
   // Altamar GT: long-legged five-speed grand tourer, tall top gear.
-  tourer: { gears: [0.3, 0.47, 0.65, 0.86, 1.3], idle: 750, redline: 6800, band: [0.78, 0.95], shiftS: 0.045, gaugeMph: 190, topScale: 1.175, accelScale: 0.925 },
+  tourer: { gears: [0.3, 0.47, 0.65, 0.86, 1.3], idle: 750, redline: 6800, band: [0.78, 0.95], shiftS: 0.045, gaugeMph: 190, topScale: 1.1, accelScale: 0.95, pullExp: 2.5 },
   // Kestrel 1600: a screaming four that lives high on the tach; a narrow band, quick shifts.
-  tuner: { gears: [0.44, 0.66, 0.86, 1.3], idle: 1100, redline: 9000, band: [0.86, 0.97], shiftS: 0.035, gaugeMph: 160, topScale: 0.95, accelScale: 1.15 },
+  tuner: { gears: [0.44, 0.66, 0.86, 1.3], idle: 1100, redline: 9000, band: [0.86, 0.97], shiftS: 0.035, gaugeMph: 160, topScale: 0.925, accelScale: 1.175 },
   // Lumen RS: six-speed dual clutch; quick shifts, wide band.
-  super: { gears: [0.28, 0.43, 0.58, 0.74, 0.92, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 240, topScale: 1.65, accelScale: 0.8 },
+  super: { gears: [0.28, 0.43, 0.58, 0.74, 0.92, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 240, topScale: 1.625, accelScale: 0.8 },
   // Corvo Rally: five-speed AWD gearing; quick to its (modest) top speed.
-  rally: { gears: [0.36, 0.56, 0.76, 0.96, 1.3], idle: 950, redline: 7800, band: [0.8, 0.95], shiftS: 0.035, gaugeMph: 170, topScale: 0.85, accelScale: 1.325 },
+  rally: { gears: [0.36, 0.56, 0.76, 0.96, 1.3], idle: 950, redline: 7800, band: [0.8, 0.95], shiftS: 0.035, gaugeMph: 170, topScale: 0.85, accelScale: 1.275 },
   // Strata GTR: five-speed sequential endurance box.
-  gt: { gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.05, accelScale: 1.025 },
+  gt: { gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.05, accelScale: 1.0 },
   // Halcyon X: six-speed paddle box with the narrowest band in the game — the hardest car to master.
-  proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.025, accelScale: 1.025 },
+  proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.025, accelScale: 1.0 },
   // Legacy placeholder id kept for old data.
-  hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.65, accelScale: 0.8 },
+  hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };
 
 export const drivetrainFor = (car: CarId): Drivetrain => DRIVETRAINS[car] ?? DRIVETRAINS.beater;
