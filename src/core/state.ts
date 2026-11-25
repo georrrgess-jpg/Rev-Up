@@ -40,6 +40,7 @@ export interface LastResult {
   firstClear: boolean;
   boss: boolean;
   personalBest?: boolean;
+  freshRep?: number;
   signatureFinish?: CarId;
   perfects: number;
   nitroUsed: number;
@@ -87,6 +88,8 @@ export interface GameState {
   badges: string[];
   paints: Partial<Record<CarId, string>>;
   livePodiums: CarId[];
+  /** last two events raced (live or quick), for the Fresh route Rep bonus */
+  recentEvents: string[];
   activeS: number;
   catchup: { goal: CarId | null; effort: number; bestTier: number; claimed: CarId[] };
   offline: { lastSeenAt: number; pendingCash: number; pendingS: number };
@@ -137,6 +140,7 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     badges: [],
     paints: {},
     livePodiums: [],
+    recentEvents: [],
     activeS: 0,
     catchup: { goal: null, effort: 0, bestTier: 0, claimed: [] },
     offline: { lastSeenAt: now, pendingCash: 0, pendingS: 0 },

@@ -67,25 +67,25 @@ export const PRINTER_INTERVAL_S = [20, 16, 13, 10]; // by printer level
 /** Crate tier odds by crate-tier level: weights for T1..T3 */
 export const CRATE_TIER_ODDS: number[][] = [
   [1, 0, 0],
-  [0.65, 0.35, 0],
-  [0.35, 0.55, 0.1],
-  [0.1, 0.65, 0.25],
+  [0.75, 0.25, 0],
+  [0.5, 0.45, 0.05],
+  [0.25, 0.6, 0.15],
 ];
 
 export const UPGRADES: UpgradeDef[] = [
   { id: 'grid', name: 'Bigger bench', levels: [{ cost: 600, label: 'Expand the board to 6×7' }] },
   {
     id: 'printer', name: 'Faster printer', levels: [
-      { cost: 150, label: 'Crate every 16 s' },
-      { cost: 480, label: 'Crate every 13 s' },
-      { cost: 1100, label: 'Crate every 10 s' },
+      { cost: 250, label: 'Crate every 16 s' },
+      { cost: 750, label: 'Crate every 13 s' },
+      { cost: 1600, label: 'Crate every 10 s' },
     ],
   },
   {
     id: 'crateTier', name: 'Better crates', levels: [
-      { cost: 250, label: '35% chance of T2 parts' },
-      { cost: 750, label: 'More T2, some T3 parts' },
-      { cost: 1600, label: 'Mostly T2, 25% T3 parts' },
+      { cost: 450, label: '25% chance of T2 parts' },
+      { cost: 1200, label: 'Half T2, a few T3 parts' },
+      { cost: 2400, label: 'Mostly T2, 15% T3 parts' },
     ],
   },
 ];
@@ -134,13 +134,13 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'hothatch', name: 'Hot hatch', model: 'Vexa GTi', district: 'suburbs', cap: 4,
-    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 265, family: 'turbo', tier: 4 }, enabled: true,
+    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 450, family: 'turbo', tier: 4 }, enabled: true,
     paint: '#e9e4d8', trim: '#d7262e', blurb: 'Short, sharp, and loud. A red pinstripe and a roof spoiler that means it.',
     offlineRate: 3, rev: { base: 80, peak: 260 },
   },
   {
     id: 'muscle', name: 'Muscle', model: 'Ironhorse 455', district: 'suburbs', cap: 5,
-    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 850, family: 'engine', tier: 5 }, enabled: true,
+    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1450, family: 'engine', tier: 5 }, enabled: true,
     paint: '#1f3a5f', trim: '#f2b33d', blurb: 'A restored long-hood coupe with twin stripes and a V8 you can feel in your chest.',
     offlineRate: 4, rev: { base: 45, peak: 160 },
   },
@@ -292,12 +292,12 @@ export const EVENTS: RaceEvent[] = [
   },
   {
     id: 'cul-de-sac', name: 'Cul-de-sac Dash', district: 'suburbs', track: 'maple', rivals: ['bolt', 'june', 'priya'],
-    payout: { cash: [140, 100, 75, 56], rep: [24, 16, 12, 9], crates: [2, 1, 1, 0] }, firstClear: { cash: 120, crates: 3 },
+    payout: { cash: [140, 100, 75, 56], rep: [24, 16, 12, 9], crates: [1, 1, 0, 0] }, firstClear: { cash: 120, crates: 3 },
     requires: { beatBoss: 'ray' }, blurb: 'Sprinklers, speed bumps, and a long on-ramp.',
   },
   {
     id: 'maple-mile', name: 'Maple Mile', district: 'suburbs', track: 'maple', rivals: ['priya', 'hank', 'sol'],
-    payout: { cash: [200, 140, 105, 80], rep: [32, 22, 16, 12], crates: [2, 1, 1, 1] }, firstClear: { cash: 180, crates: 3 },
+    payout: { cash: [200, 140, 105, 80], rep: [32, 22, 16, 12], crates: [1, 1, 1, 0] }, firstClear: { cash: 180, crates: 3 },
     requires: { beatBoss: 'ray', rep: 330 }, blurb: 'Top-speed country. Engines rule the highway.',
   },
   {
@@ -319,6 +319,9 @@ export const eventById = (id: string): RaceEvent => {
   return e;
 };
 
+/** Rep bonus for racing an event that wasn't one of your last two (nudges variety instead of one-race grinding). */
+export const FRESH_ROUTE_BONUS = 0.75;
+export const FRESH_ROUTE_AFTER_RACES = 3;
 export const PRECISION_BONUS_PER_PERFECT = 8; // cash per perfect nitro (live only)
 export const PRECISION_BONUS_CAP = 16; // two windows per track
 

@@ -17,6 +17,14 @@ export interface BotLog {
   scraps: number;
   catchups: number;
   lossRaces: number;
+  /** time when the first live race was launched (finish is milestones.firstRace) */
+  firstLaunch: number;
+  /** seconds with enough Rep for the next car but its keystone still missing */
+  stuckOnIngredients: number;
+  /** seconds with nothing useful to do (waiting on the printer or the crew) */
+  waiting: number;
+  perEvent: Record<string, number>;
+  maxRepeat: number;
   log: string[];
 }
 
@@ -38,7 +46,15 @@ export function runBot(o: BotOpts): BotLog {
   const g = new Game(kv, '/test/', now, undefined);
   g.state.rng = o.seed;
   g.state.raceSeed = o.seed * 31;
-  const L: BotLog = { milestones: {}, races: 0, quick: 0, merges: 0, scraps: 0, catchups: 0, lossRaces: 0, log: [] };
+  const L: BotLog = { milestones: {}, races: 0, quick: 0, merges: 0, scraps: 0, catchups: 0, lossRaces: 0, firstLaunch: 0, stuckOnIngredients: 0, waiting: 0, perEvent: {}, maxRepeat: 0, log: [] };
+  let lastEvent = '';
+  let repeat = 0;
+  const countEvent = (id: string) => {
+    L.perEvent[id] = (L.perEvent[id] ?? 0) + 1;
+    repeat = id === lastEvent ? repeat + 1 : 1;
+    lastEvent = id;
+    L.maxRepeat = Math.max(L.maxRepeat, repeat);
+  };
   let t = 0;
   const spend = (dt: number) => {
     // advance the clock one second at a time so the printer and catch-up see real active play
@@ -49,6 +65,8 @@ export function runBot(o: BotOpts): BotLog {
       t += step;
       g.input(now);
       g.tick(step, now);
+      const gs = P.goalStatus(g.state);
+      if (gs && !gs.keystoneDone && g.state.rep >= gs.repNeed) L.stuckOnIngredients += step;
       left -= step;
     }
   };
@@ -65,6 +83,7 @@ export function runBot(o: BotOpts): BotLog {
         L.log.push(`${t.toFixed(0)}s unlock ${e.car} (rep ${g.state.rep}, cash ${g.state.cash})`);
       }
       if (e.type === 'catchup') { L.catchups++; L.log.push(`${t.toFixed(0)}s catch-up crate ${e.family} T${e.tier}`); }
+      if (e.type === 'keystone' && ((e.family === 'tires' && e.tier === 3) || (e.family === 'turbo' && e.tier === 4) || (e.family === 'engine' && e.tier === 5)) && !L.milestones['key-' + e.family]) L.milestones['key-' + e.family] = Math.round(t);
     }
   });
   const maxS = o.maxS ?? 3600;
@@ -140,15 +159,18 @@ export function runBot(o: BotOpts): BotLog {
     if (B.freeSlots(g.state) <= 2 && g.state.crates.length) { if (scrapJunk()) continue; }
     // race
     const ev = P.recommendedEvent(g.state);
-    if (g.state.pendingQuick) { spend(1); continue; } // crew is out; keep merging as crates arrive
-    if (o.quickRace !== false && P.canQuickRace(g.state, ev)) {
+    // while the crew runs a Quick Race the player can race live // crew is out; keep merging as crates arrive
+    if (o.quickRace !== false && !g.state.pendingQuick && P.canQuickRace(g.state, ev)) {
       g.quickRace(ev.id, now);
+      countEvent(ev.id);
       L.quick++;
       spend(COST.quick);
       continue;
     }
     const setup = g.startRace(ev.id, now);
-    if (!setup) { spend(1); continue; }
+    if (!setup) { L.waiting += 1; spend(1); continue; }
+    countEvent(ev.id);
+    if (!L.firstLaunch) L.firstLaunch = Math.round(t);
     const sim = new RaceSim(setup);
     const policy = o.policy ?? 'perfect';
     while (!sim.done) {

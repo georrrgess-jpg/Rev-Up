@@ -5,7 +5,8 @@ import * as P from '../src/core/progression';
 import { RaceSim, runRace } from '../src/core/race';
 import { MemoryKV, decodeSave, encodeSave, exportText, importText, loadGame, saveKey, writeGame } from '../src/core/save';
 import { migrate, newGame, validateState } from '../src/core/state';
-import { CATCHUP_EFFORT_THRESHOLD, OFFLINE_MAX_S, carById, eventById } from '../src/data/tables';
+import { CATCHUP_EFFORT_THRESHOLD, OFFLINE_MAX_S, SIGNATURE_FINISHES, carById, eventById } from '../src/data/tables';
+import { statsFor } from '../src/core/loadout';
 import { at, emptyGame, put } from './helpers';
 
 const T0 = 1_700_000_000_000;
@@ -83,7 +84,7 @@ describe('expanded career', () => {
     const kv = new MemoryKV();
     const g = mkGame(kv);
     g.transact((s) => {
-      s.rep = 1000;
+      s.rep = 1500;
       s.crafted = ['tires:3', 'turbo:4', 'engine:5'];
       const events: Parameters<typeof P.checkUnlocks>[1] = [];
       P.checkUnlocks(s, events);
@@ -119,6 +120,79 @@ describe('expanded career', () => {
     const repeat = P.commitRace(g.state, { raceId: g.pendingRaceId!, mode: 'live', outcome }, []);
     expect(repeat?.signatureFinish).toBeUndefined();
     expect(repeat?.personalBest).toBe(false);
+  });
+
+  it('loads a 1.0 save that now qualifies for several cars: each is owned once and revealed in order', () => {
+    const kv = new MemoryKV();
+    const old = newGame(T0) as unknown as Record<string, unknown>;
+    delete old.livePodiums;
+    delete old.pendingQuick;
+    Object.assign(old, { rep: 980, crafted: ['tires:3', 'turbo:4'], cash: 777, paints: { junker: '#a8432a' }, blueprints: ['Ray’s Rust-Red'] });
+    kv.setItem(saveKey('/Rev-Up/'), encodeSave(old as never));
+    const g = new Game(kv, '/Rev-Up/', T0 + 1000);
+    expect(g.state.owned).toEqual(['junker', 'beater', 'hothatch']);
+    expect(g.state.cash).toBe(777);
+    expect(g.state.paints.junker).toBe('#a8432a');
+    expect(g.state.pendingReveal).toBe('beater');
+    // closing mid-reveal and reopening never re-grants or skips a car
+    const again = new Game(kv, '/Rev-Up/', T0 + 2000);
+    expect(again.state.owned.filter((c) => c === 'beater')).toHaveLength(1);
+    again.finishReveal('beater', T0 + 2100);
+    const third = new Game(kv, '/Rev-Up/', T0 + 3000);
+    expect(third.state.pendingReveal).toBe('hothatch');
+    third.finishReveal('hothatch', T0 + 3100);
+    expect(new Game(kv, '/Rev-Up/', T0 + 4000).state.pendingReveal).toBeNull();
+  });
+
+  it('an earned finish persists across reload and is used in the next race', () => {
+    const kv = new MemoryKV();
+    const g = mkGame(kv);
+    g.state.livePodiums = ['junker'];
+    g.setPaint('junker', SIGNATURE_FINISHES.junker!.paint, T0);
+    const g2 = new Game(kv, '/Rev-Up/', T0 + 5000);
+    expect(g2.startRace('yard-sprint', T0 + 6000)?.player.paint).toBe(SIGNATURE_FINISHES.junker!.paint);
+  });
+
+  it('the Tapeback Trophy brings the first car back: car-limited, reason given, winnable with a T2 Tapeback', () => {
+    const s = newGame(T0);
+    const e = eventById('tapeback-trophy');
+    expect(P.eventUnlocked(s, e).ok).toBe(false); // needs the Beater first
+    s.owned.push('beater');
+    s.activeCar = 'beater';
+    expect(P.eventUnlocked(s, e)).toMatchObject({ ok: false, switchCar: 'junker' });
+    s.activeCar = 'junker';
+    expect(P.eventUnlocked(s, e).ok).toBe(true);
+    expect(P.eventReason(s, e)).toMatch(/^First win: \+\$150/);
+    const stats = (t: number) => statsFor('junker', { engine: { id: 1, f: 'engine', t, q: 'std' }, tires: { id: 2, f: 'tires', t, q: 'std' }, turbo: { id: 3, f: 'turbo', t, q: 'std' } });
+    let wins = 0;
+    let winsT1 = 0;
+    for (let seed = 1; seed <= 10; seed++) {
+      const setup = (t: number) => ({ eventId: e.id, seed, player: { name: 'You', car: 'junker' as const, stats: stats(t), paint: '#fff' }, nitroCharges: 3 });
+      if (runRace(setup(2), 'perfect').place === 1) wins++;
+      if (runRace(setup(1), 'none').place === 1) winsT1++;
+    }
+    expect(wins).toBeGreaterThanOrEqual(7);
+    expect(winsT1).toBe(0);
+  });
+
+  it('Fresh route adds Rep only for an event outside the last two races, once per race', () => {
+    const s = newGame(T0);
+    s.stats.races = 5;
+    s.recentEvents = ['yard-sprint', 'crusher-run'];
+    const y = eventById('yard-sprint');
+    expect(P.computePayout(s, y, 1, 'quick', 0).freshRep).toBe(0);
+    s.owned.push('beater'); s.activeCar = 'beater';
+    s.events['yard-sprint'] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
+    s.recentEvents = ['crusher-run', 'rusty-ray'];
+    const p = P.computePayout(s, y, 1, 'quick', 0);
+    expect(p.freshRep).toBe(Math.ceil(y.payout.rep[0] * 0.75));
+    expect(p.rep).toBe(y.payout.rep[0] + p.freshRep);
+    // committing records the event, so an immediate repeat is no longer fresh
+    s.pendingRace = { id: 9, eventId: 'yard-sprint', car: 'beater', seed: 9, startedAt: T0 };
+    const outcome = { place: 1, playerTime: 20, gapText: '', perfects: 0, nitroUsed: 0, standings: [], advice: null };
+    const r = P.commitRace(s, { raceId: 9, mode: 'live', outcome }, []);
+    expect(r?.freshRep).toBe(p.freshRep);
+    expect(P.computePayout(s, y, 1, 'quick', 0).freshRep).toBe(0);
   });
 
   it('offers an opening boost and unlocks tools through races', () => {
@@ -207,7 +281,11 @@ describe('race payouts', () => {
     g.quickRace('yard-sprint', T0 + 1000);
     const q = g.state.pendingQuick!;
     expect(q).not.toBeNull();
-    expect(g.startRace('yard-sprint', T0 + 2000)).toBeNull(); // crew is out
+    g.state.rep = 25; // opens Crusher Run
+    expect(P.recommendedEvent(g.state).id).toBe('crusher-run'); // live pick avoids the crew's event
+    g.state.rep = 0;
+    expect(g.startRace('crusher-run', T0 + 2000)).toBeNull(); // still needs Rep
+    g.state.pendingRace = null;
     const cash0 = g.state.cash;
     g.tick(1, T0 + 5000);
     expect(g.state.pendingQuick).not.toBeNull();

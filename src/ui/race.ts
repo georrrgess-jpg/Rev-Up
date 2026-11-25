@@ -384,6 +384,7 @@ class RaceScreen {
     const g = P.goalStatus(s);
     const finish = r.signatureFinish ? SIGNATURE_FINISHES[r.signatureFinish] : undefined;
     if (r.personalBest) pills.push(h('span', { class: 'chip best' }, 'Personal best'));
+    if (r.freshRep) pills.push(h('span', { class: 'chip rep' }, `Fresh route +${r.freshRep} Rep`));
     const nextLabel = s.pendingReveal ? 'Car unlocked' : 'Next step';
     const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).name} is ready to reveal.` : r.advice;
     const card = h('div', { class: 'card', role: 'dialog', 'aria-label': 'Race result' },

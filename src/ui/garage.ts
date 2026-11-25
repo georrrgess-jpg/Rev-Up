@@ -356,9 +356,13 @@ export class GarageView implements View {
     const anim = new Map<string, string[]>();
     const key = (r: SlotRef) => `${r.zone}:${r.i}`;
     let delay = 0;
+    let fuseCount = 0;
+    const FX_CAP = 6; // a batch merge plays at most this many merge sounds and floaters
     let maxChain = 0;
     for (const e of ev) {
       if (e.type === 'fuse') {
+        fuseCount++;
+        if (fuseCount > FX_CAP) { anim.set(key(e.at), ['pop']); continue; }
         const cls = ['pop'];
         if (e.q === 'mint') cls.push('flash-mint');
         if (e.q === 'polished') cls.push('flash-pol');
@@ -406,6 +410,7 @@ export class GarageView implements View {
     const placed = ev.filter((e) => e.type === 'place').length;
     if (placed && !ev.some((e) => e.type === 'fuse')) sfx.place();
     void maxChain;
+    if (fuseCount > FX_CAP) this.floaterTop(`+${fuseCount - FX_CAP} more merges`, '');
     this.render(anim);
   }
 

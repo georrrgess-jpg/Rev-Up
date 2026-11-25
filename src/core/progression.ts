@@ -1,7 +1,7 @@
 import {
   ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MAX_S, OFFLINE_MIN_S, PRECISION_BONUS_CAP, PRECISION_BONUS_PER_PERFECT,
-  PRINTER_INTERVAL_S, RACE_EFFORT, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById,
+  PRINTER_INTERVAL_S, RACE_EFFORT, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById,
 } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
 import type { GameEvent } from './events';
@@ -156,7 +156,9 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   }
   const sig = SIGNATURE_FINISHES[s.activeCar];
   if (sig && !s.livePodiums.includes(s.activeCar)) return `A live top-3 earns the ${sig.name} finish for your ${carById(s.activeCar).model}`;
-  if (g && s.rep < g.repNeed) return `Win for ${e.payout.rep[0]} Rep · ${g.repNeed - s.rep} more unlocks the ${g.car.model}`;
+  const fresh = isFreshRoute(s, e) ? ` (Fresh route +${Math.ceil(e.payout.rep[0] * FRESH_ROUTE_BONUS)})` : '';
+  if (g && s.rep < g.repNeed) return `Win for ${Math.ceil(e.payout.rep[0] * (fresh ? 1 + FRESH_ROUTE_BONUS : 1))} Rep${fresh} · ${g.repNeed - s.rep} more unlocks the ${g.car.model}`;
+  if (fresh) return `Fresh route: +75% Rep on this event`;
   const best = s.events[e.id]?.bestTime;
   return best ? `Beat your record of ${best.toFixed(2)} s` : `Pays $${e.payout.cash[0]} for a win`;
 }
@@ -172,12 +174,19 @@ export interface Payout {
   firstClear: boolean;
   boss: boolean;
   bossReward?: NonNullable<RaceEvent['boss']>['reward'];
+  freshRep: number;
+}
+
+/** Fresh route: +50% Rep for an event that isn't one of your last two races. */
+export function isFreshRoute(s: GameState, e: RaceEvent): boolean {
+  return s.stats.races >= FRESH_ROUTE_AFTER_RACES && !(s.recentEvents ?? []).includes(e.id);
 }
 
 export function computePayout(s: GameState, e: RaceEvent, place: number, mode: 'live' | 'quick', perfects: number): Payout {
   const i = place - 1;
   const base = { cash: e.payout.cash[i], rep: e.payout.rep[i], crates: e.payout.crates[i] };
-  const p: Payout = { ...base, precision: 0, firstClear: false, boss: false };
+  const p: Payout = { ...base, precision: 0, firstClear: false, boss: false, freshRep: 0 };
+  if (isFreshRoute(s, e)) { p.freshRep = Math.ceil(base.rep * FRESH_ROUTE_BONUS); p.rep += p.freshRep; }
   if (mode === 'live') {
     p.precision = Math.min(PRECISION_BONUS_CAP, perfects * PRECISION_BONUS_PER_PERFECT);
     p.cash += p.precision;
@@ -264,6 +273,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   const signatureFinish = input.mode === 'live' && o.place <= 3 && SIGNATURE_FINISHES[pr.car]
     && s.owned.includes(pr.car) && !s.livePodiums.includes(pr.car) ? pr.car : undefined;
   if (signatureFinish) s.livePodiums.push(signatureFinish);
+  s.recentEvents = [e.id, ...(s.recentEvents ?? []).filter((id) => id !== e.id)].slice(0, 2);
   s.stats.races++;
   if (o.place === 1) s.stats.wins++;
   if (!s.stats.milestones['firstRace']) s.stats.milestones['firstRace'] = Math.round(s.activeS);
@@ -274,7 +284,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     raceId: input.raceId, eventId: e.id, place: o.place, mode: input.mode, time: o.playerTime, gapText: o.gapText,
     cash: pay.cash + bossCash, rep: pay.rep, crates: pay.crates + (pay.bossReward?.crates ?? 0), precision: pay.precision,
     firstClear: pay.firstClear, boss: pay.boss, perfects: o.perfects, nitroUsed: input.mode === 'live' ? o.nitroUsed : 0,
-    personalBest, signatureFinish,
+    personalBest, signatureFinish, freshRep: pay.freshRep,
     advice: adviceText(s, o),
     standings: o.standings,
   };
@@ -286,7 +296,6 @@ export function startRace(s: GameState, eventId: string, now: number): { ok: boo
   const e = eventById(eventId);
   const u = eventUnlocked(s, e);
   if (!u.ok) return u;
-  if (s.pendingQuick) return { ok: false, why: 'Your crew is out on a Quick Race' };
   s.raceSeed = (Math.imul(s.raceSeed, 1664525) + 1013904223) >>> 0;
   s.pendingRace = { id: s.raceSeed, eventId, car: s.activeCar, seed: s.raceSeed, startedAt: now };
   return { ok: true, why: '' };
@@ -308,15 +317,26 @@ export function quickDue(s: GameState, now: number) {
 
 /** Recommended event for the one-tap Race button. */
 export function recommendedEvent(s: GameState): RaceEvent {
-  const open = EVENTS.filter((e) => eventUnlocked(s, e).ok);
+  // While the crew runs a Quick Race, recommend a different event for the live race.
+  const busy = s.pendingQuick?.eventId;
+  const open = EVENTS.filter((e) => eventUnlocked(s, e).ok && e.id !== busy);
+  if (!open.length) return eventById(busy ?? EVENTS[0].id);
   const final = open.find((e) => e.id === 'foundry-final' && !s.events[e.id]?.wins);
   if (s.activeCar === 'muscle' && final) return final;
-  // First uncleared event, else boss if unbeaten, else the highest-paying open one.
-  const boss = open.find((e) => e.boss && !s.bosses.includes(e.boss.rival));
-  const uncleared = open.find((e) => !e.boss && !(s.events[e.id]?.wins));
+  // A first clear you keep losing is spaced out between other races instead of repeated back to back.
+  const struggling = (e: RaceEvent) => {
+    const r = s.events[e.id];
+    return !!r && r.starts - r.wins >= 3 && (s.recentEvents ?? []).includes(e.id);
+  };
+  // First uncleared event, else boss if unbeaten, else the best-paying open one.
+  const boss = open.find((e) => e.boss && !s.bosses.includes(e.boss.rival) && !struggling(e));
+  const uncleared = open.find((e) => !e.boss && !(s.events[e.id]?.wins) && !struggling(e));
   if (uncleared && (!boss || EVENTS.indexOf(uncleared) < EVENTS.indexOf(boss))) return uncleared;
   if (boss) return boss;
-  return open.filter((e) => !e.boss && (s.activeCar === 'muscle' || e.id !== 'foundry-final')).at(-1) ?? open[0];
+  // Repeat races: the best Rep per race, counting the Fresh route bonus, so the pick rotates between routes.
+  const pool = open.filter((e) => !e.boss && !struggling(e) && (s.activeCar === 'muscle' || e.id !== 'foundry-final'));
+  const value = (e: RaceEvent) => e.payout.rep[0] * (isFreshRoute(s, e) ? 1 + FRESH_ROUTE_BONUS : 1) + EVENTS.indexOf(e) * 0.01;
+  return pool.sort((a, b) => value(b) - value(a))[0] ?? open[0];
 }
 
 // ---------------- Offline ----------------
