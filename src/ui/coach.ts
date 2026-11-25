@@ -19,6 +19,8 @@ export interface CoachStep {
   ack?: boolean;
   /** Where the callout goes when there is room: above the target (default) or below it. */
   prefer?: 'above' | 'below';
+  /** Controls the callout should stay off when it can (the spare rack, the press, the action bar…). */
+  keepClear?: Element[];
 }
 
 export class Coach {
@@ -59,31 +61,56 @@ export class Coach {
     requestAnimationFrame(() => this.place());
   }
 
-  /** Put the callout above the targets if there is room, else below; keep it inside the host. */
+  /**
+   * Put the callout where it covers neither its targets nor the controls in `keepClear`: right above the
+   * targets when that is free, else right below, else the nearest free band of the host (e.g. above the whole
+   * board for a merge cue). The bubble itself lets taps through (see .coach in style.css), so even a forced
+   * overlap never blocks the control underneath.
+   */
   place() {
     if (!this.step || this.el.hidden) return;
     const host = this.host.getBoundingClientRect();
+    const rel = (r: DOMRect) => ({ l: r.left - host.left, t: r.top - host.top, r: r.right - host.left, b: r.bottom - host.top });
     const rects = this.step.targets.map((t) => t.getBoundingClientRect()).filter((r) => r.width > 0);
     if (!rects.length) { this.el.hidden = true; return; }
-    const top = Math.min(...rects.map((r) => r.top)) - host.top;
-    const bottom = Math.max(...rects.map((r) => r.bottom)) - host.top;
+    const tg = rects.map(rel);
+    const top = Math.min(...tg.map((r) => r.t));
+    const bottom = Math.max(...tg.map((r) => r.b));
     // target scrolled out of sight (a list or sheet): wait, rather than point at nothing
     const scroller = this.step.targets[0].closest('.scroll, .sheet');
     const view = scroller ? scroller.getBoundingClientRect() : host;
     this.el.classList.toggle('offscreen', bottom + host.top < view.top + 8 || top + host.top > view.bottom - 8);
-    const cx = (Math.min(...rects.map((r) => r.left)) + Math.max(...rects.map((r) => r.right))) / 2 - host.left;
+    const cx = (Math.min(...tg.map((r) => r.l)) + Math.max(...tg.map((r) => r.r))) / 2;
     const w = this.el.offsetWidth;
     const hgt = this.el.offsetHeight;
-    const fitsAbove = top - hgt - 14 >= 4;
-    const below = bottom + 12 + hgt <= host.height - 4;
-    const above = fitsAbove && !(this.step.prefer === 'below' && below);
-    // a tall target with no room either side (a big card): sit over its lower edge instead of off-screen
-    const y = above ? top - hgt - 12 : below ? bottom + 12 : Math.max(4, host.height - hgt - 8);
     const x = Math.max(8, Math.min(host.width - w - 8, cx - w / 2));
+    const clear = (this.step.keepClear ?? []).filter((e) => !this.step!.targets.includes(e))
+      .map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map(rel);
+    const overlap = (y: number, list: { l: number; t: number; r: number; b: number }[]) => list.reduce((a, r) =>
+      a + Math.max(0, Math.min(x + w, r.r) - Math.max(x, r.l)) * Math.max(0, Math.min(y + hgt, r.b) - Math.max(y, r.t)), 0);
+    const minY = 4;
+    const maxY = Math.max(minY, host.height - hgt - 4);
+    const aboveY = top - hgt - 12;
+    const belowY = bottom + 12;
+    const ys = [aboveY, belowY, minY, maxY];
+    for (let y = minY; y < maxY; y += 8) ys.push(y);
+    const prefer = this.step.prefer ?? 'above';
+    let best = maxY;
+    let bestScore = Infinity;
+    for (const y0 of ys) {
+      const y = Math.max(minY, Math.min(maxY, y0));
+      const side = y + hgt <= top ? 'above' : y >= bottom ? 'below' : 'over';
+      const dist = side === 'above' ? top - (y + hgt) : side === 'below' ? y - bottom : 0;
+      const score = overlap(y, tg) * 10 + overlap(y, clear) + dist * 2 + (side !== prefer ? 30 : 0);
+      if (score < bestScore) { bestScore = score; best = y; }
+    }
+    const side = best + hgt <= top ? 'above' : best >= bottom ? 'below' : 'over';
+    const gap = side === 'above' ? top - (best + hgt) : side === 'below' ? best - bottom : 0;
     this.el.style.left = `${x}px`;
-    this.el.style.top = `${Math.max(4, Math.min(host.height - hgt - 4, y))}px`;
-    this.el.classList.toggle('below', !above);
-    this.el.classList.toggle('no-arrow', !above && !below);
+    this.el.style.top = `${best}px`;
+    this.el.classList.toggle('below', side === 'below');
+    // the arrow only when the bubble sits right next to what it points at
+    this.el.classList.toggle('no-arrow', side === 'over' || gap > 24 || cx < x + 10 || cx > x + w - 10);
     (this.el.querySelector('.coach-arrow') as HTMLElement).style.left = `${Math.max(14, Math.min(w - 14, cx - x))}px`;
   }
 
@@ -141,11 +168,25 @@ export class GuideCoach {
     let cue: CoachStep | null = null;
     try { cue = this.cue(); } catch { cue = null; }
     const sheet = this.topSheet();
+    if (cue && !sheet) cue = { ...cue, keepClear: this.keepClear(cue) };
     this.coach.el.classList.toggle('over-sheet', !!sheet);
     const isNew = cue && cue.id !== this.coach.current?.id;
     this.coach.show(cue);
     // a cue on a control scrolled out of view (inside a sheet or a list): bring it into view once
     if (isNew && cue && (!cue.ack || cue.targets[0]?.closest(".sheet"))) cue.targets[0]?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  /**
+   * What a Garage cue should not cover: the spare rack, the scrap press and the action bar (the controls the
+   * cues teach), and for a cue on board cells the rest of the board, so the bubble docks above or below it.
+   */
+  private keepClear(cue: CoachStep): Element[] {
+    if (this.app.route !== 'garage') return [];
+    const all = (sel: string) => Array.from(this.app.root.querySelectorAll<HTMLElement>(sel)).filter(visible);
+    const list: Element[] = [...all(SEL.tray), ...all(SEL.press), ...all('.view.on .actions')];
+    const board = cue.targets[0]?.closest('.board');
+    if (board) list.push(board);
+    return list;
   }
 
   private topSheet(): HTMLElement | null {

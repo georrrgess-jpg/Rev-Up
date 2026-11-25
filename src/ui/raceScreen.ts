@@ -12,7 +12,8 @@ import { carLengthM, drawCar, fitCanvas } from '../render/car';
 import type { App } from './app';
 import { h, ordinal } from './dom';
 
-
+/** Lane per racer index (racer 0 runs in lane 1, …); back lanes are drawn first. */
+const LANE_OF = [1, 3, 0, 2];
 const desktop = () => typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches;
 
 /** Post-race telemetry rows for the result card: speed, shifting, boosts, and the one thing to fix. */
@@ -135,9 +136,10 @@ export class RaceScreen {
       this.canvas,
       h('div', { class: 'hud' },
         h('div', { class: 'row1' }, h('div', {}, this.posEl, this.standEl), h('div', {}, this.timeEl, h('div', { style: 'margin-top:6px;text-align:right' }, pauseBtn))),
-        this.progEl),
+        this.progEl,
+        // the ticker flows under the progress bar, so a long line wraps there instead of covering the standings
+        this.ticker),
       this.callout,
-      this.ticker,
       this.flash,
       this.hintEl,
       h('div', { class: 'nitrobar racebar' }, h('div', { class: 'shiftwrap' }, this.gradeEl, this.shiftBtn), this.gauge.el, this.nitroBtn),
@@ -494,6 +496,10 @@ export class RaceScreen {
     let camX = mid - (W * (0.48 - lookAhead)) / ppm;
     camX = Math.min(camX, player.x - (W * 0.18) / ppm);
     camX = Math.max(camX, player.x - (W * (0.62 - lookAhead)) / ppm);
+    // keep the whole player car on screen: player.x is its nose, and on a narrow phone at close zoom the car
+    // is ~45% of the width, so "nose at 18%" alone leaves its tail off the left edge. This wins over look-ahead.
+    const pLane = LANE_OF[sim.racers.indexOf(player)] ?? 3;
+    camX = Math.min(camX, player.x - carLengthM(player.car) * (0.86 + pLane * 0.06) - (W * 0.04) / ppm);
     if (this.finished) camX = Math.min(camX, sim.length - (W * 0.55) / ppm); // hold on the finish line
     const shakeY = this.shake > 0 ? Math.sin(sim.t * 90) * 3 * this.dpr * (this.shake / 0.35) : 0;
     ctx.setTransform(1, 0, 0, 1, 0, shakeY);
@@ -586,8 +592,7 @@ export class RaceScreen {
     }
 
     // cars by lane (back lanes first)
-    const order = [1, 3, 0, 2]; // lane per racer index
-    const draws = sim.racers.map((r, i) => ({ r, lane: order[i] })).sort((a, b) => a.lane - b.lane);
+    const draws = sim.racers.map((r, i) => ({ r, lane: LANE_OF[i] })).sort((a, b) => a.lane - b.lane);
     for (const { r, lane } of draws) {
       const depth = 0.86 + lane * 0.06;
       const len = carLengthM(r.car) * ppm * depth;

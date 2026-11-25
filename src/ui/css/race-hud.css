@@ -58,7 +58,7 @@
 /* Result card telemetry (rows returned by RaceScreen.resultExtras) */
 .race-telemetry { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
 .race-telemetry .tm { background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-width: 0; }
-.race-telemetry .tm span { display: block; font-size: var(--fs-2xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.race-telemetry .tm span { display: block; font-size: var(--fs-2xs); color: var(--muted); line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
 .race-telemetry .tm b { font-size: var(--fs-md); }
 .shift-strip { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
 .shift-strip .sg { display: inline-flex; align-items: baseline; gap: 3px; padding: 2px 8px; border-radius: 999px; font-weight: var(--w-heavy); font-size: var(--fs-xs); background: rgba(255,255,255,.06); }
@@ -69,3 +69,14 @@
 .race-coach { margin: 0 0 10px; font-size: var(--fs-sm); line-height: 1.35; padding: 8px 10px; border-radius: 10px; background: rgba(255,196,87,.08); border: 1px solid rgba(255,196,87,.25); }
 .race-coach.shift b { color: #5dff8a; }
 .race-coach.boost b { color: var(--amber2); }
+
+/* The ticker ("Missed shift — …") flows in the HUD under the progress bar: centred, wrapping inside the screen,
+   and never over the standings above it. */
+.hud .ticker { position: relative; left: auto; top: auto; display: table; margin: 8px auto 0; max-width: 100%; transform: translateY(-6px); white-space: normal; text-align: center; line-height: 1.25; border-radius: 14px; }
+.hud .ticker.on { transform: none; }
+.hud .ticker:empty { display: none; }
+/* telemetry tiles: labels wrap ("Clean shifts", not "Clean shi…"), values stay on one line where they fit */
+.race-telemetry .tm { display: flex; flex-direction: column; justify-content: space-between; container-type: inline-size; }
+.race-telemetry .tm b { white-space: nowrap; }
+@container (max-width: 92px) { .race-telemetry .tm b { font-size: var(--fs-sm); } }
+@container (max-width: 58px) { .race-telemetry .tm b { white-space: normal; } }

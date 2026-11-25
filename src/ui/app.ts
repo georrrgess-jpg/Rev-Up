@@ -173,12 +173,14 @@ export class App {
     bar.classList.remove('compact', 'wrap', 'no-of');
     const clipping = () => Object.values(this.chips).some((c) => c.scrollWidth > c.clientWidth + 1);
     if (!clipping()) return;
-    // first give up the Rep threshold ("/70": the goal card and the Rep sheet show it too), then the words
-    bar.classList.add('no-of');
-    if (!clipping()) return;
+    // first shorten the words (Scrap → ♻, Nitro → ⚡): the Rep threshold ("0/20") is what makes the Rep number
+    // read as progress, so it stays
     bar.classList.add('compact');
+    if (!clipping()) return;
     // enlarged text or very large balances: let the bar take a second row rather than cut numbers off
-    if (clipping()) bar.classList.add('wrap');
+    bar.classList.add('wrap');
+    // last resort only: drop the threshold (the goal card and the Rep sheet show it too)
+    if (clipping()) bar.classList.add('no-of');
   }
 
   promptReveal() {

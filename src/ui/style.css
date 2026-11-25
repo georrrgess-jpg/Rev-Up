@@ -209,8 +209,11 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .sheet .row .t { font-weight: var(--w-heavy); font-size: var(--fs-md); }
 .sheet .row .d { font-size: var(--fs-2xs); color: var(--muted); }
 .sheet { position: relative; }
-.sheet .close { position: absolute; top: 10px; right: calc(var(--safe-r) + 12px); }
-.sheet h2 { padding-right: 84px; }
+/* Close floats in the header's top-right corner: the title and the first lines of text flow around it rather
+   than under it, whatever their length or the text size. */
+.sheet .close { position: relative; z-index: 3; float: right; margin: -4px -4px 6px 10px; }
+.sheet .close + * { margin-top: 0; }
+.sheet h3, .sheet .row, .sheet .segs, .sheet .best-buy, .sheet .goal-requirement, .sheet .fit-stage, .sheet .btn.wide, .sheet .guide-sec { clear: right; }
 .sheet textarea { width: 100%; height: 90px; background: #1a140f; color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: 12px ui-monospace, monospace; padding: 8px; -webkit-user-select: text; user-select: text; }
 .toggle { width: 52px; height: 30px; border-radius: 15px; background: #1a140f; border: 1px solid var(--line); position: relative; flex: none; }
 .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--dim); transition: left .15s; }
@@ -471,6 +474,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 /* ---- coach marks ---- */
 .coach { position: absolute; z-index: 45; max-width: min(300px, calc(100% - 16px)); background: #fff2d2; color: #1c1408; border-radius: 12px; padding: 10px 12px 6px; font-size: var(--fs-sm); line-height: 1.35; font-weight: var(--w-strong); box-shadow: 0 8px 24px rgba(0,0,0,.45); animation: coachin .18s ease-out; }
 .coach[hidden] { display: none; }
+/* the bubble never blocks a tap: only its own buttons take input, so a cue sitting over cells or controls
+   leaves them usable */
+.coach { pointer-events: none; }
+.coach .coach-btn { pointer-events: auto; }
 .coach-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 2px; }
 .coach-btn { min-height: 44px; padding: 0 10px; border-radius: 8px; font-weight: var(--w-heavy); font-size: var(--fs-xs); color: #2a1a05; background: #f2b33d; }
 .coach-btn.subtle { background: transparent; color: #6a5638; }

@@ -112,7 +112,6 @@
 .fit-cars .chipbtn { flex: none; min-height: 44px; padding: 6px 12px; border-radius: 22px; border: 1.5px solid var(--line); background: var(--bg2); font-weight: var(--w-strong); font-size: var(--fs-sm); color: var(--text); white-space: nowrap; }
 .fit-cars .chipbtn.on { border-color: var(--amber2); background: #3a2a12; color: var(--amber2); }
 .fit-cars .chipbtn small { color: var(--muted); font-weight: var(--w-body); }
-.sheet .fit-sub { padding-right: 84px; }
 .fit-stage { position: relative; height: 204px; margin: 2px 0 8px; border-radius: 14px; background: linear-gradient(180deg, #232c38, #151b23); border: 1px solid var(--line); overflow: hidden; }
 .fit-stage .fit-car { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 104px; }
 .fit-slot { position: absolute; top: 8px; transform: translateX(-50%); width: 82px; min-height: 86px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 4px 4px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(16,21,28,.92); color: var(--text); }
@@ -167,6 +166,9 @@
 @media (max-width: 380px) {
   .fit-slot { width: 74px; }
 }
+/* slots sit 30% of the stage apart: never wider than that, so they cannot overlap on a narrow sheet */
+.fit-slot { max-width: calc(30% - 4px); }
+.fit-slot .fs-l, .fit-slot .fs-t { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
 @media (max-height: 700px) {
   .fit-stage { height: 158px; }
   .fit-stage .fit-car { height: 78px; }
@@ -182,3 +184,62 @@
 .reduced .cell.target, .reduced .fitstrip .eq.target { animation: none; }
 .reduced .part.merged, .reduced .part.land, .reduced .board.quake, .reduced .board.keyhit, .reduced .cell.refuse, .reduced .eq.refuse { animation: none; }
 .reduced .cell.hover-ok, .reduced .fitstrip .eq.hover-ok { transform: none; }
+
+/* ---------------------------------------------------------------- fitting the Garage on small screens
+   The body is a grid whose board row takes whatever height the goal card, the slots, the hint and the spare
+   rack leave; the board's cells shrink to that height and to the width (down to a 36 px tap target; boards are always one
+   row taller than wide: 5×6 or 6×7). Only when even that cannot fit (enlarged text on a short phone) does the
+   body scroll; the hint, the spare rack and the scrap press then stay docked at its bottom, right above the
+   action bar, and the board scrolls under them. Nothing slides behind the action bar. */
+.garage .garage-body {
+  --cell-js: var(--cell); --board-min: calc(6 * 36px + 5 * var(--gap) + 14px);
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: max-content max-content max-content max-content minmax(var(--board-min), auto) max-content max-content;
+  padding-bottom: 0;
+}
+.garage .garage-body:has(.board > .cell:nth-child(31)) { --board-min: calc(7 * 36px + 6 * var(--gap) + 14px); }
+.garage .garage-body > .goal { grid-row: 1; }
+.garage .garage-body > .equip { grid-row: 2; }
+.garage .garage-body > .capnote { grid-row: 3; }
+.garage .garage-body > .benchhead { grid-row: 4; }
+.garage .garage-body > .boardwrap { grid-row: 5; container-type: size; align-items: flex-start; }
+.garage .garage-body > .hint { grid-row: 6; }
+.garage .garage-body > .trayrow { grid-row: 7; }
+.garage .boardwrap .board {
+  --cell: min(var(--cell-js),
+    calc((100cqw - 14px - var(--gap) * (var(--cols) - 1)) / var(--cols)),
+    max(36px, calc((100cqh - 14px - var(--gap) * var(--cols)) / (var(--cols) + 1)))); /* 36 px tap floor: below it the body scrolls */
+}
+.garage .garage-body > .trayrow {
+  position: sticky; bottom: 0; z-index: 2; margin-top: 0; padding: 4px 0 4px; background: var(--bg);
+  box-shadow: 0 0 0 1px var(--bg); /* no sub-pixel seam of board showing at fractional zoom */
+}
+.garage .garage-body > .hint {
+  position: sticky; bottom: calc(max(var(--cell) * .86 + 10px, 44px) + 8px); z-index: 2; margin: 0; padding-top: 4px; background: var(--bg); box-shadow: 0 0 0 1px var(--bg);
+}
+.garage .garage-body > .hint:empty { padding: 0; }
+
+/* short screens: tighter chrome so a full board fits more often without scrolling */
+@media (max-height: 700px) {
+  .garage.view { padding-bottom: 2px; }
+  .garage .actions { padding: 4px 1px 2px; }
+  .garage .actions .btn { min-height: 44px; padding-block: 3px; }
+  .garage .actions .btn.race { font-size: var(--fs-sm); }
+}
+
+/* equipment slots on narrow strips (enlarged text, 320 px): shrink the art, then stack it over the label, so
+   "Empty" / "Engine" never ellipsize down to "E…". The slot is the size container; its children adapt. */
+.fitstrip .eq { container-type: inline-size; flex-wrap: wrap; align-content: center; row-gap: 1px; }
+.fitstrip .eq .eqt { flex: 1 1 0; }
+@container (max-width: 104px) {
+  .fitstrip .eq .part.mini, .fitstrip .eqempty { --cell: 28px; width: 28px; height: 28px; }
+  .fitstrip .eqempty svg { width: 22px; height: 22px; }
+  .fitstrip .eq .eqt b { font-size: var(--fs-xs); }
+  .fitstrip .eq .eqt > * { overflow: visible; text-overflow: clip; }
+  .fitstrip .eq .eqart { margin-right: -2px; }
+}
+@container (max-width: 76px) {
+  .fitstrip .eq .eqart { margin-inline: auto; }
+  .fitstrip .eq .eqt { flex-basis: 100%; align-items: center; text-align: center; }
+  .fitstrip .eq .eqn { display: none; }
+}
