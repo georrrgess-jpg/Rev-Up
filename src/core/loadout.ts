@@ -36,12 +36,12 @@ export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?:
   }
   const blocked: Loadout['blocked'] = {};
   for (const f of ACTIVE_FAMILIES) if (equipped[f] && equipped[f]!.t > cap) blocked[f] = equipped[f];
-  return { car, equipped, blocked, stats: statsFor(car, equipped) };
+  return { car, equipped, blocked, stats: statsFor(car, equipped, cap) };
 }
 
-export function statsFor(car: CarId, equipped: Partial<Record<Family, Part>>) {
+export function statsFor(car: CarId, equipped: Partial<Record<Family, Part>>, cap = carById(car).cap) {
   const cls = carById(car);
-  const c = (f: Family) => (equipped[f] ? contributionOn(equipped[f]!, cls.cap) : 0);
+  const c = (f: Family) => (equipped[f] ? contributionOn(equipped[f]!, cap) : 0);
   return {
     top: cls.base.top + c('engine') * STAT_SCALE.top,
     accel: cls.base.accel + c('turbo') * STAT_SCALE.accel,
