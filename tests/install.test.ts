@@ -182,9 +182,21 @@ describe('recommended fit', () => {
 
   it('a Polished part beats a standard one of the same tier', () => {
     const s = emptyGame();
-    put(s, 0, 0, 'tires', 2);
-    put(s, 0, 1, 'tires', 2, 'polished');
-    expect(I.recommendedFit(s, 'junker').tires?.part.q).toBe('polished');
+    put(s, 0, 0, 'engine', 2); // engines: not the Corsa Rojo's keystone family, so not held back as ingredients
+    put(s, 0, 1, 'engine', 2, 'polished');
+    expect(I.recommendedFit(s, 'junker').engine?.part.q).toBe('polished');
+  });
+
+  it('keeps the next car\'s crafting ingredients on the bench', () => {
+    const s = emptyGame();
+    put(s, 0, 0, 'tires', 1);
+    put(s, 0, 1, 'tires', 1); // a T1 Tires pair: the start of the Corsa Rojo's T3 Tires
+    put(s, 0, 2, 'engine', 1);
+    const rec = I.recommendedFit(s, 'junker');
+    expect(rec.tires).toBeUndefined();
+    expect(rec.engine?.part.t).toBe(1);
+    s.board[1] = null; // a lone T1 Tires has no partner: fitting it is fine
+    expect(I.recommendedFit(s, 'junker').tires?.part.t).toBe(1);
   });
 
   it('takes a part from another car only when strictly better than anything on the bench', () => {

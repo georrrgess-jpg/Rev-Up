@@ -409,7 +409,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
   .goal .gt { display: none; }
   .goal .gl { font-size: var(--fs-2xs); }
   .goal .bar { margin-top: 3px; height: 4px; }
-  .equip, .capnote, .benchhead { display: none !important; }
+  .equip:not(.fitstrip), .capnote, .benchhead { display: none !important; }
   .hint { font-size: var(--fs-2xs); min-height: 0; margin-top: 2px; }
   .trayrow { margin-top: 4px; }
   .actions { padding-top: 4px; }
@@ -446,8 +446,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 @media (max-width: 359px) {
   .chip .w { display: none; }
   .chip .g { display: inline; }
-  .chip.cash .g { display: none; }
-  .chip.cash .w { display: inline; }
+  .chip.cash .g, .chip.rep .g { display: none; }
+  .chip.cash .w, .chip.rep .w { display: inline; }
 }
 .part .tier { font-size: max(var(--fs-2xs), calc(var(--cell) * .3)); }
 .part.over-cap::before { content: 'CAP'; bottom: 1px; left: 1px; padding: 0 3px; border-radius: 4px; background: rgba(10,12,16,.82); line-height: 1.25; }
@@ -626,3 +626,144 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .alts .alt:first-of-type { border-top: 0; }
 .alts .alt .d { font-size: var(--fs-xs); color: var(--muted); }
 .milestones .ms-next { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--amber2); }
+
+/* =====================================================================================================
+   Mobile UX overhaul: guide coach, Rep/cash explainers, goal sheet, Shop sections, Race menu facts,
+   results Rep progress. Everything below is scoped to classes these screens own.
+   ===================================================================================================== */
+
+/* ---- top bar: Cash and Rep are tappable explainers; Rep shows the next threshold ---- */
+.topbar .chip { min-height: 44px; } /* same height as the icon buttons: a 44 px target without overflow */
+.topbar button.chip { cursor: pointer; }
+.chip .of { color: var(--dim); font-size: var(--fs-2xs); font-weight: var(--w-strong); margin-left: -2px; }
+.topbar.no-of .chip .of { display: none; }
+/* Rep keeps its word when compact: a ★ glyph would read as Downtown stars */
+.topbar.compact .chip.rep .g { display: none; }
+.topbar.compact .chip.rep .w { display: inline; }
+.explainer .last { color: var(--text); font-weight: var(--w-strong); }
+.explainer .need { display: flex; flex-direction: column; align-items: flex-end; font-weight: var(--w-heavy); color: #f0d9a8; white-space: nowrap; }
+.explainer .need small { color: var(--muted); font-weight: var(--w-strong); font-size: var(--fs-2xs); }
+.explainer .btn.wide { margin-top: 10px; }
+
+/* ---- guide coach (app level): above sheets when the cue is inside one ---- */
+.coach.guide { z-index: 65; max-width: min(320px, calc(100% - 16px)); }
+.coach.guide.over-sheet { z-index: 75; }
+.coach.no-arrow .coach-arrow { display: none; }
+.sheet .coach-target { z-index: 0; }
+
+/* ---- goal card chips and the goal sheet ---- */
+.goal .gl .req { white-space: nowrap; }
+.goal .gl span.req + span.req { color: var(--text); font-size: var(--fs-sm); align-self: auto; }
+.goal .gl .req.rep { color: #f0d9a8; }
+.goal .gl .req.met { color: var(--green); }
+.goal-sheet .why { color: var(--text); }
+.goal-sheet .goal-requirement { align-items: center; }
+.goal-sheet .goal-requirement .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.goal-sheet .goal-requirement .req-kind { font-size: var(--fs-2xs); color: var(--amber2); font-weight: var(--w-heavy); text-transform: uppercase; letter-spacing: .05em; }
+.goal-sheet .goal-requirement .req-status { color: var(--muted); text-align: left; font-size: var(--fs-sm); }
+.goal-sheet .goal-requirement.met strong { color: var(--green); }
+.goal-sheet .goal-requirement .btn { flex: none; }
+
+/* ---- Shop ---- */
+.workshop .goal-note { color: var(--text); margin: 0 0 8px; }
+.workshop .goal-note b { color: var(--amber2); }
+.best-buy { border: 1px solid var(--amber); background: linear-gradient(160deg, #3b2c1c, var(--panel2) 70%); border-radius: 14px; padding: 10px 12px; margin: 0 0 10px; }
+.best-buy.saving { border-color: var(--line); background: var(--bg2); }
+.best-buy .bb-label { font-size: var(--fs-2xs); font-weight: var(--w-heavy); letter-spacing: .08em; text-transform: uppercase; color: var(--amber2); }
+.best-buy .bb-row { display: flex; align-items: center; gap: 10px; }
+.best-buy .t { font-weight: var(--w-heavy); font-size: var(--fs-md); }
+.best-buy .d { font-size: var(--fs-xs); color: var(--muted); line-height: 1.35; }
+.segs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: var(--bg2); border: 1px solid var(--line); margin: 4px 0 6px; position: sticky; top: -14px; z-index: 2; }
+.segs .seg { min-height: 44px; border-radius: 9px; font-weight: var(--w-heavy); font-size: var(--fs-sm); color: var(--muted); }
+.segs .seg.on { background: var(--panel2); color: var(--amber2); box-shadow: inset 0 -2px 0 var(--amber); }
+.workshop .item { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--bg2); margin-bottom: 4px; }
+.workshop .item-head { display: flex; align-items: center; gap: 10px; }
+.workshop .item-head .t { font-weight: var(--w-heavy); font-size: var(--fs-md); }
+.workshop .item-head .d { font-size: var(--fs-2xs); color: var(--muted); }
+.workshop .item-ico, .workshop .up-ico { flex: none; width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; background: var(--panel2); border: 1px solid var(--line); font-size: var(--fs-lg); color: var(--amber2); }
+.workshop .item-ico svg, .workshop .up-ico svg { width: 26px; height: 26px; }
+.workshop .price { font-weight: var(--w-heavy); font-size: var(--fs-lg); color: var(--amber2); white-space: nowrap; }
+.workshop .facts { margin: 8px 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--muted); }
+.workshop .facts li { margin: 2px 0; }
+.workshop .facts li.up { color: var(--green); }
+.workshop .facts li.goal-fact { color: var(--amber2); }
+.workshop .item > .btn { width: 100%; min-height: 50px; }
+.workshop .btn.buy { min-width: 84px; }
+.workshop .btn small.short { color: var(--muted); }
+.workshop .btn.primary small.short { color: #5a3a0e; }
+.workshop .up-row .kind { font-size: var(--fs-2xs); color: var(--amber2); font-weight: var(--w-strong); }
+.workshop .up-printer .up-ico { color: #9fd8ff; }
+.workshop .up-crateTier .up-ico { color: var(--gold); }
+.workshop .up-crew .up-ico { color: var(--green); }
+.workshop .up-nitroTank .up-ico { color: var(--blue); }
+.workshop .up-lockup .up-ico { color: #d9b8ff; }
+.workshop .fam-pick small { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: var(--w-strong); }
+.workshop .fam-pick.on small { color: var(--amber2); }
+
+/* ---- Race menu ---- */
+.fitbar { flex: none; display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: #2b2412; border: 1px solid var(--amber); font-size: var(--fs-sm); font-weight: var(--w-strong); }
+.fitbar[hidden] { display: none; }
+.fitbar .grow { flex: 1; min-width: 0; }
+.fitbar .btn { flex: none; }
+.featured .facts { display: grid; grid-template-columns: 1fr; gap: 4px; margin: 8px 0; }
+.featured .fact { display: grid; grid-template-columns: 84px 1fr; gap: 8px; align-items: baseline; font-size: var(--fs-sm); color: var(--text); }
+.featured .fact > small { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: var(--w-heavy); }
+.featured .fact > span { min-width: 0; overflow-wrap: anywhere; }
+.featured .btns .btn.primary { flex: 1; }
+.diff { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-2xs); font-weight: var(--w-heavy); background: #2b3540; color: #cfe3f0; white-space: nowrap; }
+.diff.easy { background: rgba(111,208,140,.2); color: #8fe0a8; }
+.diff.even { background: rgba(142,211,250,.18); color: var(--blue); }
+.diff.tough { background: rgba(236,159,76,.22); color: var(--amber2); }
+.diff.vtough { background: rgba(224,98,79,.25); color: #ffb3a6; }
+.btn.quick { border-color: #3d6b86; background: #1a2733; color: #cfe9fb; }
+.btn.quick small { color: #9fc6de; }
+.featured .btn.quick { width: 100%; margin-top: 8px; min-height: 48px; }
+.quick-locked { margin-top: 8px; font-size: var(--fs-xs); color: var(--muted); padding: 8px 10px; border-radius: 10px; border: 1px dashed #3d6b86; }
+.quick-locked b { color: #cfe9fb; }
+.paytable { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: var(--fs-xs); }
+.paytable th, .paytable td { padding: 3px 4px; text-align: right; }
+.paytable th:first-child { text-align: left; color: var(--muted); }
+.paytable tr.q td { color: #9fc6de; }
+.paytable tr.r td { color: #f0d9a8; }
+.cat-label { margin: 14px 2px 0; font-size: var(--fs-2xs); font-weight: var(--w-heavy); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.district-sec.locked > summary { opacity: .75; }
+.evt-row .meta .diff { margin-right: 4px; }
+.evt-row .name { overflow-wrap: anywhere; }
+.evt-row .row-main { min-width: 0; }
+
+/* ---- results: Rep progress, other requirements, telemetry extras ---- */
+.result .rep-progress { margin: 0 0 10px; padding: 8px 10px; border-radius: 10px; background: rgba(240,217,168,.08); font-size: var(--fs-sm); }
+.result .rep-progress b { color: #f0d9a8; }
+.result .rep-progress .rp-next { color: var(--muted); }
+.result .rep-progress .bar > i { background: linear-gradient(90deg, #c9a86a, #f0d9a8); }
+.result .still-needed { margin: 0 0 10px; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--line); font-size: var(--fs-sm); font-weight: var(--w-strong); }
+.result .still-needed small { display: block; font-size: var(--fs-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: var(--w-heavy); margin-bottom: 2px; }
+.result .extras { margin: 0 0 10px; display: grid; gap: 4px; font-size: var(--fs-sm); }
+.result .fit-cta { margin: 0 0 8px; border-color: var(--amber); color: var(--amber2); }
+.result .quick-open { margin: -4px 0 10px; font-size: var(--fs-xs); color: #9fc6de; }
+.result .chip small { color: var(--muted); font-weight: var(--w-strong); }
+
+/* ---- layout audit: narrow phones, short landscape, enlarged text ---- */
+.sheet h2 { overflow-wrap: anywhere; }
+.sheet .row .t, .sheet .row .d { overflow-wrap: anywhere; }
+.result .card { overflow-wrap: anywhere; }
+.result .btns { flex-wrap: wrap; }
+.result .btns .btn { min-width: 132px; }
+.featured .name { overflow-wrap: anywhere; }
+@media (max-width: 359px) {
+  .featured .fact { grid-template-columns: 1fr; gap: 0; }
+  .workshop .fams { gap: 4px; }
+  .workshop .fam-pick { font-size: var(--fs-xs); }
+  .best-buy .bb-row { flex-wrap: wrap; }
+  .best-buy .bb-row .btn { width: 100%; }
+  .racehead canvas { width: 84px; }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  .sheet { max-height: calc(100dvh - var(--safe-t) - 8px); padding-top: 8px; }
+  .segs { top: -8px; }
+}
+.coach.offscreen { visibility: hidden; }
+@media (max-height: 660px) {
+  .racehead canvas { width: 80px; height: 38px; }
+  .fitbar { padding: 4px 8px; font-size: var(--fs-xs); }
+}

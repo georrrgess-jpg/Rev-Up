@@ -71,7 +71,7 @@ export class GarageView implements View {
     this.hintEl = h('div', { class: 'hint', role: 'status' });
     this.printerBar = h('i');
     this.cratesBtn = h('button', { class: 'btn crates', onclick: () => this.onCrates() });
-    this.mergeAllBtn = h('button', { class: 'btn', onclick: () => this.onMergeAll() });
+    this.mergeAllBtn = h('button', { class: 'btn', 'data-coach': 'merge-all', onclick: () => this.onMergeAll() });
     this.raceBtn = h('button', { class: 'btn primary race', onclick: () => this.onRace() });
     const shopBtn = h('button', { class: 'btn', 'aria-label': 'Shop: parts, crates and upgrades', onclick: () => openShop(this.app) }, 'Shop');
     this.shopBtn = shopBtn;

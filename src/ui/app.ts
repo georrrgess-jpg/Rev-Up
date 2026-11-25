@@ -1,8 +1,13 @@
 import { setMuted, sfx, unlockAudio } from '../audio';
 import type { GameEvent } from '../core/events';
 import type { Game } from '../core/game';
-import { MAX_TIER, nitroCapFor } from '../data/tables';
+import * as P from '../core/progression';
+import type { GameState } from '../core/state';
+import { EVENTS, FAMILIES, MAX_TIER, carById, eventById, nitroCapFor } from '../data/tables';
+import { GuideCoach } from './coach';
 import { fmt, h } from './dom';
+import { openGoalSheet } from './goalCard';
+import { openShop } from './shop';
 import { GarageView } from './garage';
 import { RaceView } from './raceMenu';
 import { RevealOverlay } from './reveal';
@@ -33,6 +38,7 @@ export class App {
   updateReady: (() => void) | null = null;
   offlineReady = false;
   reveal: RevealOverlay | null = null;
+  guide!: GuideCoach;
 
   constructor(public game: Game, mount: HTMLElement) {
     this.root = mount;
@@ -40,15 +46,19 @@ export class App {
     setMuted(s.settings.muted);
     document.documentElement.classList.toggle('reduced', s.settings.reducedMotion);
 
-    const chip = (key: string, cls: string, glyph: string, word: string, label: string) => {
-      const el = h('span', { class: `chip ${cls}`, title: label, 'aria-label': label },
-        h('span', { class: 'ico g', 'aria-hidden': 'true' }, glyph), h('span', { class: 'ico w', 'aria-hidden': 'true' }, word), h('span', { class: 'num v' }, '0'));
+    const chip = (key: string, cls: string, glyph: string, word: string, label: string, onTap?: () => void) => {
+      const kids = [h('span', { class: 'ico g', 'aria-hidden': 'true' }, glyph), h('span', { class: 'ico w', 'aria-hidden': 'true' }, word), h('span', { class: 'num v' }, '0'),
+        key === 'rep' ? h('span', { class: 'num of', 'aria-hidden': 'true' }) : null];
+      // Cash and Rep explain themselves on tap: cash is spending money, Rep is earned progress.
+      const el = onTap
+        ? h('button', { class: `chip ${cls}`, title: label, 'aria-label': label, onclick: onTap }, ...kids)
+        : h('span', { class: `chip ${cls}`, title: label, 'aria-label': label }, ...kids);
       this.chips[key] = el;
       return el;
     };
     const top = h('header', { class: 'topbar' },
-      chip('cash', 'cash', '$', '$', 'Cash'),
-      chip('rep', 'rep', '★', 'Rep', 'Reputation'),
+      chip('cash', 'cash', '$', '$', 'Cash: spending money. Tap for details', () => this.explainCash()),
+      chip('rep', 'rep', '★', 'Rep', 'Rep: earned progress. Tap for details', () => this.explainRep()),
       chip('scrap', 'scrap', '♻', 'Scrap', 'Scrap'),
       chip('nitro', 'nitro', '⚡', 'Nitro', 'Banked nitro charges'),
       h('span', { class: 'spacer' }),
@@ -83,6 +93,7 @@ export class App {
     window.addEventListener('pointerdown', () => game.input(), { capture: true, passive: true });
     window.addEventListener('keydown', () => game.input(), { capture: true });
 
+    this.guide = new GuideCoach(this);
     this.fromHash(true);
     if (game.load.problem) this.toast(game.load.problem, undefined, 6000);
     if (s.pendingReveal) setTimeout(() => this.openReveal(s.pendingReveal!), 300);
@@ -108,6 +119,7 @@ export class App {
     if (push && location.hash !== `#${r}`) history.replaceState(null, '', `#${r}`);
     this.views[r].show();
     this.maybeShowUpdate();
+    this.guide?.update();
   }
 
   onEvents(ev: GameEvent[]) {
@@ -115,6 +127,8 @@ export class App {
     for (const v of Object.values(this.views)) v.onEvents(ev);
     for (const e of ev) {
       if (e.type === 'unlock' && !this.reveal) setTimeout(() => this.promptReveal(), 450);
+      // fitting a part by hand is the lesson the 'fit' beat teaches: once done, it never shows again
+      if ((e.type === 'install' || e.type === 'move-fit') && !this.game.state.tips.fit) setTimeout(() => this.game.markTip('fit'), 0);
       if (e.type === 'invalid') {
         sfx.invalid();
         if (e.reason !== 'empty') this.toast(e.reason === 'Different family' || e.reason === 'Different tier' ? 'Match two parts of the same family and tier' : e.reason);
@@ -139,6 +153,11 @@ export class App {
     const any = ev.length > 0;
     set('cash', fmt(s.cash), any);
     set('rep', fmt(s.rep), any);
+    const next = repMilestones(s)[0];
+    const of = this.chips.rep.querySelector('.of')!;
+    const ofText = next ? `/${fmt(next.rep)}` : '';
+    if (of.textContent !== ofText) of.textContent = ofText;
+    this.chips.rep.setAttribute('aria-label', `Rep ${s.rep}${next ? `, next at ${next.rep}: ${next.what}` : ''}. Tap for details`);
     set('scrap', fmt(s.scrap), any);
     set('nitro', `${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`, any);
     this.fitTop();
@@ -151,8 +170,11 @@ export class App {
   fitTop() {
     const bar = this.topBar ?? (this.topBar = this.root.querySelector('.topbar'));
     if (!bar) return;
-    bar.classList.remove('compact', 'wrap');
+    bar.classList.remove('compact', 'wrap', 'no-of');
     const clipping = () => Object.values(this.chips).some((c) => c.scrollWidth > c.clientWidth + 1);
+    if (!clipping()) return;
+    // first give up the Rep threshold ("/70": the goal card and the Rep sheet show it too), then the words
+    bar.classList.add('no-of');
     if (!clipping()) return;
     bar.classList.add('compact');
     // enlarged text or very large balances: let the bar take a second row rather than cut numbers off
@@ -208,6 +230,36 @@ export class App {
     this.toastTimer = window.setTimeout(() => el.remove(), ms);
   }
 
+  /** Rep: what it is, where it stands, and what each next threshold opens. */
+  explainRep() {
+    const s = this.game.state;
+    const ms = repMilestones(s).slice(0, 4);
+    const last = s.lastResult;
+    this.sheet((close) => h('div', { class: 'explainer' },
+      h('button', { class: 'btn sm close', onclick: close }, 'Close'),
+      h('h2', {}, `Rep · ${fmt(s.rep)}`),
+      h('p', {}, 'Rep is your racing reputation. Every race finish earns it (wins earn most) and it is never spent. Reaching a Rep threshold opens new races and, with the other requirements, new cars.'),
+      last ? h('p', { class: 'last' }, `Last race: +${last.rep} Rep at ${eventById(last.eventId).name}.`) : null,
+      h('h3', {}, ms.length ? 'Coming up' : 'Every Rep threshold reached'),
+      ...ms.map((m) => h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, m.what), h('div', { class: 'd' }, m.also ?? '')),
+        h('span', { class: 'num need' }, `${fmt(m.rep)} Rep`, h('small', {}, `${fmt(m.rep - s.rep)} to go`)))),
+      P.goalStatus(s) ? h('button', { class: 'btn wide', onclick: () => { close(); openGoalSheet(this); } }, 'Everything the next car needs') : null,
+      h('button', { class: 'btn wide primary', onclick: () => { close(); this.go('race'); } }, 'Race for Rep'),
+    ));
+  }
+
+  /** Cash: spending money, and where it goes. */
+  explainCash() {
+    const s = this.game.state;
+    this.sheet((close) => h('div', { class: 'explainer' },
+      h('button', { class: 'btn sm close', onclick: close }, 'Close'),
+      h('h2', {}, `Cash · $${fmt(s.cash)}`),
+      h('p', {}, 'Cash is your spending money. Races pay it by place (live races pay the most), merges add a little, and your cars earn some while you are away.'),
+      h('p', {}, 'Spend it in the Shop on parts, tune-ups and garage upgrades, or on paint and wheels in the Paint shop. Spending never lowers your Rep.'),
+      h('button', { class: 'btn wide primary', onclick: () => { close(); openShop(this); } }, 'Open the Shop'),
+    ));
+  }
+
   sheet(build: (close: () => void) => HTMLElement, onClose?: () => void): () => void {
     const back = h('div', { class: 'sheet-back' });
     const opener = document.activeElement;
@@ -241,4 +293,22 @@ export class App {
   }
 
   get topTier() { return MAX_TIER; }
+}
+
+/** Rep thresholds still ahead, nearest first: races that open at a Rep level and the next car's Rep. */
+export function repMilestones(s: GameState): { rep: number; what: string; also?: string }[] {
+  const out: { rep: number; what: string; also?: string }[] = [];
+  const g = P.goalStatus(s);
+  if (g && g.repNeed > s.rep) {
+    const other = [!g.keystoneDone ? `a crafted T${g.tier} ${FAMILIES[g.family].name}` : '', g.event && !g.eventDone ? `a win at ${eventById(g.event).name}` : ''].filter(Boolean);
+    out.push({ rep: g.repNeed, what: `The ${g.car.model}`, also: other.length ? `Also needs ${other.join(' and ')}` : 'The last thing it needs' });
+  }
+  for (const e of EVENTS) {
+    const r = e.requires.rep;
+    if (!r || r <= s.rep || e.heatOf) continue;
+    const other = [e.requires.car && !s.owned.includes(e.requires.car) ? `the ${carById(e.requires.car).model}` : '',
+      e.requires.beatBoss && !s.bosses.includes(e.requires.beatBoss) ? 'a rival win' : ''].filter(Boolean);
+    out.push({ rep: r, what: `${e.name} race`, also: other.length ? `Also needs ${other.join(' and ')}` : 'Opens in the Race tab' });
+  }
+  return out.sort((a, b) => a.rep - b.rep);
 }

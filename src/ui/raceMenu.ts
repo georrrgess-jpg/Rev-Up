@@ -1,21 +1,29 @@
+// The Race menu: one recommended event with the reason it suits your goal and build, then the catalogue.
+// Each event shows track type, difficulty, reward and requirements; rivals and full payouts sit behind a tap.
+// Live races (you drive: full purse and bonuses) and Quick Races (your crew drives while you merge: a share
+// of the purse, no bonuses) are labelled and priced apart. Owned by the mobile UX workstream.
 import { carStyle } from '../core/style';
 import type { GameState } from '../core/state';
 import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
-import { DISTRICTS, EVENTS, RIVALS, RaceEvent, TRACKS, carById, eventById, finishStripe, CREW_NITRO, nitroCapFor } from '../data/tables';
+import { mph } from '../core/units';
+import { DISTRICTS, EVENTS, FAMILIES, RIVALS, RaceEvent, TRACKS, carById, eventById, finishStripe, CREW_NITRO, nitroCapFor } from '../data/tables';
 import { drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
+import { difficulty, fitStatus } from './benefit';
 import { h, ordinal } from './dom';
-
-const kmh = (ms: number) => Math.round(ms * 3.6);
-
+import { openFitParts } from './fit';
 import { RaceScreen } from './raceScreen';
+
+/** Speed-trap thresholds and records are stored in km/h until the stage-2 tables move to mph: show them in mph. */
+const trapMph = (kmh: number) => mph(kmh / 3.6);
 
 export class RaceView implements View {
   el: HTMLElement;
   private head: HTMLElement;
   private headCanvas: HTMLCanvasElement;
+  private fitBar: HTMLElement;
   private list: HTMLElement;
   private visible = false;
   private timer = 0;
@@ -23,10 +31,12 @@ export class RaceView implements View {
   constructor(private app: App) {
     this.headCanvas = h('canvas', { 'aria-hidden': 'true' });
     this.head = h('div', { class: 'stats' });
+    this.fitBar = h('div', { class: 'fitbar' });
     this.list = h('div', { class: 'racelist scroll' });
-    this.el = h('section', { class: 'view', 'aria-label': 'Race' },
+    this.el = h('section', { class: 'view race-view', 'aria-label': 'Race' },
       h('div', { class: 'racehead' }, this.headCanvas, this.head, h('span', { style: 'flex:1' }),
         h('button', { class: 'btn sm', onclick: () => app.go('showroom') }, 'Change car')),
+      this.fitBar,
       this.list);
   }
 
@@ -43,7 +53,8 @@ export class RaceView implements View {
     const s = this.app.game.state;
     const cls = carById(s.activeCar);
     const lo = computeLoadout(s);
-    this.head.replaceChildren(h('strong', {}, cls.model), h('div', { class: 'head-stats' }, h('span', {}, `${kmh(lo.stats.top)} km/h`), h('span', {}, `Nitro ${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`)));
+    this.head.replaceChildren(h('strong', {}, cls.model),
+      h('div', { class: 'head-stats' }, h('span', {}, `${mph(lo.stats.top)} mph top`), h('span', {}, `Nitro ${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`)));
     const { w, h: hh } = fitCanvas(this.headCanvas);
     const ctx = this.headCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, hh);
@@ -52,76 +63,115 @@ export class RaceView implements View {
     drawCar(ctx, s.activeCar, (w - length * 1.06) / 2, hh * .91, length,
       { paint: paint ?? cls.paint, trim: cls.trim, livery: finishStripe(s.activeCar, paint), style: carStyle(s, s.activeCar) });
 
+    // Empty or improvable slots: say so before the player races, with the one action that fixes it.
+    const fs = fitStatus(s);
+    const fitMsg = fs.empty.length
+      ? `${fs.empty.length === 1 ? `The ${FAMILIES[fs.empty[0]].name} slot is` : `${fs.empty.length} part slots are`} empty on your ${cls.model}. Empty slots add nothing.`
+      : fs.better.length ? `${fs.better.length === 1 && fs.better[0] !== 'tires' ? `A better ${FAMILIES[fs.better[0]].name} is` : `Better ${fs.better.map((f) => FAMILIES[f].name).join(' and ')} are`} on your bench, not on the car.` : '';
+    this.fitBar.hidden = !fitMsg;
+    this.fitBar.replaceChildren(...(fitMsg ? [h('span', { class: 'grow' }, fitMsg),
+      h('button', { class: 'btn sm primary', 'data-coach': 'race-fit', onclick: () => openFitParts(this.app) }, 'Fit parts')] : []));
+
     const rec = P.recommendedEvent(s);
     const q = s.pendingQuick;
-    const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details[open]')).map((d) => d.dataset.event));
+    const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.event-detail[open]')).map((d) => d.dataset.event));
     const nitroNote = `${s.nitro + CREW_NITRO} nitro${s.nitro ? '' : ' (crew)'}`; // banked charges plus the free crew charge
     const details = (e: RaceEvent) => {
-      const pay = e.payout;
+      const p = P.purse(s, e);
+      const quick = P.canQuickRace(s, e) || (!e.boss && !e.timeAttack && !e.speedTrap && !e.knockout);
       return h('details', { class: 'event-detail', 'data-event': e.id, ...(expanded.has(e.id) ? { open: '' } : {}) },
         h('summary', {}, 'Rivals and payouts'),
         h('p', {}, e.blurb),
-        h('div', { class: 'rivals' }, ...e.rivals.map((id) => RIVALS[id]).map((r) => h('div', {}, h('b', {}, r.name), ` · ${r.line}`))),
-        h('p', {}, `Every place pays: ${[0, 1, 2, 3].map((i) => `${ordinal(i + 1)} $${pay.cash[i]} · ${pay.rep[i]} Rep`).join(' — ')}.`),
+        e.rivals.length ? h('div', { class: 'rivals' }, ...e.rivals.map((id) => RIVALS[id]).map((r) => h('div', {}, h('b', {}, r.name), ` · ${r.line}`))) : null,
+        e.timeAttack ? null : h('table', { class: 'paytable' },
+          h('tr', {}, h('th', {}, ''), ...p.live.slice(0, e.rivals.length + 1).map((_, i) => h('th', {}, ordinal(i + 1)))),
+          h('tr', {}, h('th', {}, 'Live'), ...p.live.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `$${c}`))),
+          quick ? h('tr', { class: 'q' }, h('th', {}, 'Quick'), ...p.quick.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `$${c}`))) : null,
+          h('tr', { class: 'r' }, h('th', {}, 'Rep'), ...e.payout.rep.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `${c}`)))),
+        h('p', {}, `Live only: +$${p.perfect} per Perfect boost (up to 2)${p.firstClear ? `, +$${p.firstClear} for your first win` : ''}. Quick Race pays ${Math.round(p.quickShare * 100)}% of the live purse and no bonuses.`),
         e.boss ? h('p', { class: 'event-bonus' }, `First win: ${e.boss.reward.blueprint} paint, “${e.boss.reward.badge}” badge, $${e.boss.reward.cash} and ${e.boss.reward.crates} crates.`) : null);
     };
-    const quickBtn = (e: RaceEvent, small: boolean) => {
-      if (!P.canQuickRace(s, e)) return null;
-      const here = q?.eventId === e.id;
+    const quickPart = (e: RaceEvent, small: boolean) => {
       const crew = P.purse(s, e).quick;
-      return h('button', { class: `btn${small ? ' sm' : ''}${q && !here ? ' off' : ''}`, 'aria-label': `Quick Race: your crew races for up to $${crew[0]}`, onclick: () => this.startQuick(e.id) },
-        here ? `Crew ${Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000))} s` : small ? h('span', { class: 'stack' }, 'Quick', h('small', {}, `$${crew[0]}`)) : h('span', { class: 'stack' }, 'Quick Race', h('small', {}, `crew earns up to $${crew[0]}`)));
+      if (!P.canQuickRace(s, e)) {
+        if (small || e.boss || e.timeAttack || e.speedTrap || e.knockout || e.heatOf) return null;
+        return h('div', { class: 'quick-locked' }, h('b', {}, 'Quick Race'), ` opens after your first live win here — then your crew can race it for $${crew[0]} while you merge.`);
+      }
+      const here = q?.eventId === e.id;
+      const left = here ? Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000)) : 0;
+      return h('button', {
+        class: `btn quick${small ? ' sm' : ''}${q && !here ? ' off' : ''}`, 'data-coach': small ? null : 'race-quick',
+        'aria-label': `Quick Race: your crew races for up to $${crew[0]}, no bonuses`, onclick: () => this.startQuick(e.id),
+      }, here ? `Crew racing · ${left} s` : small ? h('span', { class: 'stack' }, 'Quick', h('small', {}, `$${crew[0]}`))
+        : h('span', { class: 'stack' }, 'Quick Race', h('small', {}, `crew drives · up to $${crew[0]}`)));
     };
     const course = (e: RaceEvent) => h('span', { class: 'course' }, TRACKS[e.track].course);
+    const diffTag = (e: RaceEvent) => {
+      const car = P.eventUnlocked(s, e).switchCar ?? s.activeCar;
+      const d = difficulty(s, e, car);
+      return h('span', { class: `diff ${d.cls}`, title: d.why }, d.label);
+    };
+    const reasonFor = (e: RaceEvent) => {
+      if (e.speedTrap) {
+        const m = s.medals?.[e.id] ?? 0;
+        const best = s.events[e.id]?.bestSpeed;
+        return m >= 3 ? `Gold won${best ? ` · record ${trapMph(best)} mph` : ''}` : `${['Bronze', 'Silver', 'Gold'][m]} at ${trapMph([e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m])} mph through the gate${best ? ` · best ${trapMph(best)} mph` : ''}`;
+      }
+      return P.eventReason(s, e);
+    };
 
     // Featured: one recommended event with a reason to run it now (a knockout shows the heat you race next).
     const shown = rec.knockout ? eventById(rec.knockout.heats[s.knockout?.heat ?? 0]) : rec;
     const fr = s.events[rec.id];
-    const featured = h('section', { class: 'featured', 'aria-label': 'Up next' },
-      h('div', { class: 'feat-label' }, 'Up next'),
+    const d = difficulty(s, shown, P.eventUnlocked(s, rec).switchCar ?? s.activeCar);
+    const winRep = shown.payout.rep[0];
+    const fact = (k: string, v: (string | HTMLElement)[] | string, cls = '') => h('div', { class: `fact ${cls}` }, h('small', {}, k), h('span', {}, ...(Array.isArray(v) ? v : [v])));
+    const featured = h('section', { class: 'featured', 'aria-label': 'Recommended race' },
+      h('div', { class: 'feat-label' }, 'Recommended for you'),
       h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
-      h('div', { class: 'meta' }, course(rec), ` ${TRACKS[rec.track].favours}`),
-      h('p', { class: 'reason' }, P.eventReason(s, rec)),
+      h('p', { class: 'reason' }, reasonFor(rec)),
+      h('div', { class: 'facts' },
+        fact('Track', [course(rec), ` ${TRACKS[rec.track].favours}`]),
+        fact('Difficulty', [h('span', { class: `diff ${d.cls}` }, d.label), ` ${d.why}`]),
+        fact('Win pays', shown.timeAttack ? `$${shown.payout.cash[0]} a run · medals pay once` : `$${shown.payout.cash[0]} and ${winRep} Rep${shown.payout.crates[0] ? ` · ${shown.payout.crates[0]} crate${shown.payout.crates[0] > 1 ? 's' : ''}` : ''}${P.purse(s, shown).firstClear ? ` · +$${P.purse(s, shown).firstClear} first win` : ''}`),
+        fact('Needs', P.eventUnlocked(s, rec).switchCar ? `The ${carById(P.eventUnlocked(s, rec).switchCar!).model} (we'll switch to it)` : 'Nothing more — open now'),
+        fr?.bestTime ? fact('Your record', `${fr.bestTime.toFixed(2)} s`) : null),
       rec.goals ? goalList(s, rec) : null,
       rec.knockout ? heatList(s, rec) : null,
-      purseStrip(s, shown),
-      h('div', { class: 'event-rewards' }, h('span', {}, `${shown.payout.rep[0]} Rep for a win`),
-        shown.payout.crates[0] ? h('span', {}, `${shown.payout.crates[0]} crate${shown.payout.crates[0] > 1 ? 's' : ''}`) : null,
-        fr?.bestTime ? h('span', {}, `Record ${fr.bestTime.toFixed(2)} s`) : null),
       h('div', { class: 'btns' },
-        h('button', { class: `btn primary${q ? ' off' : ''}`, onclick: () => this.startLive(rec.id) }, h('span', { class: 'stack' }, 'Race', h('small', {}, `live · ${nitroNote}`))),
-        quickBtn(rec, false)),
+        h('button', { class: `btn primary race-live${q && q.eventId === rec.id ? ' off' : ''}`, 'data-coach': 'race-live', onclick: () => this.startLive(rec.id) },
+          h('span', { class: 'stack' }, 'Race live', h('small', {}, `you drive · full purse · ${nitroNote}`)))),
+      quickPart(rec, false),
       details(rec),
       q?.eventId === rec.id ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null);
 
     // A second choice beside the recommendation: a different route with its own reward.
     const alts = P.alternatives(s, rec);
     const altBox = alts.length ? h('section', { class: 'alts', 'aria-label': 'Also worth racing' }, h('div', { class: 'feat-label' }, 'Or try'),
-      ...alts.map(({ e, why }) => h('div', { class: 'alt' }, h('div', { class: 'grow' }, h('b', {}, e.name), h('div', { class: 'd' }, why)),
-        h('button', { class: `btn sm${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
+      ...alts.map(({ e }) => h('div', { class: 'alt' }, h('div', { class: 'grow' }, h('b', {}, e.name), ' ', diffTag(e), h('div', { class: 'd' }, reasonFor(e))),
+        h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
     const out: HTMLElement[] = altBox ? [featured, altBox] : [featured];
     if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));
-    // Catalogue: one collapsible section per district, with a progress summary; the recommended one opens.
-    const openSections = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.district-sec[open]')).map((d) => d.dataset.district));
+
+    // Catalogue: districts you can race in first (open), locked districts after (closed, with what opens them).
+    const openSections = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.district-sec[open]')).map((dd) => dd.dataset.district));
     const firstRender = !this.list.querySelector('details.district-sec');
-    const order: string[] = ['downtown', 'coastal', 'suburbs', 'scrapyard', 'meets', 'trials'];
+    // campaign order first; any district added later (stage-2 endgame) follows in table order
+    const order: string[] = ['scrapyard', 'suburbs', 'meets', 'trials', 'coastal', 'downtown'];
+    for (const e of EVENTS) if (!order.includes(e.district)) order.push(e.district);
     const medalName = ['', 'Bronze', 'Silver', 'Gold'];
+    const sections: { el: HTMLElement; locked: boolean }[] = [];
     for (const dist of order) {
       const evs = EVENTS.filter((e) => e.district === dist && !e.heatOf);
       if (!evs.length) continue;
       const open = evs.filter((e) => P.eventUnlocked(s, e).ok || P.eventUnlocked(s, e).switchCar);
       let summary: string;
-      if (dist === 'trials') {
-        const medals = evs.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0);
-        summary = `${medals}/${evs.length * 3} medals`;
-      } else if (dist === 'meets') {
-        summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} trophies`;
-      } else if (dist === 'downtown') {
-        summary = `★ ${P.starsIn(s)}/${evs.filter((e) => e.goals).length * 3} · ${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
-      } else {
-        summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
-      }
-      if (!open.length) summary = `🔒 ${P.eventUnlocked(s, evs[0]).why}`;
+      if (dist === 'trials') summary = `${evs.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0)}/${evs.length * 3} medals`;
+      else if (dist === 'meets') summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} trophies`;
+      else if (dist === 'downtown') summary = `★ ${P.starsIn(s)}/${evs.filter((e) => e.goals).length * 3} · ${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
+      else summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
+      const locked = !open.length;
+      if (locked) summary = `🔒 ${P.eventUnlocked(s, evs[0]).why}`;
       const rows: HTMLElement[] = [];
       for (const e of evs) {
         if (e.id === rec.id) continue;
@@ -130,13 +180,13 @@ export class RaceView implements View {
         const medal = s.medals?.[e.id] ?? 0;
         const status = !u.ok && !u.switchCar ? `🔒 ${u.why}`
           : e.knockout ? (s.knockout ? `Through to heat ${s.knockout.heat + 1} of ${e.knockout.heats.length}` : r?.wins ? `✓ Champion ×${r.wins}` : 'Three heats · knockout')
-          : e.speedTrap ? `${medal ? `${medalName[medal]} · ` : ''}${medal < 3 ? `${medalName[medal + 1]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][medal]} km/h` : 'all medals'}${r?.bestSpeed ? ` · best ${r.bestSpeed} km/h` : ''}`
+          : e.speedTrap ? `${medal ? `${medalName[medal]} · ` : ''}${medal < 3 ? `${medalName[medal + 1]} at ${trapMph([e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][medal])} mph` : 'all medals'}${r?.bestSpeed ? ` · best ${trapMph(r.bestSpeed)} mph` : ''}`
           : e.timeAttack ? (medal ? `${medalName[medal]}${medal < 3 ? ` · ${medalName[medal + 1]} at ${[e.timeAttack.bronze, e.timeAttack.silver, e.timeAttack.gold][medal].toFixed(2)} s` : ' · all medals'}` : `Bronze at ${e.timeAttack.bronze.toFixed(2)} s`) + (r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : '')
           : e.boss && s.bosses.includes(e.boss.rival) ? `Rival beaten${r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
-          : r?.wins ? `✓ Won${r.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
-          : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : e.boss ? `Rival race · ${e.boss.reward.blueprint} paint` : `First win +$${e.firstClear.cash} · ${e.firstClear.crates} crates`;
+          : r?.wins ? `✓ Won · win pays $${e.payout.cash[0]} and ${e.payout.rep[0]} Rep`
+          : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : e.boss ? `Rival race · ${e.boss.reward.blueprint} paint` : `Win: $${e.payout.cash[0] + e.firstClear.cash} and ${e.payout.rep[0]} Rep the first time`;
         const action = u.ok
-          ? h('div', { class: 'row-btns' }, quickBtn(e, true), h('button', { class: `btn sm${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
+          ? h('div', { class: 'row-btns' }, quickPart(e, true), h('button', { class: `btn sm primary-lite${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
           : u.switchCar && s.owned.includes(u.switchCar)
             ? h('button', { class: 'btn sm', onclick: () => this.startLive(e.id) }, `Race · ${carById(u.switchCar).model.split(' ')[0]}`)
             : null;
@@ -153,16 +203,20 @@ export class RaceView implements View {
         rows.push(h('div', { class: `evt-row${u.ok ? '' : ' locked'}` },
           h('div', { class: 'row-main' },
             h('div', { class: 'name' }, e.name, ...tags),
-            h('div', { class: 'meta' }, course(e), ` ${status}`)),
+            h('div', { class: 'meta' }, course(e), ' ', u.ok || u.switchCar ? diffTag(e) : null, ` ${status}`)),
           action,
           u.ok || u.switchCar ? details(e) : null));
       }
       if (!rows.length) continue;
-      const shouldOpen = firstRender ? (open.length > 0 && evs.some((e) => !s.events[e.id]?.wins || (e.timeAttack && (s.medals?.[e.id] ?? 0) < 3))) : openSections.has(dist);
-      out.push(h('details', { class: 'district-sec', 'data-district': dist, ...(shouldOpen ? { open: '' } : {}) },
+      const shouldOpen = firstRender ? (!locked && evs.some((e) => !s.events[e.id]?.wins || (e.timeAttack && (s.medals?.[e.id] ?? 0) < 3))) : openSections.has(dist);
+      sections.push({ locked, el: h('details', { class: `district-sec${locked ? ' locked' : ''}`, 'data-district': dist, ...(shouldOpen ? { open: '' } : {}) },
         h('summary', { class: 'district' }, h('span', {}, DISTRICTS[dist as keyof typeof DISTRICTS].name), h('span', { class: 'dist-sum' }, summary)),
-        ...rows));
+        ...rows) });
     }
+    const openSecs = sections.filter((x) => !x.locked).map((x) => x.el);
+    const lockedSecs = sections.filter((x) => x.locked).map((x) => x.el);
+    if (openSecs.length) out.push(h('div', { class: 'feat-label cat-label' }, 'All races'), ...openSecs);
+    if (lockedSecs.length) out.push(h('div', { class: 'feat-label cat-label' }, 'Still locked'), ...lockedSecs);
     const scroll = this.list.scrollTop;
     this.list.replaceChildren(...out);
     this.list.scrollTop = scroll;
@@ -193,13 +247,13 @@ export class RaceView implements View {
       this.app.views[this.app.route].show();
       if (this.app.game.state.pendingReveal) this.app.openReveal(this.app.game.state.pendingReveal);
       else this.app.maybeShowUpdate();
+      this.app.guide?.update();
     });
     this.app.root.append(rs.el);
   }
 }
 
 // ---------------------------------------------------------------------------------------------
-
 
 /** ★★☆ for an event's goals. */
 function starTag(bits: number): HTMLElement {
@@ -222,14 +276,4 @@ function heatList(s: GameState, e: RaceEvent): HTMLElement {
     const hEv = eventById(id);
     return h('li', { class: k < at && s.knockout ? 'done' : k === at ? 'now' : '' }, h('b', {}, hEv.name), ` · ${hEv.advance === 1 ? 'win to take it' : `top ${hEv.advance} go through`}`);
   }));
-}
-
-/** What a live race pays before you commit: each place, the skill bonus, and any one-time reward. */
-function purseStrip(s: GameState, e: RaceEvent): HTMLElement {
-  const p = P.purse(s, e);
-  if (e.timeAttack) return h('div', { class: 'purse' }, h('span', { class: 'p1' }, `$${p.live[0]} a run`), h('span', {}, 'medals pay once'));
-  return h('div', { class: 'purse', 'aria-label': `Pays ${p.live.map((c, i) => `${ordinal(i + 1)} $${c}`).join(', ')}` },
-    ...p.live.slice(0, e.rivals.length + 1).map((c, i) => h('span', { class: i === 0 ? 'p1' : '' }, h('small', {}, ordinal(i + 1)), `$${c}`)),
-    h('span', { class: 'skill' }, h('small', {}, 'Perfect'), `+$${p.perfect}`),
-    p.firstClear ? h('span', { class: 'once' }, h('small', {}, 'First win'), `+$${p.firstClear}`) : null);
 }

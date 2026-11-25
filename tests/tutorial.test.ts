@@ -4,7 +4,7 @@ import { Game } from '../src/core/game';
 import { RaceSim } from '../src/core/race';
 import { MemoryKV, encodeSave, saveKey } from '../src/core/save';
 import { newGame } from '../src/core/state';
-import { tutorialStep } from '../src/core/tutorial';
+import { BEGINNER_STEPS, bestBuy, tutorialStep } from '../src/core/tutorial';
 
 const T0 = 1_700_000_000_000;
 const at = (s: ReturnType<typeof newGame>, r: number, c: number) => ({ zone: 'board' as const, i: r * s.cols + c });
@@ -17,17 +17,42 @@ function race(g: Game, now: number) {
 }
 
 describe('teach-through-play steps', () => {
-  it('walks a fresh save: merge → first race → craft toward the next car → spend → goal card', () => {
+  it('walks a fresh save: goal → merge → fit → first race → spend → remaining requirements → craft', () => {
     const kv = new MemoryKV();
     const g = new Game(kv, '/t/', T0);
+    expect(tutorialStep(g.state)).toBe('goal'); // the next car and why, before anything else
+    g.markTip('goal');
     expect(tutorialStep(g.state)).toBe('merge');
     g.move(at(g.state, 2, 1), at(g.state, 2, 2), T0 + 1000);
+    expect(tutorialStep(g.state)).toBe('fit'); // a fresh car has empty slots: parts don't fit themselves
+    g.installPart('junker', at(g.state, 2, 2), T0 + 1500); // the merged T2 Engine
+    expect(tutorialStep(g.state)).toBe('race1');
+    g.fitRecommended('junker', T0 + 1600); // and the rest, as the Fit Parts view suggests
     expect(tutorialStep(g.state)).toBe('race1');
     race(g, T0 + 5000);
-    expect(tutorialStep(g.state)).toBe('craftGoal'); // starter Tires pair → T3 Tires for the Corsa Rojo
-    g.markTip('craftGoal');
-    const next = tutorialStep(g.state);
-    expect(['shop', 'goalCard']).toContain(next);
+    // use the payout: the beat appears once the Shop has a useful buy you can afford (here after a second purse)
+    const buy = bestBuy(g.state);
+    if (!buy.affordable) {
+      expect(tutorialStep(g.state)).toBe('goalCard');
+      g.transact((s) => { s.cash = Math.max(s.cash, buy.pick?.price ?? 0); return []; }, T0 + 35_000); // a second purse
+    }
+    expect(tutorialStep(g.state)).toBe('spend');
+    const pick = bestBuy(g.state).pick!;
+    expect(pick.price).toBeLessThanOrEqual(g.state.cash);
+    if (pick.kind === 'order') g.orderPart(pick.fam, pick.tier, T0 + 40_000);
+    else if (pick.kind === 'tune') g.buyTune('junker');
+    else g.buyUpgrade(pick.id);
+    expect(tutorialStep(g.state)).toBe('goalCard'); // then the exact remaining requirements
+    g.markTip('goalCard');
+    expect(tutorialStep(g.state)).toBe('craftGoal'); // starter Tires pairs → T3 Tires for the Corsa Rojo
+  });
+
+  it('merging first counts as seeing the goal; the fit beat ends with any fitted part', () => {
+    const g = new Game(new MemoryKV(), '/t/', T0);
+    g.move(at(g.state, 2, 1), at(g.state, 2, 2), T0 + 1000);
+    expect(tutorialStep(g.state)).toBe('fit');
+    g.fitRecommended('junker', T0 + 2000);
+    expect(tutorialStep(g.state)).toBe('race1');
   });
 
   it('is safe out of order: racing before merging keeps the merge tip until a merge happens', () => {
@@ -35,17 +60,28 @@ describe('teach-through-play steps', () => {
     race(g, T0 + 1000);
     expect(tutorialStep(g.state)).toBe('merge');
     g.move(at(g.state, 2, 1), at(g.state, 2, 2), T0 + 40_000);
-    expect(tutorialStep(g.state)).not.toBe('race1'); // already raced
+    expect(['race1', 'fit', 'goal']).not.toContain(tutorialStep(g.state)); // already raced
   });
 
   it('resumes the same step after a reload mid-step', () => {
     const kv = new MemoryKV();
     const g = new Game(kv, '/t/', T0);
     g.move(at(g.state, 2, 1), at(g.state, 2, 2), T0 + 1000);
+    g.fitRecommended('junker', T0 + 1500);
     expect(tutorialStep(g.state)).toBe('race1');
     g.startRace('yard-sprint', T0 + 2000); // closed the page mid-race
     const again = new Game(kv, '/t/', T0 + 60_000);
     expect(tutorialStep(again.state)).toBe('race1');
+  });
+
+  it('the spend beat waits for enough cash and ends on "Got it" as well as on a purchase', () => {
+    const g = new Game(new MemoryKV(), '/t/', T0);
+    g.transact((s) => { s.stats.milestones.firstMerge = 1; s.stats.races = 1; s.tips.goal = true; s.cash = 20; return []; }, T0);
+    expect(tutorialStep(g.state)).toBe('goalCard'); // nothing affordable yet: skip ahead
+    g.transact((s) => { s.cash = 200; return []; }, T0);
+    expect(tutorialStep(g.state)).toBe('spend');
+    g.markTip('spend');
+    expect(tutorialStep(g.state)).toBe('goalCard');
   });
 
   it('Skip turns every tip off, and contextual tips end with "Got it"', () => {
@@ -55,7 +91,8 @@ describe('teach-through-play steps', () => {
     const h = new Game(new MemoryKV(), '/t2/', T0);
     h.transact((s) => {
       s.stats.milestones.firstMerge = 1; s.stats.races = 4; s.owned.push('beater');
-      Object.assign(s.tips, { craftGoal: true, shop: true, goalCard: true });
+      for (const id of BEGINNER_STEPS) s.tips[id] = true;
+      s.tips.betterPart = true;
       s.tray[0] = { id: s.nextPartId++, f: 'engine', t: 1, q: 'std' };
       return [];
     }, T0);
@@ -73,15 +110,30 @@ describe('teach-through-play steps', () => {
     kv.setItem(saveKey('/t/'), encodeSave(old as never));
     const g = new Game(kv, '/t/', T0);
     const step = tutorialStep(g.state);
-    expect(['merge', 'race1', 'craftGoal', 'shop', 'goalCard']).not.toContain(step);
+    expect(['goal', 'merge', 'fit', 'race1', 'spend', 'goalCard', 'craftGoal']).not.toContain(step);
     expect(g.state.owned).toEqual(['junker', 'beater', 'hothatch']);
   });
 
-  it('explains equip caps the first time a part runs above the cap', () => {
+  it('tells a returning player once when a better part waits on the bench (parts no longer fit themselves)', () => {
     const g = new Game(new MemoryKV(), '/t/', T0);
     g.transact((s) => {
       s.stats.milestones.firstMerge = 1; s.stats.races = 4;
-      Object.assign(s.tips, { craftGoal: true, shop: true, goalCard: true, nitroBank: true, overflow: true, scrap: true, mergeAll: true });
+      for (const id of BEGINNER_STEPS) s.tips[id] = true;
+      s.board = s.board.map(() => null); s.crates = [];
+      s.board[0] = { id: s.nextPartId++, f: 'engine', t: 2, q: 'std' };
+      s.installed = { junker: { engine: { id: s.nextPartId++, f: 'engine', t: 1, q: 'std' } } };
+      return [];
+    }, T0);
+    expect(tutorialStep(g.state)).toBe('betterPart');
+    g.markTip('betterPart');
+    expect(tutorialStep(g.state)).not.toBe('betterPart');
+  });
+
+  it('explains part limits the first time a part runs above the car limit', () => {
+    const g = new Game(new MemoryKV(), '/t/', T0);
+    g.transact((s) => {
+      s.stats.milestones.firstMerge = 1; s.stats.races = 4;
+      Object.assign(s.tips, { goal: true, fit: true, spend: true, craftGoal: true, shop: true, goalCard: true, betterPart: true, nitroBank: true, overflow: true, scrap: true, mergeAll: true });
       s.board = s.board.map(() => null); s.crates = [];
       s.installed = { junker: { tires: { id: s.nextPartId++, f: 'tires', t: 3, q: 'std' } } }; // Tapeback cap is T2
       return [];
