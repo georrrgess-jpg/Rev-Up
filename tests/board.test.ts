@@ -279,6 +279,42 @@ describe('full board, overflow, crates and scrap', () => {
   });
 });
 
+describe('merge preview and refusal reasons', () => {
+  it('previews the merged tier and the full cascade exactly as a standard merge resolves it', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const s = emptyGame(seed);
+      let r = seed * 31337;
+      const rnd = () => ((r = (r * 1103515245 + 12345) >>> 0) / 2 ** 32);
+      for (let i = 0; i < s.board.length; i++) if (rnd() < 0.7) s.board[i] = { id: s.nextPartId++, f: rnd() < 0.7 ? 'engine' : 'tires', t: 1 + Math.floor(rnd() * 3), q: 'std' };
+      const refs = s.board.map((_, i) => ({ zone: 'board' as const, i }));
+      for (const from of refs) for (const to of refs) {
+        const pv = B.mergePreview(s, from, to);
+        if (!pv) continue;
+        const d = structuredClone(s);
+        B.luck.force = 'std';
+        const ev = B.moveOrFuse(d, from, to, 0);
+        B.luck.force = null;
+        const fuses = ev.filter((e) => e.type === 'fuse');
+        expect(fuses.length).toBe(pv.chain);
+        expect(B.getPart(d, to)?.t).toBe(pv.tier);
+      }
+    }
+  });
+
+  it('says why two parts do not merge, and null when they do', () => {
+    const s = emptyGame();
+    const a = put(s, 0, 0, 'engine', 2);
+    const b = put(s, 0, 1, 'tires', 2);
+    const c = put(s, 0, 2, 'engine', 3);
+    const d = put(s, 0, 3, 'engine', 2);
+    expect(B.mergeBlocker(a, b)).toBe('Engines only merge with Engines');
+    expect(B.mergeBlocker(a, c)).toBe('T2 only merges with another T2');
+    expect(B.mergeBlocker(a, d)).toBeNull();
+    expect(B.mergePreview(s, at(s, 0, 0), at(s, 0, 1))).toBeNull();
+    expect(B.mergePreview(s, at(s, 0, 0), at(s, 0, 3))).toMatchObject({ fromTier: 2, tier: 4, chain: 2 }); // the T3 beside the target cascades
+  });
+});
+
 describe('Merge All', () => {
   it('resolves deterministically in one pass with normal rules, conserving parts, one nitro max', () => {
     const mk = () => {

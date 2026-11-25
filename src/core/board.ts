@@ -1,5 +1,5 @@
 import {
-  ACTIVE_FAMILIES, BOARD_EXPANDED, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
+  ACTIVE_FAMILIES, BOARD_EXPANDED, FAMILIES, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
   Family, MAX_TIER, MERGE_ALL_NITRO_MIN_CHAIN, MERGE_CASH, QUALITY_ODDS, Quality, SCRAP_VALUE, PART_ORDER_PRICE, nitroCapFor, carById, ENABLED_CARS,
   TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST,
 } from '../data/tables';
@@ -152,6 +152,45 @@ export function moveOrFuse(s: GameState, from: SlotRef, to: SlotRef, now: number
   const fusions = events.slice(before).filter((e) => e.type === 'fuse').length;
   bumpCombo(s, now, fusions, events);
   return events;
+}
+
+/** Why two parts can't merge, in plain words (null when they can). */
+export function mergeBlocker(a: Part | null, b: Part | null): string | null {
+  if (!a || !b || a.id === b.id) return null;
+  if (canFuse(a, b)) return null;
+  if (a.f !== b.f) return `${FAMILIES[a.f].plural} only merge with ${FAMILIES[a.f].plural}`;
+  if (a.t !== b.t) return `T${a.t} only merges with another T${a.t}`;
+  return `T${MAX_TIER} is the top tier for now`;
+}
+
+/**
+ * What dropping `from` onto `to` would make, assuming standard quality rolls (a Mint can jump one tier more):
+ * the merged tier and the full cascade through orthogonal neighbours of `to`. Null when it is not a merge.
+ */
+export function mergePreview(s: GameState, from: SlotRef, to: SlotRef): { family: Family; fromTier: number; tier: number; chain: number } | null {
+  const a = getPart(s, from);
+  const b = getPart(s, to);
+  if (sameRef(from, to) || !canFuse(a, b)) return null;
+  let tier = b!.t + 1;
+  let chain = 1;
+  if (to.zone !== 'board') return { family: b!.f, fromTier: b!.t, tier, chain };
+  const used = new Set<number>([a!.id, b!.id]);
+  const r = Math.floor(to.i / s.cols);
+  const c = to.i % s.cols;
+  for (;;) {
+    if (tier >= MAX_TIER) break;
+    let found = false;
+    for (const [dr, dc] of NEIGHBOR_ORDER) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nc < 0 || nr >= s.rows || nc >= s.cols) continue;
+      const i = nr * s.cols + nc;
+      if (from.zone === 'board' && from.i === i) continue; // the source cell is empty after the merge
+      const p = s.board[i];
+      if (p && !used.has(p.id) && p.f === b!.f && p.t === tier) { used.add(p.id); tier++; chain++; found = true; break; }
+    }
+    if (!found) break;
+  }
+  return { family: b!.f, fromTier: b!.t, tier, chain };
 }
 
 // ---------------- Merge All ----------------
