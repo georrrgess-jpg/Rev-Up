@@ -1,5 +1,5 @@
 import {
-  ACTIVE_FAMILIES, BOARD_EXPANDED, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
+  ACTIVE_FAMILIES, BOARD_EXPANDED, FAMILIES, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
   Family, MAX_TIER, MERGE_ALL_NITRO_MIN_CHAIN, MERGE_CASH, QUALITY_ODDS, Quality, SCRAP_VALUE, PART_ORDER_PRICE, nitroCapFor, carById, ENABLED_CARS,
   TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST,
 } from '../data/tables';
@@ -158,11 +158,10 @@ export function moveOrFuse(s: GameState, from: SlotRef, to: SlotRef, now: number
 export function mergeBlocker(a: Part | null, b: Part | null): string | null {
   if (!a || !b || a.id === b.id) return null;
   if (canFuse(a, b)) return null;
-  if (a.f !== b.f) return `A ${FAMILY_NAME[a.f]} only merges with a ${FAMILY_NAME[a.f]}`;
+  if (a.f !== b.f) return `${FAMILIES[a.f].plural} only merge with ${FAMILIES[a.f].plural}`;
   if (a.t !== b.t) return `T${a.t} only merges with another T${a.t}`;
   return `T${MAX_TIER} is the top tier for now`;
 }
-const FAMILY_NAME: Record<Family, string> = { engine: 'Engine', tires: 'Tire', turbo: 'Turbo', transmission: 'Transmission', aero: 'Aero kit' };
 
 /**
  * What dropping `from` onto `to` would make, assuming standard quality rolls (a Mint can jump one tier more):
