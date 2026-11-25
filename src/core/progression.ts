@@ -1,13 +1,25 @@
 import {
   ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
-  PRINTER_INTERVAL_S, RACE_EFFORT, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
+  PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
 import type { GameEvent } from './events';
 import { computeLoadout } from './loadout';
-import type { GameState, LastResult, LeanOutcome } from './state';
+import type { CarMastery, EventRecord, GameState, LastResult, LeanOutcome } from './state';
+import { mph } from './units';
 
 export const PRINTER_BANK_CAP = 10; // printer pauses with this many unopened printer crates
+
+// ---------------- Difficulty ----------------
+
+/** Districts where rivals shift clean (the reference acceleration): from the Coastal Crown onward. */
+const CLEAN_RIVALS: DistrictId[] = ['coastal', 'downtown', 'desert', 'summit'];
+/** How well an event's rivals shift: 'ordinary' (a beat late) early on, 'clean' from the Coastal Crown onward.
+ *  The race setup passes this as `RaceSetup.rivalShift`; a knockout heat uses its parent's. */
+export function rivalShiftFor(e: RaceEvent): 'ordinary' | 'clean' {
+  const parent = e.heatOf ? eventById(e.heatOf) : e;
+  return e.rivalShift ?? parent.rivalShift ?? (CLEAN_RIVALS.includes(parent.district) ? 'clean' : 'ordinary');
+}
 
 // ---------------- Goals ----------------
 
@@ -18,7 +30,7 @@ export function starsIn(s: GameState): number {
 const bitCount = (b: number) => (b & 1) + ((b >> 1) & 1) + ((b >> 2) & 1);
 export const STAR_LABELS = ['Win', 'Under par', 'A Perfect boost'];
 /** Each goal pays once: half the event's win purse. */
-export const starCash = (e: RaceEvent) => Math.round(e.payout.cash[0] * 0.5);
+export const starCash = (e: RaceEvent) => roundCash(e.payout.cash[0] * 0.5);
 
 export function nextCar(s: GameState): CarClass | null {
   return ENABLED_CARS.find((c) => !s.owned.includes(c.id)) ?? null;
@@ -192,19 +204,68 @@ export function collection(s: GameState): { have: number; total: number; next: s
   return { have, total, next };
 }
 
-/** Per-car records (races, wins, best times, Perfects, shifts, top speed) for future masteries and levels. */
+// ---------------- Records ----------------
+
+/** A speed-trap event record: `bestMph` (new); `bestSpeed` is the km/h record older builds wrote. */
+export type TrapRecord = EventRecord & { bestMph?: number };
+/** Best speed-trap reading in mph, reading an older save's km/h record sensibly. */
+export const bestTrapMph = (rec: EventRecord | undefined): number => {
+  if (!rec) return 0;
+  const r = rec as TrapRecord;
+  return r.bestMph ?? (rec.bestSpeed ? Math.round(rec.bestSpeed / 1.609344) : 0);
+};
+
+const emptyMastery = (): CarMastery => ({ races: 0, wins: 0, podiums: 0, best: {}, perfects: 0, shiftsClean: 0, shifts: 0, topSpeed: 0 });
+
+/** Per-car records (races, wins, best time per event, Perfects, shifts, top speed) for future masteries and levels.
+ *  Heats are recorded under their own ids (`main-event:2`), so a best time always means the same course. */
 export function recordMastery(s: GameState, car: CarId, e: RaceEvent, o: LeanOutcome) {
-  const m = ((s.mastery ??= {})[car] ??= { races: 0, wins: 0, podiums: 0, best: {}, perfects: 0, shiftsClean: 0, shifts: 0, topSpeed: 0 });
+  const m = ((s.mastery ??= {})[car] ??= emptyMastery());
   m.races++;
   if (o.place === 1) m.wins++;
   if (o.place <= 3) m.podiums++;
-  const id = e.heatOf ?? e.id;
-  if (o.playerTime !== null && (m.best[e.id] === undefined || o.playerTime < m.best[e.id])) m.best[e.id] = o.playerTime;
-  void id;
+  if (o.playerTime !== null && !e.speedTrap && (m.best[e.id] === undefined || o.playerTime < m.best[e.id])) m.best[e.id] = o.playerTime;
   m.perfects += o.perfects;
   m.shifts += o.shifts ?? 0;
   m.shiftsClean += o.shiftsClean ?? 0;
   m.topSpeed = Math.max(m.topSpeed, o.topSpeed ?? o.trapSpeed ?? 0);
+}
+
+/** Read-only summary of one car's records, for future level or mastery systems (no levels are built on it yet). */
+export interface MasterySummary extends CarMastery {
+  car: CarId;
+  /** clean shifts / shifts (0 when none yet) */
+  shiftRate: number;
+  /** top speed in mph */
+  topMph: number;
+  /** events with a best time on this car */
+  eventsRaced: number;
+  winRate: number;
+}
+export function masteryFor(s: GameState, car: CarId): MasterySummary {
+  const m = s.mastery?.[car] ?? emptyMastery();
+  return {
+    ...m, best: { ...m.best }, car,
+    shiftRate: m.shifts ? m.shiftsClean / m.shifts : 0,
+    topMph: mph(m.topSpeed),
+    eventsRaced: Object.keys(m.best).length,
+    winRate: m.races ? m.wins / m.races : 0,
+  };
+}
+
+/** Paint shop items earned in races (they can also be bought later): granted once, the first time. */
+export const EARNED_STYLE: { item: string; how: string; earned: (e: RaceEvent, car: CarId, place: number) => boolean }[] = [
+  { item: 'livery:rally', how: 'A live podium with the Corvo Rally', earned: (_e, car, place) => car === 'rally' && place <= 3 },
+  { item: 'livery:neon', how: 'Win a Downtown Nights event', earned: (e, _car, place) => place === 1 && (e.heatOf ? eventById(e.heatOf) : e).district === 'downtown' },
+];
+export function grantEarnedStyle(s: GameState, e: RaceEvent, car: CarId, place: number): string[] {
+  const out: string[] = [];
+  for (const r of EARNED_STYLE) {
+    if (!STYLE_ITEMS.some((i) => i.id === r.item) || (s.owns ?? []).includes(r.item) || !r.earned(e, car, place)) continue;
+    (s.owns ??= []).push(r.item);
+    out.push(r.item);
+  }
+  return out;
 }
 
 /** Tune-up the active car one stage. */
@@ -226,6 +287,7 @@ export function upgradeShown(s: GameState, u: UpgradeDef): boolean {
     case 'quick': return Object.values(s.events).some((r) => r.wins > 0);
     case 'cars3': return s.owned.length >= 3;
     case 'cars4': return s.owned.length >= 4;
+    case 'cars7': return s.owned.length >= 7;
     default: return true;
   }
 }
@@ -265,21 +327,28 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   if (e.knockout) {
     const n = (s.knockout?.heat ?? 0);
     const h0 = eventById(e.knockout.heats[n]);
-    return s.knockout ? `You're through — ${h0.name} is next (${n + 1} of ${e.knockout.heats.length}). Change cars if this course suits another.` : `Three heats in a row. Win the final against Nova Sato for the ${e.boss!.reward.blueprint} paint and the road to the Lumen RS.`;
+    const opens = unlockedBy(e);
+    return s.knockout ? `You're through — ${h0.name} is next (${n + 1} of ${e.knockout.heats.length}). Change cars if this course suits another.` : `${e.knockout.heats.length} heats in a row. Win the final against ${RIVALS[e.boss!.rival].name} for the ${e.boss!.reward.blueprint} paint${opens ? ` and the road to the ${opens.model}` : ''}.`;
   }
   if (e.speedTrap) {
     const m = s.medals?.[e.id] ?? 0;
-    return m >= 3 ? `Gold won · record ${s.events[e.id]?.bestSpeed ?? 0} km/h` : `${['Bronze', 'Silver', 'Gold'][m]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m]} km/h through the gate${s.events[e.id]?.bestSpeed ? ` · best ${s.events[e.id]!.bestSpeed} km/h` : ''}`;
+    const best = bestTrapMph(s.events[e.id]);
+    return m >= 3 ? `Gold won · record ${best} mph` : `${['Bronze', 'Silver', 'Gold'][m]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m]} mph through the gate${best ? ` · best ${best} mph` : ''}`;
   }
   if (e.goals) {
     const have = s.stars?.[e.id] ?? 0;
     const left = STAR_LABELS.filter((_, k) => !(have & (1 << k)));
     if (left.length) return `Goals left: ${left.map((l) => (l === 'Under par' ? `under ${e.goals!.par.toFixed(1)} s` : l.toLowerCase())).join(' · ')} — $${starCash(e)} each, once`;
   }
-  if (e.boss && !s.bosses.includes(e.boss.rival)) return `Beat ${RIVALS[e.boss.rival].name} for the ${e.boss.reward.blueprint} paint${e.boss.rival === 'ray' ? ' and to open the Suburbs' : ''}`;
+  if (e.boss && !s.bosses.includes(e.boss.rival)) {
+    const car = unlockedBy(e);
+    return `Beat ${RIVALS[e.boss.rival].name} for the ${e.boss.reward.blueprint} paint${e.boss.rival === 'ray' ? ' and to open the Suburbs' : car && !s.owned.includes(car.id) ? ` and the road to the ${car.model}` : ''}`;
+  }
+  const opens = unlockedBy(e);
+  if (opens && !s.owned.includes(opens.id) && !s.events[e.id]?.wins) return `Win it for +$${roundCash(e.firstClear.cash)} and the road to the ${opens.model}`;
   if (!s.events[e.id]?.wins) {
     const fam = g && !g.keystoneDone ? ` ${FAMILIES[g.family].name}` : '';
-    return `First win: +$${e.firstClear.cash} and ${e.firstClear.crates}${fam} crates${fam ? ` toward the ${g!.car.model}` : ''}`;
+    return `First win: +$${roundCash(e.firstClear.cash)} and ${e.firstClear.crates}${fam} crates${fam ? ` toward the ${g!.car.model}` : ''}`;
   }
   const sig = SIGNATURE_FINISHES[s.activeCar];
   if (sig && !s.livePodiums.includes(s.activeCar)) return `A live top-3 earns the ${sig.name} finish for your ${carById(s.activeCar).model}`;
@@ -287,8 +356,11 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   if (g && s.rep < g.repNeed) return `Win for ${Math.ceil(e.payout.rep[0] * (fresh ? 1 + FRESH_ROUTE_BONUS : 1))} Rep${fresh} · ${g.repNeed - s.rep} more unlocks the ${g.car.model}`;
   if (fresh) return `New track bonus: +75% Rep on this event`;
   const best = s.events[e.id]?.bestTime;
-  return best ? `Beat your record of ${best.toFixed(2)} s` : `Pays $${e.payout.cash[0]} for a win`;
+  return best ? `Beat your record of ${best.toFixed(2)} s` : `Pays $${roundCash(e.payout.cash[0])} for a win`;
 }
+
+/** The car whose unlock needs a win at this event, if any. */
+export const unlockedBy = (e: RaceEvent): CarClass | undefined => ENABLED_CARS.find((c) => c.unlock?.event === e.id);
 
 export const canQuickRace = (s: GameState, e: RaceEvent) =>
   !e.boss && !e.timeAttack && !e.speedTrap && !e.knockout && !e.heatOf && (s.events[e.id]?.wins ?? 0) > 0 && eventUnlocked(s, e).ok;
@@ -310,24 +382,25 @@ export function isFreshRoute(s: GameState, e: RaceEvent): boolean {
 }
 
 /** Cash for one Perfect boost in this event (live only, at most two per race). */
-export const perfectBonus = (e: RaceEvent) => Math.max(PRECISION_BONUS_PER_PERFECT, Math.round(e.payout.cash[0] * PERFECT_BONUS_SHARE));
+export const perfectBonus = (e: RaceEvent) => roundCash(Math.max(PRECISION_BONUS_PER_PERFECT, e.payout.cash[0] * PERFECT_BONUS_SHARE));
+/** The crew's cut of the live purse for one place, on a cash step (what the Quick Race button shows and pays). */
+export const quickShare = (s: GameState) => QUICK_PAY_SHARE[Math.min(s.upgrades.crew ?? 0, QUICK_PAY_SHARE.length - 1)];
+export const quickCash = (s: GameState, e: RaceEvent, place: number) => roundCash(e.payout.cash[place - 1] * quickShare(s));
 
 /** The purse a player can see before racing: live by place, the crew's Quick Race cut, and skill bonus. */
 export function purse(s: GameState, e: RaceEvent) {
-  const share = QUICK_PAY_SHARE[Math.min(s.upgrades.crew ?? 0, QUICK_PAY_SHARE.length - 1)];
   return {
-    live: e.payout.cash,
-    quick: e.payout.cash.map((c) => Math.round(c * share)),
-    quickShare: share,
+    live: e.payout.cash.map(roundCash),
+    quick: e.payout.cash.map((_, i) => quickCash(s, e, i + 1)),
+    quickShare: quickShare(s),
     perfect: perfectBonus(e),
-    firstClear: !(s.events[e.id]?.wins) && !e.boss ? e.firstClear.cash : 0,
+    firstClear: !(s.events[e.id]?.wins) && !e.boss ? roundCash(e.firstClear.cash) : 0,
   };
 }
 
 export function computePayout(s: GameState, e: RaceEvent, place: number, mode: 'live' | 'quick', perfects: number): Payout {
   const i = place - 1;
-  const share = mode === 'quick' ? QUICK_PAY_SHARE[Math.min(s.upgrades.crew ?? 0, QUICK_PAY_SHARE.length - 1)] : 1;
-  const base = { cash: Math.round(e.payout.cash[i] * share), rep: e.payout.rep[i], crates: e.payout.crates[i] };
+  const base = { cash: mode === 'quick' ? quickCash(s, e, place) : roundCash(e.payout.cash[i]), rep: e.payout.rep[i], crates: e.payout.crates[i] };
   const p: Payout = { ...base, precision: 0, firstClear: false, boss: false, freshRep: 0 };
   if (isFreshRoute(s, e)) { p.freshRep = Math.ceil(base.rep * FRESH_ROUTE_BONUS); p.rep += p.freshRep; }
   if (mode === 'live') {
@@ -337,7 +410,7 @@ export function computePayout(s: GameState, e: RaceEvent, place: number, mode: '
     const rec = s.events[e.id];
     if (won && !(rec && rec.wins > 0) && !e.boss && (e.firstClear.cash > 0 || e.firstClear.crates > 0)) {
       p.firstClear = true;
-      p.cash += e.firstClear.cash;
+      p.cash += roundCash(e.firstClear.cash);
       p.crates += e.firstClear.crates;
     }
     if (won && e.boss && !s.bosses.includes(e.boss.rival)) {
@@ -435,7 +508,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     for (let m = prev + 1; m <= medal; m++) {
       newMedals.push(m);
       const r = MEDAL_REWARDS[MEDALS[m - 1]];
-      medalCash += r.cash;
+      medalCash += roundCash(r.cash);
       medalCrates += r.crates;
     }
     if (medal > prev) s.medals[e.id] = medal;
@@ -459,18 +532,20 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     s.stars[e.id] = had | bits;
     s.cash += starPay;
   }
-  // Speed trap: medals by km/h through the gate; each medal pays once.
-  let trapKmh: number | undefined;
+  // Speed trap: medals by mph through the gate; each medal pays once.
+  let trapMphNow: number | undefined;
   if (e.speedTrap && input.mode === 'live' && o.trapSpeed !== undefined) {
     const st = e.speedTrap;
-    trapKmh = Math.round(o.trapSpeed * 3.6);
-    rec.bestSpeed = Math.max(rec.bestSpeed ?? 0, trapKmh);
-    medal = trapKmh >= st.gold ? 3 : trapKmh >= st.silver ? 2 : trapKmh >= st.bronze ? 1 : 0;
+    trapMphNow = mph(o.trapSpeed);
+    const tr = rec as TrapRecord;
+    tr.bestMph = Math.max(bestTrapMph(tr), trapMphNow);
+    rec.bestSpeed = Math.max(rec.bestSpeed ?? 0, Math.round(o.trapSpeed * 3.6)); // legacy km/h record, kept for old readers
+    medal = trapMphNow >= st.gold ? 3 : trapMphNow >= st.silver ? 2 : trapMphNow >= st.bronze ? 1 : 0;
     const prev = s.medals[e.id] ?? 0;
     for (let m = prev + 1; m <= medal; m++) {
       newMedals.push(m);
       const r = MEDAL_REWARDS[MEDALS[m - 1]];
-      medalCash += r.cash * 2; // the speed trap is a late event: medals pay double
+      medalCash += roundCash(r.cash * 2); // the speed traps are late events: medals pay double
       medalCrates += r.crates;
     }
     if (medal > prev) s.medals[e.id] = medal;
@@ -479,7 +554,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     const best = s.medals[e.id] ?? 0;
     if (best < 3) {
       const target = [st.bronze, st.silver, st.gold][best];
-      nextMedal = { name: ['Bronze', 'Silver', 'Gold'][best], target, gap: target - trapKmh };
+      nextMedal = { name: ['Bronze', 'Silver', 'Gold'][best], target, gap: target - trapMphNow };
     }
   }
   // Knockout: the top places of a heat go through; losing a heat ends the run, winning the final wins the event.
@@ -505,6 +580,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     trophy = e.trophy;
   }
   if (input.mode === 'live') recordMastery(s, pr.car, e, o);
+  const earned = input.mode === 'live' ? grantEarnedStyle(s, e, pr.car, o.place) : [];
   s.recentEvents = [e.id, ...(s.recentEvents ?? []).filter((id) => id !== e.id)].slice(0, 2);
   s.stats.races++;
   if (o.place === 1) s.stats.wins++;
@@ -512,11 +588,13 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   addEffort(s, RACE_EFFORT, events);
   checkUnlocks(s, events);
   openCrates(s).forEach((ev) => events.push(ev));
-  const result: LastResult = {
+  const result: LastResult & { trapMph?: number; earnedStyle?: string[] } = {
     raceId: input.raceId, eventId: e.id, place: o.place, mode: input.mode, time: o.playerTime, gapText: o.gapText,
     cash: pay.cash + bossCash + medalCash + starPay, rep: pay.rep, crates: pay.crates + (pay.bossReward?.crates ?? 0) + medalCrates, precision: pay.precision,
     firstClear: pay.firstClear, boss: pay.boss, perfects: o.perfects, nitroUsed: input.mode === 'live' ? o.nitroUsed : 0,
-    personalBest, signatureFinish, freshRep: pay.freshRep, medal, newMedals, nextMedal, trophy, newStars, trapKmh, heat,
+    personalBest, signatureFinish, freshRep: pay.freshRep, medal, newMedals, nextMedal, trophy, newStars, heat,
+    ...(trapMphNow !== undefined ? { trapMph: trapMphNow, trapKmh: Math.round(trapMphNow * 1.609344) } : {}),
+    ...(earned.length ? { earnedStyle: earned } : {}),
     breakdown: [
       { label: input.mode === 'quick' ? `Crew purse · ${ordinalShort(o.place)}` : `Purse · ${ordinalShort(o.place)}`, cash: pay.cash - pay.precision - (pay.firstClear ? e.firstClear.cash : 0), kind: 'base' as const },
       ...(pay.precision ? [{ label: `Perfect boost${o.perfects > 1 ? 's' : ''} ×${Math.min(2, o.perfects)}`, cash: pay.precision, kind: 'skill' as const }] : []),
@@ -611,7 +689,7 @@ export function accrueOffline(s: GameState, now: number) {
   const counted = Math.min(elapsed, room);
   if (elapsed >= OFFLINE_MIN_S || s.offline.pendingS > 0) {
     s.offline.pendingS += counted;
-    s.offline.pendingCash = Math.floor((s.offline.pendingS / 60) * offlineRate(s));
+    s.offline.pendingCash = floorCash((s.offline.pendingS / 60) * offlineRate(s)); // on a cash step, never more than accrued
   }
   s.offline.lastSeenAt = Math.max(s.offline.lastSeenAt, now);
 }

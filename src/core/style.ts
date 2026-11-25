@@ -7,17 +7,19 @@ import type { CarStyle, PaintMaterial, WheelSetId } from '../render/car';
 /** The cosmetic style a car is drawn with, everywhere it appears. */
 export function carStyle(s: GameState, car: CarId): CarStyle {
   const st = s.style?.[car];
-  return st ? { wheel: st.wheel as WheelSetId | undefined, material: st.material as PaintMaterial | undefined, restore: st.restore } : {};
+  return st ? { wheel: st.wheel as WheelSetId | undefined, material: st.material as PaintMaterial | undefined, restore: st.restore, livery: st.livery } : {};
 }
 
+/** Premium paint is bought per car; colours, wheels and liveries are bought (or earned) once and fit every car. */
 export const ownsKey = (item: StyleItem, car: CarId) => (item.kind === 'material' ? `${item.id}:${car}` : item.id);
 export const owned = (s: GameState, item: StyleItem, car: CarId) => (s.owns ?? []).includes(ownsKey(item, car));
 
-/** Items shown for this car now: open by cars owned; restoration only for the Tapeback and in order. */
+/** Items shown for this car now: open by cars owned (an earned item shows as soon as it is owned); restoration only
+ *  for the Tapeback and in order. */
 export function shopItems(s: GameState, car: CarId): StyleItem[] {
   const restore = s.style[car]?.restore ?? 0;
   return STYLE_ITEMS.filter((i) => {
-    if (s.owned.length < i.opens) return false;
+    if (s.owned.length < i.opens && !owned(s, i, car)) return false;
     if (i.kind === 'restore') return car === 'junker' && Number(i.value) <= restore + 1;
     return true;
   });
@@ -43,6 +45,7 @@ export function applyStyle(s: GameState, itemId: string | null, car: CarId, kind
   if (itemId === null) {
     if (kind === 'wheel') delete st.wheel;
     if (kind === 'material') delete st.material;
+    if (kind === 'livery') delete st.livery;
     return [];
   }
   const item = styleItem(itemId);
@@ -50,11 +53,12 @@ export function applyStyle(s: GameState, itemId: string | null, car: CarId, kind
   if (item.kind === 'paint') s.paints[car] = item.value;
   if (item.kind === 'wheel') st.wheel = item.value;
   if (item.kind === 'material') st.material = item.value;
+  if (item.kind === 'livery') st.livery = item.value;
   if (item.kind === 'restore') st.restore = Math.max(st.restore ?? 0, Number(item.value));
   return [];
 }
 
 /** Total Paint shop catalogue value still unbought for the cars owned (for the audit and Showroom progress). */
 export const styleRemaining = (s: GameState) =>
-  s.owned.reduce((a, car) => a + shopItems(s, car).filter((i) => !owned(s, i, car) && (i.kind !== 'paint' && i.kind !== 'wheel' || car === s.owned[0])).reduce((b, i) => b + i.price, 0), 0);
+  s.owned.reduce((a, car) => a + shopItems(s, car).filter((i) => !owned(s, i, car) && (i.kind !== 'paint' && i.kind !== 'wheel' && i.kind !== 'livery' || car === s.owned[0])).reduce((b, i) => b + i.price, 0), 0);
 

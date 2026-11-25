@@ -48,11 +48,11 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Lumen RS: six-speed dual clutch; quick shifts, wide band.
   super: { gears: [0.28, 0.43, 0.58, 0.74, 0.92, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 240, topScale: 1.625, accelScale: 0.8 },
   // Corvo Rally: five-speed AWD gearing; quick to its (modest) top speed.
-  rally: { gears: [0.36, 0.56, 0.76, 0.96, 1.3], idle: 950, redline: 7800, band: [0.8, 0.95], shiftS: 0.035, gaugeMph: 170, topScale: 0.85, accelScale: 1.275 },
+  rally: { gears: [0.36, 0.56, 0.76, 0.96, 1.3], idle: 950, redline: 7800, band: [0.8, 0.95], shiftS: 0.035, gaugeMph: 170, topScale: 1.08, accelScale: 0.95, pullExp: 3 },
   // Strata GTR: five-speed sequential endurance box.
-  gt: { gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.05, accelScale: 1.0 },
+  gt: { gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.2, accelScale: 0.8, pullExp: 2.5 },
   // Halcyon X: six-speed paddle box with the narrowest band in the game — the hardest car to master.
-  proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.025, accelScale: 1.0 },
+  proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.26, accelScale: 0.8, pullExp: 2.6 },
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };
