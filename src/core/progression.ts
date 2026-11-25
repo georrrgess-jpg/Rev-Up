@@ -210,7 +210,9 @@ export function adviceText(s: GameState, o: LeanOutcome): string {
     const g = goalStatus(s);
     if (g) return g.line;
     if (!s.events['foundry-final']?.wins) return 'Take the Ironhorse to the Foundry Invitational.';
-    return 'Take another car to a live podium to earn its Showroom finish.';
+    const next = s.owned.find((id) => SIGNATURE_FINISHES[id] && !s.livePodiums.includes(id));
+    if (next) return `Take the ${carById(next).model} to a live top 3 to earn its ${SIGNATURE_FINISHES[next]!.name} finish${next === 'junker' ? ' — try the Tapeback Trophy' : ''}.`;
+    return 'Every finish is earned. Chase your records on each route.';
   }
   const a = o.advice;
   if (!a) return 'Upgrade in the Garage and try again.';

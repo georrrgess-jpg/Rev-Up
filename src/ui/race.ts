@@ -485,6 +485,27 @@ class RaceScreen {
     // sun
     ctx.fillStyle = theme === 'scrap' ? 'rgba(255,200,120,0.55)' : 'rgba(255,220,160,0.5)';
     ctx.beginPath(); ctx.arc(W * 0.78, horizon * 0.82, H * 0.06, 0, 7); ctx.fill();
+    // restrained background motion: slow clouds drifting against the camera
+    if (!this.reduced) {
+      ctx.fillStyle = sim.track.theme === 'suburb' ? 'rgba(230,236,245,0.10)' : 'rgba(255,214,170,0.08)';
+      for (let k = 0; k < 4; k++) {
+        const span = W * 1.6;
+        const cx = ((k * span) / 4 - camX * ppm * 0.03 - sim.t * 6 * this.dpr) % span;
+        const x = cx < -W * 0.3 ? cx + span : cx;
+        const y = horizon * (0.25 + 0.12 * (k % 3));
+        ctx.beginPath(); ctx.ellipse(x, y, W * 0.16, H * 0.018, 0, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + W * 0.06, y - H * 0.012, W * 0.09, H * 0.016, 0, 0, 7); ctx.fill();
+      }
+    }
+    // route lighting: the Foundry glows and breathes along the horizon
+    if (sim.track.id === 'foundry') {
+      const pulse = this.reduced ? 0.5 : 0.5 + 0.5 * Math.sin(sim.t * 1.7);
+      const glow = ctx.createRadialGradient(W * 0.3, horizon, 0, W * 0.3, horizon, W * 0.55);
+      glow.addColorStop(0, `rgba(255,120,40,${0.28 + 0.12 * pulse})`);
+      glow.addColorStop(1, 'rgba(255,80,20,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, horizon + 4);
+    }
 
     // far layer
     const far = (par: number, color: string, base: number, hmax: number, spacing: number, kind: 'pile' | 'house' | 'crane' | 'tree') => {
