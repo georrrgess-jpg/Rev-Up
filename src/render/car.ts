@@ -309,6 +309,31 @@ function drawCover(ctx: CanvasRenderingContext2D, s: Shape, x: number, y: number
   ctx.restore();
 }
 
+export function drawCarCover(ctx: CanvasRenderingContext2D, id: CarId | string, x: number, y: number, w: number, amount: number) {
+  if (amount > 0) drawCover(ctx, shapeFor(id), x, y, w, amount);
+}
+
+export function drawHeadlightBeam(ctx: CanvasRenderingContext2D, id: CarId | string, x: number, y: number, w: number, k: number) {
+  if (k <= 0) return;
+  const s = shapeFor(id);
+  const hx = x + s.light[0] * w;
+  const hy = y - s.light[1] * w;
+  const bg = ctx.createLinearGradient(hx, hy, hx + w * 1.4, hy);
+  bg.addColorStop(0, `rgba(255,236,190,${0.55 * k})`);
+  bg.addColorStop(1, 'rgba(255,236,190,0)');
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.moveTo(hx, hy - w * 0.015);
+  ctx.lineTo(hx + w * 1.4, hy - w * 0.22);
+  ctx.lineTo(hx + w * 1.4, hy + w * 0.16);
+  ctx.lineTo(hx, hy + w * 0.02);
+  ctx.fill();
+  ctx.fillStyle = '#fff6d8';
+  ctx.beginPath();
+  ctx.ellipse(hx, hy, w * 0.018, w * 0.014, 0, 0, 7);
+  ctx.fill();
+}
+
 /** Trace the body outline (for clipping showroom light sweeps to the paint). */
 export function carBodyPath(ctx: CanvasRenderingContext2D, id: CarId | string, x: number, y: number, w: number) {
   poly(ctx, shapeFor(id).body, x, y, w);

@@ -108,8 +108,12 @@ export class ShowroomView implements View {
     this.app.root.append(this.inspectEl);
     const t0 = performance.now();
     const reduced = s.settings.reducedMotion;
+    let lastDraw = 0;
     const draw = (t: number) => {
-      const { w, h: hh, dpr } = fitCanvas(canvas);
+      if (!reduced) this.raf = requestAnimationFrame(draw);
+      if (t - lastDraw < 30) return; // a slow light sweep does not need more than ~30 fps
+      lastDraw = t;
+      const { w, h: hh, dpr } = fitCanvas(canvas, 1.5);
       const ctx = canvas.getContext('2d')!;
       const tier = ENABLED_CARS.findIndex((x) => x.id === id);
       const bg = ctx.createRadialGradient(w / 2, hh * 0.25, 10, w / 2, hh * 0.6, Math.max(w, hh) * 0.8);
@@ -144,7 +148,6 @@ export class ShowroomView implements View {
       ctx.fillStyle = lg;
       ctx.fillRect(x, y - cw * 0.46, cw, cw * 0.4);
       ctx.restore();
-      if (!reduced) this.raf = requestAnimationFrame(draw);
     };
     requestAnimationFrame(draw);
   }

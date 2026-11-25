@@ -184,8 +184,10 @@ export class App {
   }
 
   /** Offer a staged service-worker update only on a safe screen. */
+  private updateOffered = false;
   maybeShowUpdate() {
-    if (!this.updateReady || this.busy) return;
+    if (!this.updateReady || this.busy || this.updateOffered) return;
+    this.updateOffered = true; // offered once; Settings keeps a Reload button afterwards
     const apply = this.updateReady;
     this.toast('An update is ready.', { label: 'Reload', run: () => { this.game.saveNow(); apply(); } }, 12000);
   }

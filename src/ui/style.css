@@ -138,6 +138,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .btn.primary:active { transform: translateY(2px); box-shadow: 0 2px 0 #a5641a; }
 .btn.race { flex: 1.5; font-size: 17px; }
 .btn.crates .count { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--amber2); color: var(--amber-ink); font-size: 11px; display: grid; place-items: center; padding: 0 5px; }
+.btn.race.pulse { animation: glow 1.6s infinite; }
 .btn.crates.pulse { animation: glow 1.6s infinite; border-color: var(--amber); }
 .btn.sm { min-height: 36px; font-size: 13px; padding: 4px 10px; }
 .btn.danger { background: #4a211b; border-color: #8a3a2e; }

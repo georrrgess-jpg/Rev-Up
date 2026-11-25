@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Rev Up — merge parts, race for cash and reputation, fill a showroom one earned car at a time.",
+  "description": "Rev Up \u2014 merge parts, race for cash and reputation, fill a showroom one earned car at a time.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -13,7 +13,10 @@
     "playthrough": "vitest run tests/playthrough.test.ts --reporter verbose",
     "icons": "node scripts/make-icons.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "publish:pages": "node scripts/publish-pages.mjs"
+    "publish:pages": "node scripts/publish-pages.mjs",
+    "perf": "node scripts/perf.mjs",
+    "check:input": "node scripts/input-check.mjs",
+    "serve:pages": "node scripts/serve.mjs dist /Rev-Up/ 4180"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

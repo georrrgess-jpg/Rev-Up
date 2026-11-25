@@ -1,6 +1,6 @@
 import { sfx, unlockAudio } from '../audio';
 import { CarId, carById } from '../data/tables';
-import { drawCar, fitCanvas } from '../render/car';
+import { drawCar, drawCarCover, drawHeadlightBeam, fitCanvas } from '../render/car';
 import type { App } from './app';
 import { h } from './dom';
 
@@ -22,6 +22,9 @@ export class RevealOverlay {
   private dragX: number | null = null;
   private dragCover = 1;
   private reduced: boolean;
+  private litQ = -1;
+  private carCache = document.createElement('canvas');
+  private cacheW = 0;
 
   constructor(private app: App, private car: CarId, private onDone: () => void) {
     this.reduced = app.game.state.settings.reducedMotion;
@@ -118,18 +121,10 @@ export class RevealOverlay {
   }
 
   private draw() {
-    const { w, h: hh, dpr } = fitCanvas(this.canvas);
+    const { w, h: hh, dpr } = fitCanvas(this.canvas, 1.5);
     const ctx = this.canvas.getContext('2d')!;
     const c = carById(this.car);
     const lit = this.phase === 'cover' || this.phase === 'pull' ? 0.25 : Math.min(1, this.phase === 'lights' ? this.t : 1);
-    // room
-    const bg = ctx.createRadialGradient(w / 2, hh * 0.3, 10, w / 2, hh * 0.55, Math.max(w, hh) * 0.75);
-    bg.addColorStop(0, `rgba(${90 + 80 * lit},${60 + 50 * lit},${40 + 20 * lit},1)`);
-    bg.addColorStop(1, '#050403');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, w, hh);
-    ctx.fillStyle = '#0c0907';
-    ctx.fillRect(0, hh * 0.64, w, hh);
     // camera: layered zoom/pan
     let zoom = 1;
     let pan = 0;
@@ -142,14 +137,27 @@ export class RevealOverlay {
     const cw = Math.min(w * 0.88, hh * 1.5) * zoom;
     const x = (w - cw) / 2 - pan;
     const y = hh * 0.64;
-    // overhead spot
-    const sp = ctx.createRadialGradient(w / 2, y - cw * 0.1, 10, w / 2, y, cw * 0.8);
-    sp.addColorStop(0, `rgba(255,225,180,${0.12 + 0.25 * lit})`);
-    sp.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sp;
-    ctx.fillRect(0, 0, w, hh);
+    // Room lighting is a CSS gradient (composited by the browser), updated only when it changes.
+    const q = Math.round(lit * 20) / 20;
+    if (q !== this.litQ) {
+      this.litQ = q;
+      this.el.style.background = `radial-gradient(60% 40% at 50% 62%, rgba(255,225,180,${(0.12 + 0.25 * q).toFixed(2)}), transparent 70%), linear-gradient(to bottom, transparent 64%, #0c0907 64%), radial-gradient(90% 70% at 50% 30%, rgb(${90 + 80 * q},${60 + 50 * q},${40 + 20 * q}), #050403 75%)`;
+    }
+    ctx.clearRect(0, 0, w, hh);
     const headlights = this.phase === 'lights' ? Math.min(1, this.t * 2) * (0.6 + 0.4 * Math.sin(this.t * 14)) : this.phase === 'camera' || this.phase === 'done' ? 0.8 : 0;
-    drawCar(ctx, this.car, x, y, cw, { paint: c.paint, trim: c.trim, cover: this.cover, headlights });
+    // The car body is cached once per size; cover and beams are drawn live on top.
+    const baseW = Math.round(Math.min(w * 0.88, hh * 1.5) * 1.22);
+    if (this.cacheW !== baseW) {
+      this.cacheW = baseW;
+      this.carCache.width = Math.round(baseW * 1.1);
+      this.carCache.height = Math.round(baseW * 0.56);
+      const cc = this.carCache.getContext('2d')!;
+      drawCar(cc, this.car, baseW * 0.05, baseW * 0.52, baseW, { paint: c.paint, trim: c.trim });
+    }
+    const sc = cw / baseW;
+    ctx.drawImage(this.carCache, x - baseW * 0.05 * sc, y - baseW * 0.52 * sc, this.carCache.width * sc, this.carCache.height * sc);
+    drawHeadlightBeam(ctx, this.car, x, y, cw, headlights);
+    drawCarCover(ctx, this.car, x, y, cw, this.cover);
     // headlight sweep across the room
     if (this.phase === 'lights' || this.phase === 'camera') {
       const k = this.phase === 'lights' ? this.t : 1 + this.t;
@@ -159,7 +167,7 @@ export class RevealOverlay {
       g.addColorStop(0.5, 'rgba(255,240,200,0.12)');
       g.addColorStop(1, 'rgba(255,240,200,0)');
       ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, hh);
+      ctx.fillRect(sx - 120 * dpr, 0, 240 * dpr, hh);
     }
   }
 }

@@ -39,6 +39,7 @@ export function openSettings(app: App) {
       h('h3', {}, 'Install'),
       installHelp,
       h('p', {}, offline),
+      app.updateReady ? h('button', { class: 'btn primary', onclick: () => { game.saveNow(); app.updateReady?.(); } }, 'Update ready — reload') : null,
       h('h3', {}, 'Move your save'),
       h('p', {}, 'Safari and the Home Screen app can keep separate saves. Copy the code from one and import it in the other.'),
       ta,
