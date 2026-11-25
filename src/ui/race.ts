@@ -223,6 +223,8 @@ class RaceScreen {
   private dpr = 1;
   private reduced: boolean;
   private zoom = 0;
+  private zoomTarget = 0;
+  private look = 0;
   private ticker!: HTMLElement;
   private flash!: HTMLElement;
   private tickerTimer = 0;
@@ -233,7 +235,6 @@ class RaceScreen {
   private result: LastResult | null = null;
   private prevV: number[] = [];
   private slowWindows = 0;
-  private goodWindows = 0;
   private gainShown: object | null = null;
   private eventName: string;
 
@@ -380,9 +381,10 @@ class RaceScreen {
     if (this.frameTimes.length >= 60) {
       const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
       this.frameTimes = [];
-      if (avg > 0.024) { this.slowWindows++; this.goodWindows = 0; } else if (avg < 0.019) { this.goodWindows++; this.slowWindows = 0; }
+      // two slow seconds in a row drop effects for the rest of the race; a single hitch (a GC, the launch) does not,
+      // and quality never climbs back mid-race, which would re-render every sprite and stutter again
+      this.slowWindows = avg > 0.024 ? this.slowWindows + 1 : 0;
       if (this.slowWindows >= 2 && this.quality === 1) { this.quality = 0; this.resize(); }
-      if (this.goodWindows >= 3 && this.quality === 0) { this.quality = 1; this.resize(); }
     }
     if (!this.paused) {
       if (this.countdown > 0) {
@@ -442,7 +444,8 @@ class RaceScreen {
     const approaching = eta < 2.2;
     this.nitroBtn.classList.toggle('approach', approaching);
     if (approaching) {
-      this.nitroBtn.style.setProperty('--eta', String(Math.max(0, Math.min(1, 1 - eta / 2.2))));
+      const q = (Math.round(Math.max(0, Math.min(1, 1 - eta / 2.2)) * 20) / 20).toFixed(2); // 20 steps: no repaint every frame
+      if (this.nitroBtn.style.getPropertyValue('--eta') !== q) this.nitroBtn.style.setProperty('--eta', q);
       this.nitroBtn.dataset.label = `WINDOW IN ${eta.toFixed(1)} s`;
     } else if (inWindow) this.nitroBtn.dataset.label = '▲ PERFECT WINDOW';
     // overtakes, called out once they settle (after the launch)
@@ -588,12 +591,18 @@ class RaceScreen {
     const packSpan = Math.max(...xs) - Math.min(...xs);
     const span = packSpan * ppm0 * 0.45 < W * 0.8 ? packSpan : Math.abs(nearest.x - player.x);
     const target = Math.max(ppm0 * 0.45, Math.min(ppm0, (W * 0.78) / (span + 9)));
-    this.zoom = this.zoom ? this.zoom + (target - this.zoom) * 0.06 : target;
-    const ppm = this.zoom * (1 - 0.05 * Math.min(1, this.kick));
+    // Zoom only retargets on a clear change and eases slowly: car sprites are cached per size step, so a zoom
+    // that wanders re-renders every car mid-race.
+    if (!this.zoomTarget || Math.abs(target / this.zoomTarget - 1) > 0.1) this.zoomTarget = target;
+    this.zoom = this.zoom ? this.zoom + (this.zoomTarget - this.zoom) * 0.03 : target;
+    const ppm = this.zoom;
     const focus = packSpan * ppm < W * 0.8 ? xs : [player.x, nearest.x];
     const mid = (Math.max(...focus) + Math.min(...focus)) / 2;
     const ahead = sim.windowState().next;
-    const lookAhead = ahead && player.v > 1 && (ahead.start - player.x) / player.v < 2.5 ? 0.12 : 0;
+    const lookGoal = ahead && player.v > 1 && (ahead.start - player.x) / player.v < 2.5 ? 0.12 : 0;
+    this.look += (lookGoal - this.look) * 0.05;
+    // a boost kick lets the camera lag so the car surges forward on screen
+    const lookAhead = this.look - 0.05 * Math.min(1, this.kick);
     let camX = mid - (W * (0.48 - lookAhead)) / ppm;
     camX = Math.min(camX, player.x - (W * 0.18) / ppm);
     camX = Math.max(camX, player.x - (W * (0.62 - lookAhead)) / ppm);

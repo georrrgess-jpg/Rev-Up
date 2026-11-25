@@ -497,8 +497,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .ticker.on { opacity: 1; transform: translate(-50%, 0); }
 .ticker.gold { color: var(--gold); }
 .ticker.blue { color: #9fd8ff; }
-.race-flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 0 rgba(255,214,94,0); transition: box-shadow .25s ease-out; z-index: 3; }
-.race-flash.on { box-shadow: inset 0 0 80px 18px rgba(255,214,94,.55); transition: none; }
+.race-flash { position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: 0; visibility: hidden; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,214,94,.5)); transition: opacity .25s ease-out, visibility 0s .25s; }
+.race-flash.on { opacity: 1; visibility: visible; transition: none; }
 .nitrobtn.approach::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; background: conic-gradient(var(--amber2) calc(var(--eta, 0) * 360deg), rgba(255,255,255,.12) 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); }
 .nitrobtn.approach::before, .nitrobtn.window::before { content: attr(data-label); }
 .nitrobtn.approach::before { position: absolute; top: -34px; right: 0; padding: 5px 10px; border-radius: 999px; background: rgba(8,10,14,.85); color: var(--amber2); font-size: var(--fs-2xs); font-weight: var(--w-heavy); white-space: nowrap; }

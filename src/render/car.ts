@@ -428,10 +428,11 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
   if (blur > 0) {
     // spinning fast: spokes smear into a disc with soft concentric streaks
     ctx.globalAlpha = 0.75 * blur;
-    const bg = ctx.createRadialGradient(0, 0, R * 0.15, 0, 0, R * 0.95);
-    bg.addColorStop(0, 'rgba(200,205,210,0.9)'); bg.addColorStop(0.6, 'rgba(120,126,132,0.85)'); bg.addColorStop(1, 'rgba(70,74,78,0.9)');
-    ctx.fillStyle = bg;
+    // flat rings instead of a per-frame gradient: this runs for every wheel on every race frame
+    ctx.fillStyle = 'rgb(78,82,86)';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgb(150,156,162)';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.55, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = R * 0.04;
     for (const k of [0.45, 0.7]) { ctx.beginPath(); ctx.arc(0, 0, R * k, angle % 6, (angle % 6) + 2.2); ctx.stroke(); }
     ctx.globalAlpha = 1;
