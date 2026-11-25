@@ -224,6 +224,18 @@ Source lives on the development branch; the compiled site is published to a dedi
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
 
+### 1.5 · Garage and Racing Overhaul
+
+- **Tests** (`npm test`): 149 passing, 3 calibration probes skipped unless `PROBE=1`. New suites: `install` (fit, swap, remove with a full board, move between cars, no loss or duplication, recommended fit, keystone ingredients kept), `migration-v2` (v1 saves keep the active car's build), `shift` (missed / ordinary / clean shifting, rival shift quality), `difficulty` and `tune-ladder` (wins by shift × nitro per event; time to each car per player type).
+- **Release checks:** `npm run smoke` 22/22 (fresh install, and upgrading from the 1.4 build on gh-pages with the save carried from v1 to v2); `npm run check:input` 24/24 (320 to 1280 px, full 6×7 board, 36 px cells).
+- **Fresh-save playthrough** (production build, real taps only, 390×844): goal → merge → fit → race → what is still needed, in that order; the Corsa Rojo after 6–7 live races (about 5–10 minutes); no page errors.
+- **Difficulty** (Neon Mile, wins of 6 with no / late / Perfect nitro): missed shifts 0/0/1, ordinary 0/0/6, clean 6/6/6. Missed shifts cost 0.6–1.1 s against clean, ordinary 0.2–0.5 s; Perfect boosts gain 0.4–0.9 s. Endgame events are lost by 0.5–0.9 s with no inputs and won by 0.4–1.0 s with clean shifts and Perfect boosts.
+- **Pace to the top cars** (seeded simulation through the real rules): Lumen RS at 31 min (clean player), 34–35 (mixed), 85 (weak: missed shifts, no nitro, Tune-ups); Halcyon X at 60 / 69–74 / 118 min. Most repeats of one event in a row: 3.
+- **Speeds** (full build, clean shifts, measured in the race sim): Tapeback 77 mph, Corsa 103, Ironhorse 155, Lumen 217, Strata 208, Halcyon 240 on the harbor-bridge trap (225 on the Mesa trap).
+- **Layout:** Garage, Fit Parts, Shop, Race menu, race HUD, results and sheets audited at 320×568, 360×640, 390×844, 430×932 (each also at 125% zoom) and 768×1024. Phone landscape shows the rotate prompt.
+- **Performance** (4× CPU slowdown, 390×844): races hold 47–49 fps (1.4: ~52); cold load ~2.9 s (1.4: ~2.1 s) with the bundle at 116 KB gzip.
+- **Known gaps:** a weak player (missed shifts, no nitro) can lose up to 12 races in a row in simulation before building past an event; with 125% text on 360×640 and 320×568 the 6×7 board scrolls under the docked spare rack; container-query layout tweaks need iOS 16+ / Chrome 105+ (older browsers keep the previous look).
+
 ### 1.4 · Main Event
 
 Environment: Linux cloud container, headless Chromium, production build served at `/Rev-Up/`. **Every device check below is emulated; no physical phone was available.**
