@@ -55,7 +55,11 @@ export function openShop(app: App, focusFamily?: Family, startTab: ShopTab = 'pa
       const car = carById(s.activeCar);
       const maxT = B.orderMaxTier(s);
       const goalFam = g && !g.keystoneDone ? g.family : null;
-      fam ??= goalFam ?? 'engine';
+      // open on the best buy's part when it is an order (else the goal family), so the panel agrees with the card
+      const first = shopPick(s).pick;
+      const firstOrder = first && first.kind === 'order' ? first : null;
+      fam ??= goalFam ?? firstOrder?.fam ?? 'engine';
+      if (!tier && firstOrder && firstOrder.fam === fam) tier = firstOrder.tier;
       // default tier: the one that feeds the goal craft (two of these make the next), else the highest sold
       if (!tier || tier > maxT) tier = goalFam === fam && g ? Math.max(1, Math.min(maxT, g.tier - 1)) : maxT;
       const need = (cost: number) => (s.cash >= cost ? null : h('small', { class: 'short' }, `$${fmt(cost - s.cash)} more`));

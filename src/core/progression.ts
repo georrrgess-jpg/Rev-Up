@@ -3,6 +3,7 @@ import {
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
   PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
+import { fitRecommended } from './install';
 import type { GameEvent } from './events';
 import { computeLoadout } from './loadout';
 import type { CarMastery, EventRecord, GameState, LastResult, LeanOutcome } from './state';
@@ -91,6 +92,9 @@ export function checkUnlocks(s: GameState, events: GameEvent[]) {
       s.pendingReveal ??= car.id;
       s.stats.milestones[car.id] = Math.round(s.activeS);
       events.push({ type: 'unlock', car: car.id });
+      // a new car arrives with your best parts fitted (bench first; another car's part only when strictly better),
+      // so the unlock is an upgrade the moment it is revealed — swaps stay possible in Fit Parts
+      events.push(...fitRecommended(s, car.id));
     } else return;
   }
 }
