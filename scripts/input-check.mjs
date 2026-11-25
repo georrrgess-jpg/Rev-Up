@@ -71,16 +71,34 @@ const browser = await chromium.launch();
   await ctx.close();
 }
 
-for (const [w, h, name] of [[360, 640, 'narrow'], [390, 844, 'modern'], [1280, 800, 'desktop']]) {
-  const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+const SIZES = [[320, 568, 'small'], [360, 640, 'narrow'], [390, 844, 'modern'], [430, 932, 'large'], [1280, 800, 'desktop']];
+for (const [w, h, name] of SIZES) {
+  for (const preset of ['', 'full', 'fullx']) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+    const page = await ctx.newPage();
+    await page.goto(URL0 + (preset ? `?dev=${preset}` : ''));
+    await page.waitForTimeout(preset ? 1200 : 300);
+    await page.waitForSelector('.board .cell .part');
+    const m = await page.evaluate(() => {
+      const vis = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.right <= innerWidth + 1 && r.top >= 0 && r.left >= 0 && r.width > 0; };
+      const cell = document.querySelector('.board .cell').getBoundingClientRect().width;
+      return { race: vis('.btn.race'), board: vis('.board'), tray: vis('.tray'), scrap: vis('.press'), nav: vis('.nav'), cell: Math.round(cell), overflowX: document.documentElement.scrollWidth > innerWidth };
+    });
+    const pass = m.race && m.board && m.tray && m.scrap && m.nav && !m.overflowX && m.cell >= 36;
+    ok(`${name} ${w}×${h}${preset === 'fullx' ? ' full 6×7 board' : preset ? ' full board' : ''}: board, overflow, scrap, Race and nav on screen`, pass, JSON.stringify(m));
+    await ctx.close();
+  }
+}
+
+{ // very large balances and long names must not push controls off screen
+  const ctx = await browser.newContext({ viewport: { width: 320, height: 568 } });
   const page = await ctx.newPage();
-  await page.goto(URL0);
-  await page.waitForSelector('.board .cell .part');
-  const m = await page.evaluate(() => {
-    const vis = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.right <= innerWidth + 1 && r.top >= 0 && r.left >= 0 && r.width > 0; };
-    return { race: vis('.btn.race'), board: vis('.board'), tray: vis('.tray'), nav: vis('.nav'), overflowX: document.documentElement.scrollWidth > innerWidth };
-  });
-  ok(`${name} ${w}×${h}: board, tray, race button, nav fully on screen`, m.race && m.board && m.tray && m.nav && !m.overflowX, JSON.stringify(m));
+  await page.goto(URL0 + '?dev=late');
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => { const g = window.revup.game; g.transact((s) => { s.cash = 98765432; s.rep = 1234567; s.scrap = 99999; return [{ type: 'cash', amount: 1, reason: 'test' }]; }); });
+  await page.waitForTimeout(200);
+  const m = await page.evaluate(() => ({ overflowX: document.documentElement.scrollWidth > innerWidth, settings: document.querySelector('[aria-label=Settings]').getBoundingClientRect().right <= innerWidth }));
+  ok('large balances keep the top bar inside 320 px', !m.overflowX && m.settings, JSON.stringify(m));
   await ctx.close();
 }
 await browser.close();

@@ -264,11 +264,22 @@ export class GarageView implements View {
     const n = s.crates.length;
     const printerCrates = s.crates.filter((c) => c.source === 'printer').length;
     const paused = printerCrates >= P.PRINTER_BANK_CAP;
-    this.cratesBtn.replaceChildren(
-      h('span', { class: 'stack' }, 'Crates', h('small', {}, paused ? 'Printer full' : n ? `${n} queued` : 'Printing')),
-      h('span', { class: 'printer' }, this.printerBar));
-    this.cratesBtn.setAttribute('aria-label', `Crates: ${n} waiting${paused ? ', printer paused until you open some' : ''}`);
-    this.cratesBtn.classList.toggle('pulse', n > 0 && B.freeSlots(s) > 0);
+    const full = B.freeSlots(s) === 0 && !!s.stats.milestones.firstMerge;
+    if (full) {
+      // A full bench turns the crate button into the recovery action, so it is always in reach.
+      const pair = this.anyPair();
+      const junk = pair ? null : this.lowestScrap();
+      const jp = junk ? B.getPart(s, junk) : null;
+      this.cratesBtn.replaceChildren(h('span', { class: 'stack' }, pair ? 'Merge pair' : jp ? `Scrap T${jp.t}` : 'Bench full', h('small', {}, n ? `${n} crates wait` : 'bench full')));
+      this.cratesBtn.setAttribute('aria-label', pair ? 'Bench full: show a pair to merge' : jp ? `Bench full: scrap a T${jp.t} ${FAMILIES[jp.f].name}` : 'Bench full');
+      this.cratesBtn.classList.add('pulse');
+    } else {
+      this.cratesBtn.replaceChildren(
+        h('span', { class: 'stack' }, 'Crates', h('small', {}, paused ? 'Printer full' : n ? `${n} queued` : 'Printing')),
+        h('span', { class: 'printer' }, this.printerBar));
+      this.cratesBtn.setAttribute('aria-label', `Crates: ${n} waiting${paused ? ', printer paused until you open some' : ''}`);
+      this.cratesBtn.classList.toggle('pulse', n > 0 && B.freeSlots(s) > 0);
+    }
     this.updatePrinter();
     const unlocked = P.mergeAllUnlocked(s);
     const racesLeft = Math.max(0, MERGE_ALL_UNLOCK_RACES - s.stats.races);
@@ -304,6 +315,7 @@ export class GarageView implements View {
       const label = pair ? 'Board full · Show a pair to merge' : junk ? `Board full · Scrap a T${B.getPart(s, junk)!.t} ${FAMILIES[B.getPart(s, junk)!.f].name} (+${B.scrapValue(B.getPart(s, junk)!)})` : 'Board full';
       if (this.hintEl.dataset.k !== label) {
         this.hintEl.dataset.k = label;
+        requestAnimationFrame(() => this.visible && this.layout()); // re-fit the board now the recovery button takes space
         this.hintEl.replaceChildren(h('button', { class: 'btn sm recover', onclick: () => {
           const p2 = this.anyPair();
           if (p2) { this.setSel(p2[0]); this.cellFor(p2[1])?.firstElementChild?.classList.add('pop'); return; }
@@ -314,7 +326,7 @@ export class GarageView implements View {
       this.raceBtn.classList.remove('pulse');
       return;
     }
-    if (this.hintEl.dataset.k) { delete this.hintEl.dataset.k; this.hintEl.textContent = ''; }
+    if (this.hintEl.dataset.k) { delete this.hintEl.dataset.k; this.hintEl.textContent = ''; requestAnimationFrame(() => this.visible && this.layout()); }
     if (!s.stats.milestones.firstMerge) t = 'Drag one Engine onto the other to merge them';
     else if (s.stats.races === 0 && !s.pendingRace) t = 'Merged! Tap Race to earn cash and Rep';
     else if (this.sel) {
@@ -641,6 +653,13 @@ export class GarageView implements View {
   private onCrates() {
     const s = this.s;
     this.app.game.markTip('crates');
+    if (B.freeSlots(s) === 0 && s.stats.milestones.firstMerge) {
+      const pair = this.anyPair();
+      if (pair) { this.setSel(pair[0]); this.cellFor(pair[1])?.firstElementChild?.classList.add('pop'); return; }
+      const junk = this.lowestScrap();
+      if (junk) this.requestScrap(junk);
+      return;
+    }
     if (!s.crates.length) {
       const secs = Math.ceil(P.printerInterval(s) - s.printerS);
       this.app.toast(`No crates yet. The printer makes one in ${secs} s`);

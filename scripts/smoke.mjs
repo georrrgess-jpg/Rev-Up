@@ -21,7 +21,8 @@ function build(out) {
 
 rmSync('.smoke', { recursive: true, force: true });
 mkdirSync('.smoke', { recursive: true });
-build('.smoke/v1');
+if (process.env.SMOKE_V1_DIR) cpSync(process.env.SMOKE_V1_DIR, '.smoke/v1', { recursive: true }); // e.g. the currently deployed build
+else build('.smoke/v1');
 await new Promise((r) => setTimeout(r, 1100)); // new build timestamp → new hashes
 build('.smoke/v2');
 const site = { dir: '.smoke/site' };

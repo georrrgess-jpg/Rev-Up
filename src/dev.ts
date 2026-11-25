@@ -1,5 +1,6 @@
 // Development-only presets for late states and fixed seeds. Loaded via ?dev=<preset>&seed=<n>
 // only when running `npm run dev`; excluded from production builds by import.meta.env.DEV.
+import { expandBoard } from './core/board';
 import type { Game } from './core/game';
 import type { GameState, Part } from './core/state';
 import type { Family } from './data/tables';
@@ -41,7 +42,9 @@ export function applyPreset(game: Game, preset: string) {
         for (const id of ['yard-sprint', 'crusher-run', 'rusty-ray', 'cul-de-sac', 'maple-mile']) s.events[id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 18 };
         fill(s, [['engine', 5], ['tires', 5], ['turbo', 5], ['engine', 3], ['engine', 3], ['tires', 1], ['turbo', 2]]);
         break;
+      case 'fullx':
       case 'full': {
+        if (preset === 'fullx') expandBoard(s);
         const list: [Family, number][] = [];
         const fams: Family[] = ['engine', 'tires', 'turbo'];
         for (let i = 0; i < s.board.length + s.tray.length; i++) list.push([fams[i % 3], (i % 4) + 1]);

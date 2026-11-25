@@ -4,15 +4,19 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~40 KB JS + 6 KB CSS gzipped; all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~50 KB JS + 7 KB CSS gzipped; all art is drawn in code (no image downloads except the app icons).
 
-## Showroom update · 1.1
+## Update 1.2 · cars, phone UI, loop
 
-- Four reworked car illustrations with distinct bodywork, wheels, paint, glass, and lighting. Showroom inspection includes headlights and paint selection.
-- A live podium earns each car's own signature finish. Finish choices persist across sessions and appear in races. Live results also surface personal bests.
-- The workbench shows available space and car unlock requirements. Event details expand on demand. The first race includes a starter nitro charge when the player has none banked.
-- Merge All unlocks after five finishes or ten active minutes. Live podium crates help the current craft, Hot hatch and Muscle require less Rep, and earned cars reveal in sequence.
-- The Foundry Invitational opens after earning the Muscle and beating Rusty Ray. Its tight bends reward tires before the two boost straights.
+- **Vehicle art rebuilt.** Each car is an original profile built in metres from its wheelbase, ride height, overhangs, roofline and wheel arches, extruded along one oblique depth so it has real hood, roof, deck, fascia and windshield planes under one shared light, plus contact shadows, tyre thickness, far-side wheels and per-car construction:
+  - **Tapeback 1.1** — short upright hatch, steel wheels, sagging mismatched bumpers, a replacement door, rust along the arches and sill seams, duct tape you can read on a phone, one yellowed headlight.
+  - **Corsa Rojo** — four-door sedan with front and rear door breaks, a sun-faded roof, rectangular lamps with amber corners, rubber side moulding, period wheel covers.
+  - **Vexa GTi** — lowered hot hatch, flared arches, tight glasshouse, roof spoiler, sport wheels with red calipers, big lower intake, red grille line, LED eyebrows and a split stripe that kicks up over the rear arch.
+  - **Ironhorse 455** — long-hood coupe with a low fastback cabin, broad rear haunches, a sculpted hood scoop, quad round headlights in chrome bezels, deep-dish wheels, chrome bumpers, twin stripes over hood, roof and deck.
+  The same geometry and finish are used in the Garage, Showroom, reveal and race; races draw cached body layers with live wheels, lights and nitro, and the camera now frames the whole pack. `art.html` (dev server only) shows every car at hero, card, race and thumbnail sizes.
+- **Reveal.** Pull the cover (or tap) → dark silhouette → spotlight cue → headlights and the car's own engine voice (Tapeback misfires, Corsa hums, Vexa rasps with blips, Ironhorse lopes) → camera settles → hero hold with the model name and what it unlocks ("T3 parts now fit (was T2) · +11 km/h"). Skip and reduced-motion versions; **Replay reveal** from Showroom inspection.
+- **Phone UI.** On short screens (320×568, 360×640) the whole board, overflow tray, scrap press and Race button fit without scrolling. Parts with a usable match get a teal ring. A full bench turns the Crates button into the recovery action (**Merge pair** / **Scrap T1**). The Race tab leads with one recommended event, its course type ("Drag launch · one bend — Turbo off the line") and a reason to run it; other events are compact rows with rivals and payouts behind a disclosure. The live nitro button shows a **▲ PERFECT WINDOW** label and dashed ring in a window. Results give specific next steps ("Build a T3 Turbo for the launch — you lost 0.4 s there"). Inspection shows earned and locked finishes, **Race this car** and **Replay reveal**. Returning players see where they left off.
+- **Loop.** Live races are allowed while the crew runs a Quick Race (no more waiting). **Fresh route:** +75% Rep on an event that isn't one of your last two races, and the recommendation rotates accordingly; a first clear you keep losing is spaced out between other races. New class event **Tapeback Trophy** (Tapeback only, opens with the Corsa Rojo). Signature finishes for a live podium per car, the Foundry Invitational finale for the Ironhorse, Merge All after five finishes, a starter nitro charge for the first race (from 1.1) remain.
 
 ## Commands
 
@@ -53,7 +57,7 @@ Invalid drops return the part to where it was. The page never scrolls while drag
 - **Equip.** The active car auto-equips the strongest part per family up to its equip cap. Stronger parts above the cap stay on the bench and are flagged. Scrapping an equipped part asks first and names what equips next.
 - **Racing.** Three rivals, a fixed-timestep (60 Hz) simulation on segmented tracks (launch, straights or highway, a bend). Amber **nitro windows** on the two straights are telegraphed on the road, on the progress bar and with an optional beep; a tap inside a window is a **Perfect** (1.5× effect), outside it still boosts. Every finish pays cash, Rep and crates scaled by place, with the real time gap and one next step. Rewards are committed at the finish line, so closing the page cannot lose or double them.
 - **Quick Race.** After a live win, an ordinary event can be raced by your crew in the background: same simulation without nitro, the placement's base payout, finished after the race's real duration while you keep merging. First-win bonuses, precision bonuses and rival rewards need a live race.
-- **Cars.** Junker (start, cap T2) → Beater (45 Rep + crafted T3 Tires, cap T3) → Hot hatch (265 Rep + crafted T4 Turbo, cap T4) → Muscle (850 Rep + crafted T5 Engine, cap T5). Keystones are recorded in a permanent ledger the moment you craft them (including tiers jumped by a Mint); crate drops never count. The next car sits under a cover above the board with the exact remaining goal.
+- **Cars.** Junker (start, cap T2) → Beater (45 Rep + crafted T3 Tires, cap T3) → Hot hatch (450 Rep + crafted T4 Turbo, cap T4) → Muscle (1450 Rep + crafted T5 Engine, cap T5). Keystones are recorded in a permanent ledger the moment you craft them (including tiers jumped by a Mint); crate drops never count. The next car sits under a cover above the board with the exact remaining goal.
 - **Rusty Ray.** The Scrapyard rival (needs the Beater). First win: the Ray's Rust-Red paint blueprint, the "Scrapyard King" badge, $200, 4 crates, and the Suburbs open.
 - **Reveal.** Ownership is saved before the unveil. Drag the cover off (or tap), then a headlight sweep, a camera move and a per-car rev. Skip is always available; an interrupted reveal resumes on next launch.
 - **Catch-up.** After ~150 s of active play (and race finishes) without progress on the current keystone, one free crate of that family arrives (once per car). Idle time and reloads earn nothing toward it.
@@ -87,7 +91,7 @@ All in `src/data/tables.ts`:
 
 | Knob | Current | Effect |
 | --- | --- | --- |
-| `CARS[].unlock.rep` | 45 / 265 / 850 | Rep per car (main pacing lever) |
+| `CARS[].unlock.rep` | 45 / 450 / 1450 | Rep per car (main pacing lever) |
 | `CARS[].unlock.family/tier` | T3 Tires / T4 Turbo / T5 Engine | Keystones |
 | `QUALITY_ODDS`, `QUALITY_BONUS` | 2% / 10%, +15% | Mint / Polished |
 | `COMBO_WINDOW_MS`, `COMBO_NITRO_EVERY`, `NITRO_CAP` | 2000, 3, 3 | Combo → nitro |
@@ -98,6 +102,8 @@ All in `src/data/tables.ts`:
 | `RIVALS[].stats` | per rival | Difficulty |
 | `CATCHUP_EFFORT_THRESHOLD`, `RACE_EFFORT` | 150, 15 | Catch-up crate |
 | `MERGE_ALL_UNLOCK_RACES` / `MERGE_ALL_UNLOCK_ACTIVE_S` | 5 / 600 | Merge All unlock |
+| `FRESH_ROUTE_BONUS` / `FRESH_ROUTE_AFTER_RACES` | 0.75 / 3 | Rep bonus for varying events |
+| `TRACKS[].course` / `favours` | per track | Course type shown on the Race tab |
 | `OFFLINE_MAX_S`, `CARS[].offlineRate` | 8 h, $1–4/min | Offline claim |
 
 The data model already carries Transmission and Aero, T6–T10, all ten classes and the later districts (disabled). The full campaign's hypercar is gated by Rep, a crafted T10 keystone and a Summit Gala rival win — not by a Mint roll.
@@ -126,40 +132,47 @@ Source lives on the development branch; the compiled site is published to a dedi
 
 ## Verification results
 
-Environment: Linux cloud container, Node 24, headless Chromium (Playwright), production build. **No physical phone was available**; device checks below are emulation.
+Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
 
-**Automated tests** (`npm test`): 57 passing — fusion and cascade (4-step cascade with stable order and part conservation), Polished +15%, Mint tier skip, cap-bound Mint, keystone ledger (Mint jumps, consumed keystones, crate drops excluded), combo/nitro window and cap, full board + full tray with crates waiting and scrap recovery, unprofitable crate recycling at every crate tier, targeted crates, auto-equip/cap/scrap warning, Merge All determinism and conservation, race determinism, weak vs strong build, perfect vs mistimed vs no nitro, stat roles per segment, real gaps, payouts by placement, Quick Race gating/duration/reload, single-award boss loot, exactly-once commits, save round-trip, corrupted/malformed/newer saves, stale-tab writes, namespacing, abandoned races, reveal ownership across reload, offline cap, repeated reloads, clock rollback.
+**Automated tests** (`npm test`): 62 passing — the 1.1 rules, race and save suites plus: a 1.0 save loaded from storage that now qualifies for two cars (each owned once, revealed in order, survives closing mid-reveal), an earned finish persisting across reload into the next race, the Tapeback Trophy gate and balance (T2 Tapeback with good nitro wins ≥7/10 seeds, T1 without nitro 0/10), the Fresh-route bonus paying once and not on an immediate repeat, and live racing while the crew runs a Quick Race.
 
-**Clean save → Muscle** (`npm run playthrough`, **simulation**: a scripted player through the real game API with modelled input time — 1.3 s per drag, race time + 7 s of menus per live race — and baseline luck, i.e. every roll Standard, zero Mint/Polished; 5 seeds):
+**Clean save → Muscle** (`npm run playthrough`, **simulation**: scripted player through the real game API, 1.3 s per drag, race time + 7 s menus per live race, baseline luck — every roll Standard, zero Mint/Polished — 5 seeds):
 
-| Milestone | Target | Measured (5 seeds) |
+| Measure | Target | Before (1.1) | After (1.2) |
+| --- | --- | --- | --- |
+| First merge | ≤ 5 s | 2 s | 2 s |
+| First race launched | ≤ 30 s | 7–10 s | 7–10 s |
+| First race finished | — | 34–38 s | 34–38 s |
+| Beater | 2–4 min | 2:21–3:37 | 2:20–4:04 |
+| Hot hatch | 10–14 min | 11:23–12:37 | 10:40–13:45 |
+| Muscle | 20–25 min | 20:47–22:38 | 19:36–22:47 |
+| Longest run of the same race in a row | — | 19–22 | 3–4 |
+| Time waiting with nothing to do | — | 5:23–7:58 | 0 s |
+| Races to Muscle (of which Quick) | — | 44–48 (22–30) | 54–59 (17–20) |
+| Merges to Muscle | — | 149–163 | 132–142 |
+| Time stuck on ingredients (Rep met, keystone missing) | — | 0 s | 0 s |
+
+Keystones (T3 Tires, T4 Turbo, T5 Engine) are crafted well before their Rep in every seed, so the main route never stalls on a rare drop; Rep is the pacing lever and the Fresh-route rotation spreads it over all five events.
+
+**Race checks** (seed 11, Tapeback with T2 parts, Crusher Run, same setup): no nitro 20.02 s (3rd, 0.3 s behind first), mistimed nitro 19.78 s (2nd, 0.1 s behind), perfect nitro 19.24 s (1st, 0.5 s ahead).
+
+**Production smoke test** (`npm run smoke`): 22/22 at `/nested/path/Rev-Up/` (manifest, icons, scoped service worker, offline relaunch with a merge and a full race, staged update with one navigation and the save intact). Also 22/22 at the real `/Rev-Up/` path upgrading **from the currently deployed 1.1 build on `gh-pages`** to this build (`SMOKE_PREFIX=/Rev-Up/ SMOKE_V1_DIR=<gh-pages export> npm run smoke`): same save key and Home Screen identity, old cache removed, no reload loop, save unchanged.
+
+**Interaction checks** (`npm run check:input`): 24/24 — keyboard merge and scrap (with the equipped-part warning), non-matching taps never mutate the board, reduced motion, no page scroll, two-tab handover, oversized balances at 320 px, and board + overflow + scrap + Race + nav fully on screen at 320×568, 360×640, 390×844, 430×932 and 1280×800 with an empty, a full 5×6 and a full 6×7 bench (smallest cell 36 px on a full 6×7 bench at 320×568).
+
+**Performance** (`npm run perf`, emulated: 390×844 @3×, canvas DPR capped at 2, 1.6 Mbps / 150 ms RTT, 4× CPU slowdown, software rendering, no GPU):
+
+| Measure | Before (1.1) | After (1.2) |
 | --- | --- | --- |
-| First merge | ≤ 5 s | 2 s |
-| First race finished | ~30 s | 34–38 s |
-| Beater | ~3 min | 2:21–3:37 |
-| Rusty Ray beaten | — | 2:53–5:25 |
-| Hot hatch | ~12 min | 11:23–12:37 |
-| Muscle | ~25 min | 20:47–22:38 |
-
-**Race checks** (seed 11, Junker with T2 parts, Crusher Run): no nitro 20.02 s (3rd, 0.3 s behind first), mistimed nitro 19.78 s (2nd, 0.1 s behind), perfect nitro 19.24 s (1st, 0.5 s ahead). A T1→T2 build is >0.5 s faster on all 20 tested seeds.
-
-**Production smoke test** (`npm run smoke`, built for and served at `/nested/path/Rev-Up/`): 22/22 — page, manifest, service worker and all icons resolve under the path; manifest `id`/`start_url`/`scope` match; the service worker controls the page with a scoped, revisioned cache; "Offline play is ready" is shown; drag merge; namespaced save; **network disabled → relaunch, tap merge, and a full race with a result**; upgrade to a second deployed revision is staged, offered, applied with one navigation (no reload loop), the old cache is removed and the save is unchanged; no page errors.
-
-**Interaction checks** (`npm run check:input`): 11/11 — keyboard-only merge, keyboard scrap with the equipped-part warning, non-matching taps never mutate the board, reduced-motion toggle, no page scroll, second tab asks before taking over and the first tab freezes, and board, tray, Race button and nav fully on screen at 360×640, 390×844 and 1280×800. Screenshots of the Garage, a full board, the race HUD, results, reveal and showroom were reviewed at those sizes.
-
-**Performance** (`npm run perf`, emulated: 390×844 @3×, canvas DPR capped at 2, "Fast 3G" 1.6 Mbps / 150 ms RTT, 4× CPU slowdown, software rendering, no GPU):
-
-| Measure | Result |
-| --- | --- |
-| Usable garage (first load, cold) | ~1.5 s; 137 KB transferred |
-| Dragging on a full board | 60 fps avg, p95 16.7 ms |
-| Race | 60 fps avg, p95 16.8 ms |
-| Reveal | 58 fps avg, p95 16.8 ms |
-
-These are desktop Chromium emulation measurements. Physical iPhone and Android profiling is still pending.
+| Usable garage, cold load | 1.55 s, 137 KB | 1.63 s, 168 KB |
+| Dragging on a full board | 59 fps, p95 16.7 ms | 59–60 fps, p95 16.7 ms |
+| Live race | 54 fps, p95 33 ms | 55–57 fps, p95 33 ms |
+| Reveal | 51 fps, p95 33 ms | 53 fps, p95 33 ms |
 
 ## Known limitations
 
 - Not yet tested on a physical iPhone or Android device (Home Screen standalone launch, safe areas, pause/resume and save persistence after relaunch should be confirmed on hardware).
 - Quick Race and the Race button always race the active car; switch cars in the Showroom.
+- On a full 6×7 bench at 320×568 part cells shrink to 36 px (below the 44 px target for primary controls); the Race and recovery buttons stay at 44 px+.
+- Emulated frame times come from software rendering; real phone GPUs should do better, but this is unmeasured.
 - One model per class and three tracks in this release; Downtown onward, Transmission/Aero and T6–T10 exist in data only.

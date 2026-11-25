@@ -32,8 +32,8 @@ function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined,
     ctx.lineTo(w * (.5 + (x - .5) * 1.9), height);
     ctx.stroke();
   }
-  const length = Math.min(w * .78, height * 1.5, 680);
-  drawCar(ctx, id, (w - length * 1.06) / 2, height * (height > w * .8 ? .73 : .82), length, {
+  const length = Math.min(w * .86, height * 1.7, 740);
+  drawCar(ctx, id, (w - length * 1.09) / 2, height * (height > w * .8 ? .73 : .82), length, {
     paint: paint ?? car.paint,
     trim: car.trim,
     livery: finishStripe(id, paint),

@@ -1,7 +1,7 @@
 {
   "name": "rev-up",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "description": "Rev Up \u2014 merge parts, race for cash and reputation, fill a showroom one earned car at a time.",
   "scripts": {

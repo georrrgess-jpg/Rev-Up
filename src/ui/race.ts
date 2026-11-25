@@ -487,7 +487,7 @@ class RaceScreen {
     ctx.beginPath(); ctx.arc(W * 0.78, horizon * 0.82, H * 0.06, 0, 7); ctx.fill();
     // restrained background motion: slow clouds drifting against the camera
     if (!this.reduced) {
-      ctx.fillStyle = sim.track.theme === 'suburb' ? 'rgba(230,236,245,0.10)' : 'rgba(255,214,170,0.08)';
+      ctx.fillStyle = sim.track.theme === 'suburb' ? 'rgba(230,236,245,0.05)' : 'rgba(255,214,170,0.045)';
       for (let k = 0; k < 4; k++) {
         const span = W * 1.6;
         const cx = ((k * span) / 4 - camX * ppm * 0.03 - sim.t * 6 * this.dpr) % span;
