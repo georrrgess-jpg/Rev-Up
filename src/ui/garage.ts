@@ -12,6 +12,8 @@ import {
 import { drawCar, fitCanvas } from '../render/car';
 import { familyIcon, partSvg } from '../render/parts';
 import type { App, View } from './app';
+import { tutorialStep } from '../core/tutorial';
+import { Coach, CoachStep } from './coach';
 import { h } from './dom';
 
 const PRESS: SlotRef = { zone: 'tray', i: -1 }; // sentinel for the scrap press
@@ -63,6 +65,7 @@ export class GarageView implements View {
     this.mergeAllBtn = h('button', { class: 'btn', onclick: () => this.onMergeAll() });
     this.raceBtn = h('button', { class: 'btn primary race', onclick: () => this.onRace() });
     const shopBtn = h('button', { class: 'btn', 'aria-label': 'Workshop: crates and upgrades', onclick: () => this.openWorkshop() }, 'Shop');
+    this.shopBtn = shopBtn;
 
     this.el = h('section', { class: 'view garage', 'aria-label': 'Garage' },
       h('div', { class: 'garage-body scroll' },
@@ -73,6 +76,9 @@ export class GarageView implements View {
         this.hintEl),
       h('div', { class: 'actions' }, this.cratesBtn, shopBtn, this.mergeAllBtn, this.raceBtn),
     );
+    this.coach = new Coach(this.el,
+      (id) => { this.app.game.markTip(id); this.render(); },
+      () => { this.app.game.markTip('skipGuide'); this.render(); this.app.toast('Tips off. Replay them any time from How to play (?).'); });
     this.bindPointer();
     this.bindKeys();
     window.addEventListener('resize', () => this.visible && this.layout());
@@ -86,7 +92,12 @@ export class GarageView implements View {
     this.render();
     requestAnimationFrame(() => this.layout());
   }
+  private coach!: Coach;
+  private prevStats: { top: number; accel: number; grip: number; car: string } | null = null;
+  private shopBtn!: HTMLButtonElement;
+
   hide() {
+    this.coach?.clear();
     this.visible = false;
     this.cancelDrag();
     this.setSel(null);
@@ -94,6 +105,7 @@ export class GarageView implements View {
 
   // ---------------- Layout ----------------
   private layout() {
+    requestAnimationFrame(() => this.coach?.place());
     const s = this.s;
     const vw = this.el.clientWidth - 24;
     const gap = 5;
@@ -171,8 +183,28 @@ export class GarageView implements View {
     this.renderHighlights();
     this.renderGoal();
     this.renderEquip(lo);
+    // Show the auto-equipped stat change right where the equipped parts are listed.
+    const st = lo.stats;
+    const prev = this.prevStats;
+    if (prev && prev.car === s.activeCar) {
+      const bits: string[] = [];
+      if (st.top - prev.top > 0.05) bits.push(`Top speed +${Math.round((st.top - prev.top) * 3.6)} km/h`);
+      if (st.accel - prev.accel > 0.02) bits.push(`Acceleration +${(st.accel - prev.accel).toFixed(1)}`);
+      if (st.grip - prev.grip > 0.005) bits.push(`Grip +${(st.grip - prev.grip).toFixed(2)}`);
+      if (bits.length) {
+        const r = this.equipEl.getBoundingClientRect();
+        const host = this.el.getBoundingClientRect();
+        const f = h('div', { class: 'floater stat' }, bits.join(' · '));
+        f.style.left = `${r.left - host.left + r.width / 2}px`;
+        f.style.top = `${r.top - host.top}px`;
+        this.el.append(f);
+        setTimeout(() => f.remove(), 1600);
+      }
+    }
+    this.prevStats = { ...st, car: s.activeCar };
     this.renderActions();
     this.renderHint();
+    this.coach.show(this.coachStep());
   }
 
   private renderHighlights() {
@@ -193,6 +225,55 @@ export class GarageView implements View {
       const pair = this.findPair();
       if (pair) for (const r of pair) this.cellFor(r)?.firstElementChild?.classList.add('pop');
     }
+  }
+
+  /** The coach mark for the current tutorial step (the step itself is decided in core/tutorial.ts). */
+  private coachStep(): CoachStep | null {
+    const s = this.s;
+    if (!this.visible || this.app.busy || this.drag) return null;
+    const step = tutorialStep(s);
+    if (!step) return null;
+    const cell = (r: SlotRef) => this.cellFor(r)!;
+    const pairOf = (f?: string): [SlotRef, SlotRef] | null => {
+      const refs: SlotRef[] = [...s.board.map((_, i) => ({ zone: 'board' as const, i })), ...s.tray.map((_, i) => ({ zone: 'tray' as const, i }))];
+      for (let x = 0; x < refs.length; x++) for (let y = x + 1; y < refs.length; y++) {
+        const pa = B.getPart(s, refs[x]);
+        if (pa && (!f || pa.f === f) && B.canFuse(pa, B.getPart(s, refs[y]))) return [refs[x], refs[y]];
+      }
+      return null;
+    };
+    const car = carById(s.activeCar);
+    const g = P.goalStatus(s);
+    switch (step) {
+      case 'merge': {
+        const pair = (pairOf('engine') ?? pairOf())!;
+        const fam = FAMILIES[B.getPart(s, pair[0])!.f];
+        return { id: step, targets: pair.map(cell), text: `Drag one ${fam.name} onto the other to merge them — or tap one, then the other.` };
+      }
+      case 'race1':
+        return { id: step, targets: [this.raceBtn], text: `Race ${P.recommendedEvent(s).name} next — your ${car.model} can win it, and every live race comes with a free crew nitro.` };
+      case 'craftGoal': {
+        const fam = FAMILIES[g!.family];
+        return { id: step, targets: pairOf(g!.family)!.map(cell), ack: true, text: `Merge your ${fam.plural}: crafting a T${g!.tier} ${fam.name} is one of the two things the ${g!.car.model} needs.` };
+      }
+      case 'shop':
+        return { id: step, targets: [this.shopBtn], ack: true, text: `You have $${s.cash}. In the Shop, a ${FAMILIES[g!.family].name} crate ($70) drops a part toward the ${g!.car.model}; upgrades speed up your crate printer.` };
+      case 'goalCard':
+        return { id: step, targets: [this.goalBtn], ack: true, text: 'This is your next car. Tap it any time to see exactly what is left and where to earn it.' };
+      case 'nitroBank': {
+        const chip = document.querySelector('.chip.nitro');
+        return chip ? { id: step, targets: [chip], ack: true, text: 'You banked nitro: three quick merges in a row add a charge (up to 3). Banked charges add to your free crew nitro in live races.' } : null;
+      }
+      case 'overflow':
+        return { id: step, targets: [this.trayEl], ack: true, text: 'Overflow holds parts when the bench is full. Drag them back onto the bench or onto a match any time.' };
+      case 'scrap':
+        return { id: step, targets: [this.pressEl], ack: true, text: 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap buys crates of the family you need.' };
+      case 'mergeAll':
+        return { id: step, targets: [this.mergeAllBtn], ack: true, text: 'Merge All is unlocked: one tap merges every pair on the bench. Quick manual merges still bank nitro.' };
+      case 'cap':
+        return { id: step, targets: [this.equipEl], ack: true, text: `Parts above the ${car.model}'s T${car.cap} cap still fit but run at T${car.cap}. Your next car gets their full power.` };
+    }
+    return null;
   }
 
   private findPair(): [SlotRef, SlotRef] | null {
@@ -217,7 +298,8 @@ export class GarageView implements View {
       this.goalTitle.textContent = `Next car · ${g.car.model}`;
       this.goalLine.replaceChildren(
         h('span', { class: g.keystoneDone ? 'met' : '' }, `${g.keystoneDone ? '✓' : 'Craft'} T${g.tier} ${FAMILIES[g.family].name}`),
-        h('span', { class: s.rep >= g.repNeed ? 'met' : '' }, s.rep >= g.repNeed ? '✓ Rep' : `${g.repNeed - s.rep} more Rep`));
+        ...(g.event ? [h('span', { class: g.eventDone ? 'met' : '' }, `${g.eventDone ? '✓' : 'Win'} ${eventById(g.event).name}`)] : []),
+        h('span', { class: s.rep >= g.repNeed ? 'met' : '' }, s.rep >= g.repNeed ? '✓ Rep' : `${s.rep}/${g.repNeed} Rep`));
 
       this.goalBar.style.width = `${Math.round(g.progress * 100)}%`;
       this.goalBtn.setAttribute('aria-label', `Next car: ${g.line}`);
@@ -327,8 +409,9 @@ export class GarageView implements View {
       return;
     }
     if (this.hintEl.dataset.k) { delete this.hintEl.dataset.k; this.hintEl.textContent = ''; requestAnimationFrame(() => this.visible && this.layout()); }
-    if (!s.stats.milestones.firstMerge) t = 'Drag one Engine onto the other to merge them';
-    else if (s.stats.races === 0 && !s.pendingRace) t = 'Merged! Tap Race to earn cash and Rep';
+    const coached = !s.tips.skipGuide;
+    if (!s.stats.milestones.firstMerge) t = coached ? '' : 'Drag two matching parts together to merge them';
+    else if (s.stats.races === 0 && !s.pendingRace) t = coached ? '' : 'Merged! Tap Race to earn cash and Rep';
     else if (this.sel) {
       const part = B.getPart(s, this.sel);
       if (part) t = `T${part.t} ${FAMILIES[part.f].name} selected. Tap a matching part.`;

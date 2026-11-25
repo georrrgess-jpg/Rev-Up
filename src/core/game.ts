@@ -3,6 +3,7 @@ import * as B from './board';
 import type { GameEvent, SlotRef } from './events';
 import { computeLoadout } from './loadout';
 import * as P from './progression';
+import { settleTutorialForExistingSave } from './tutorial';
 import { RaceOutcome, RaceSetup, RaceSim, leanOutcome } from './race';
 import { KV, LoadResult, loadGame, writeGame } from './save';
 import type { GameState, LastResult } from './state';
@@ -29,6 +30,7 @@ export class Game {
     // A race in flight at reload is abandoned: no payout, no charges spent.
     this.state.pendingRace = null;
     P.accrueOffline(this.state, now);
+    settleTutorialForExistingSave(this.state);
     const ev: GameEvent[] = [];
     P.checkUnlocks(this.state, ev);
     this.persist(now);

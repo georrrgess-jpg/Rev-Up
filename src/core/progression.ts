@@ -44,7 +44,7 @@ export function goalStatus(s: GameState): GoalStatus | null {
   const units = ingredients.reduce((sum, p) => sum + (p.t < u.tier ? 2 ** (p.t - 1) : 0), 0);
   const keyFrac = keystoneDone ? 1 : Math.min(1, units / 2 ** (u.tier - 1));
   const eventDone = !u.event || (s.events[u.event]?.wins ?? 0) > 0;
-  const keyPart = keystoneDone ? 1 : Math.min(.95, keyFrac);
+  const keyPart = keystoneDone ? 1 : Math.min(0.95, craftedTier(s, u.family) / u.tier);
   const progress = u.event ? (repFrac + keyPart + (eventDone ? 1 : 0)) / 3 : (repFrac + keyPart) / 2;
   const fam = FAMILIES[u.family];
   const parts: string[] = [];
