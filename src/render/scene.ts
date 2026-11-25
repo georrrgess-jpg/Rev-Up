@@ -94,9 +94,11 @@ function layer(w: number, top: number, bottom: number, par: number, paint: (c: C
 }
 
 function blitLayer(ctx: C2, L: Layer, scroll: number) {
-  const off = ((scroll * L.par) % L.w + L.w) % L.w;
-  ctx.drawImage(L.cv, -off, L.top);
-  ctx.drawImage(L.cv, L.w - off, L.top);
+  // whole device pixels: an integer offset is a straight copy (no resampling of a screen-sized bitmap)
+  const off = Math.round(((scroll * L.par) % L.w + L.w) % L.w);
+  const top = Math.round(L.top);
+  ctx.drawImage(L.cv, -off, top);
+  if (L.w - off < ctx.canvas.width) ctx.drawImage(L.cv, L.w - off, top);
 }
 
 const poly = (c: C2, pts: number[], fill: string) => {
