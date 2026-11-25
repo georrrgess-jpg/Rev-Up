@@ -29,7 +29,8 @@ const browser = await chromium.launch();
   await page.waitForTimeout(200);
   if (await page.locator('.sheet').count()) {
     const txt = await page.locator('.sheet').innerText();
-    ok('scrapping an equipped part warns about the stat loss and names the next part', /equipped/.test(txt) && /(equips next|left to equip)/.test(txt), txt.split('\n')[1]);
+    // v2: parts are fitted to cars, never scrapped from a car; scrapping a bench part that would upgrade the car asks first
+    ok('scrapping a part that would upgrade your car asks first and offers to fit it', /better than the .* fitted to your/.test(txt) || /Fit it instead/.test(txt), txt.split('\n')[1]);
     await page.click('.sheet .btn.danger');
     await page.waitForTimeout(200);
   }
