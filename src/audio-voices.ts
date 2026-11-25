@@ -12,5 +12,11 @@ export const VOICES: Record<string, Voice> = {
   tuner: { layers: [['square', 1, 0], ['sawtooth', 2, 7], ['square', 4, -9]], filter: 'bandpass', cut: 3200, q: 2.2, lope: 0.05, lopeHz: 22, blips: true, hum: 1.5 },
   // Lumen RS: a smooth V12 under an electric whine
   super: { layers: [['sawtooth', 1, 0], ['sawtooth', 1.5, 3], ['sine', 6, 0], ['triangle', 3, -4]], filter: 'lowpass', cut: 2600, q: 0.9, lope: 0.03, lopeHz: 28, hum: 1.1 },
+  // Corvo Rally: a gruff turbo four with an uneven, crackling idle (anti-lag)
+  rally: { layers: [['square', 1, 0], ['sawtooth', 2, 12], ['square', 0.5, -8]], filter: 'bandpass', cut: 1800, q: 2.6, lope: 0.3, lopeHz: 13, blips: true, hum: 1.15 },
+  // Strata GTR: a hard-edged race V8, loud and flat
+  gt: { layers: [['sawtooth', 1, 0], ['sawtooth', 1, 30], ['square', 2, -12]], filter: 'lowpass', cut: 2000, q: 2.4, lope: 0.18, lopeHz: 10, hum: 0.95 },
+  // Halcyon X: a screaming hybrid V6 over a turbine-like electric whine
+  proto: { layers: [['sawtooth', 1, 0], ['triangle', 2, 6], ['sine', 8, 0], ['sine', 12, 5]], filter: 'bandpass', cut: 3400, q: 1.1, lope: 0.02, lopeHz: 34, hum: 1.35 },
 };
 

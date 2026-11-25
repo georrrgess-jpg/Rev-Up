@@ -126,16 +126,16 @@ export class Game {
     this.input(now);
     return this.transact((d) => S.buyStyle(d, itemId, car), now);
   }
-  applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material', now = Date.now()) {
+  applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material' | 'livery', now = Date.now()) {
     return this.transact((d) => S.applyStyle(d, itemId, car, kind), now);
   }
   installPart(car: CarId, from: SlotRef, now = Date.now()) {
     this.input(now);
     return this.transact((d) => I.installPart(d, car, from), now);
   }
-  removePart(car: CarId, family: Family, now = Date.now()) {
+  removePart(car: CarId, family: Family, to?: SlotRef, now = Date.now()) {
     this.input(now);
-    return this.transact((d) => I.removePart(d, car, family), now);
+    return this.transact((d) => I.removePart(d, car, family, to), now);
   }
   movePartBetweenCars(fromCar: CarId, family: Family, toCar: CarId, now = Date.now()) {
     this.input(now);

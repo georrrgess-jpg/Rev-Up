@@ -1,1 +1,7 @@
 /* art workstream styles (see docs/CONTRACTS.md). Loaded after style.css. */
+.reveal.reveal-stage .rtext { text-shadow: 0 2px 12px rgba(0,0,0,0.85); }
+.reveal.reveal-stage .reveal-kicker { font-size: var(--fs-2xs); letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber2, #ffc457); font-weight: var(--w-heavy, 800); }
+.paintshop .shop-item.soon { border-style: dashed; opacity: 0.9; }
+.inspect .inspect-actions { flex-wrap: wrap; }
+.inspect .inspect-actions .btn:not(.primary) { flex: 1 1 auto; }
+.inspect .inspect-actions .btn.primary { flex: 1 1 100%; }

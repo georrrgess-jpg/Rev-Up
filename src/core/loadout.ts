@@ -18,15 +18,28 @@ export interface Loadout {
 export const contributionOn = (p: Part, cap: number) => TIER_STAT[Math.min(p.t, cap)] * (p.q === 'std' ? 1 : QUALITY_BONUS);
 
 /**
- * Auto-equip the strongest part per family. Parts above the car's equip cap still fit and run at the cap
- * tier, so earlier cars stay competitive after you craft higher tiers. `blocked` lists families whose
- * equipped part is running restricted to the cap (shown in the Garage).
+ * The car's build: exactly the parts fitted to its slots (core/install.ts); nothing is auto-equipped. Parts above
+ * the car's cap fit but run at the cap tier, so earlier cars stay competitive after you craft higher tiers.
+ * `blocked` lists families whose fitted part is running restricted to the cap (shown in the Garage).
+ * `exclude` leaves one part id out; `partCap` is a stock-class race's tier limit.
  */
 export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?: number, partCap?: number): Loadout {
-  const cap = Math.min(carById(car).cap, partCap ?? Infinity);
-  // v2: a car runs exactly the parts fitted to its slots (see core/install.ts); nothing is auto-equipped.
   const equipped: Loadout['equipped'] = {};
   for (const [f, p] of Object.entries(s.installed?.[car] ?? {}) as [Family, Part][]) if (p && p.id !== exclude) equipped[f] = p;
+  return build(s, car, equipped, partCap);
+}
+
+/** The build with some slots replaced (`null` empties a slot): before/after previews in Fit Parts. */
+export function loadoutWith(s: GameState, car: CarId, over: Partial<Record<Family, Part | null>>, partCap?: number): Loadout {
+  const equipped: Loadout['equipped'] = { ...(s.installed?.[car] ?? {}) };
+  for (const [f, p] of Object.entries(over) as [Family, Part | null][]) {
+    if (p) equipped[f] = p; else delete equipped[f];
+  }
+  return build(s, car, equipped, partCap);
+}
+
+function build(s: GameState, car: CarId, equipped: Loadout['equipped'], partCap?: number): Loadout {
+  const cap = Math.min(carById(car).cap, partCap ?? Infinity);
   const blocked: Loadout['blocked'] = {};
   for (const f of ACTIVE_FAMILIES) if (equipped[f] && equipped[f]!.t > cap) blocked[f] = equipped[f];
   // a Tune-up multiplies the car's stats; a stock-class race (partCap) runs untuned

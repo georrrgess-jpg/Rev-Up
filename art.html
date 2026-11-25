@@ -7,39 +7,87 @@
 <style>
   body { margin: 0; background: #1b2128; color: #dfe6ec; font: 13px system-ui, sans-serif; }
   canvas { display: block; }
+  nav { padding: 8px; } nav a { color: #ffc457; margin-right: 12px; }
 </style>
 </head>
 <body>
+<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?lit">Lit</a></nav>
 <canvas id="c"></canvas>
 <script type="module">
-  import { drawCar } from '/src/render/car.ts';
+  // Dev-only art sheet: every car at hero / card / race / thumbnail sizes, plus liveries, wheel sets, materials and race scenery.
+  import { drawCar, ART_CARS, FACTORY_LOOKS, LIVERIES } from '/src/render/car.ts';
   import { CARS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
+  import { drawBackdrop, drawRoadDressing, drawForeground, roadColors, THEMES } from '/src/render/scene.ts';
   const q = new URLSearchParams(location.search);
+  const sheet = q.get('sheet') ?? 'cars';
   const only = q.get('car');
-  const cars = CARS.filter((c) => c.enabled && (!only || c.id === only));
-  const W = innerWidth, H = cars.length * 420;
+  const NAMES = { rally: 'Corvo Rally', gt: 'Strata GTR', proto: 'Halcyon X' };
+  const look = (id) => { const c = CARS.find((x) => x.id === id); const f = FACTORY_LOOKS[id]; return { id, model: c && c.model !== '—' ? c.model : NAMES[id], paint: f?.paint ?? c.paint, trim: f?.trim ?? c.trim }; };
+  const cars = ART_CARS.filter((id) => !only || id === only).map(look);
+  const W = innerWidth;
   const c = document.getElementById('c');
   const dpr = Math.min(2, devicePixelRatio || 1);
-  c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
-  const ctx = c.getContext('2d');
-  ctx.scale(dpr, dpr);
-  cars.forEach((car, i) => {
-    const y0 = i * 420;
-    const g = ctx.createLinearGradient(0, y0, 0, y0 + 420);
-    g.addColorStop(0, '#3a4652'); g.addColorStop(0.7, '#1c232a'); g.addColorStop(1, '#12171c');
-    ctx.fillStyle = g; ctx.fillRect(0, y0, W, 420);
-    ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.model} (${car.id})`, 10, y0 + 16);
-    const hero = Math.min(W * 0.55, 620);
-    drawCar(ctx, car.id, 20, y0 + 330, hero * 0.92, { paint: car.paint, trim: car.trim, headlights: q.has('lit') ? 1 : 0, wheelAngle: 0.3 });
-    const sig = SIGNATURE_FINISHES[car.id];
-    let x = hero + 80;
-    drawCar(ctx, car.id, x, y0 + 120, 220, { paint: sig.paint, trim: car.trim, livery: sig.stripe });
-    drawCar(ctx, car.id, x, y0 + 230, 150, { paint: car.paint, trim: car.trim, cache: true, wheelAngle: 1, nitro: 1.5, headlights: 0.5 });
-    drawCar(ctx, car.id, x + 180, y0 + 230, 96, { paint: car.paint, trim: car.trim });
-    drawCar(ctx, car.id, x + 300, y0 + 230, 60, { paint: car.paint, trim: car.trim });
-    drawCar(ctx, car.id, x, y0 + 320, 150, { paint: car.paint, trim: car.trim, cover: 1 });
-    drawCar(ctx, car.id, x + 180, y0 + 320, 150, { paint: car.paint, trim: car.trim, silhouette: true });
-  });
+  const size = (H) => { c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px'; const ctx = c.getContext('2d'); ctx.scale(dpr, dpr); return ctx; };
+  const bg = (ctx, y0, h) => { const g = ctx.createLinearGradient(0, y0, 0, y0 + h); g.addColorStop(0, '#3a4652'); g.addColorStop(0.7, '#1c232a'); g.addColorStop(1, '#12171c'); ctx.fillStyle = g; ctx.fillRect(0, y0, W, h); };
+  if (sheet === 'cars') {
+    const RH = 330;
+    const ctx = size(cars.length * RH);
+    cars.forEach((car, i) => {
+      const y0 = i * RH;
+      bg(ctx, y0, RH);
+      ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.model} (${car.id})`, 10, y0 + 16);
+      const hero = Math.min(W * 0.5, 560);
+      drawCar(ctx, car.id, 20, y0 + 270, hero * 0.9, { paint: car.paint, trim: car.trim, headlights: q.has('lit') ? 1 : 0, wheelAngle: 0.3 });
+      const sig = SIGNATURE_FINISHES[car.id];
+      const x = hero + 60;
+      drawCar(ctx, car.id, x, y0 + 110, 200, { paint: sig?.paint ?? car.paint, trim: car.trim, livery: sig?.stripe, style: sig ? undefined : { livery: 'number' } });
+      drawCar(ctx, car.id, x + 250, y0 + 110, 200, { paint: car.paint, trim: car.trim, style: { livery: LIVERIES[i % LIVERIES.length].id } });
+      drawCar(ctx, car.id, x, y0 + 210, 130, { paint: car.paint, trim: car.trim, cache: true, wheelAngle: 1, nitro: 1.5, headlights: 0.5, blur: 0.7 });
+      drawCar(ctx, car.id, x + 160, y0 + 210, 96, { paint: car.paint, trim: car.trim, cache: true });
+      drawCar(ctx, car.id, x + 280, y0 + 210, 60, { paint: car.paint, trim: car.trim, cache: true });
+      drawCar(ctx, car.id, x + 370, y0 + 210, 40, { paint: car.paint, trim: car.trim });
+      drawCar(ctx, car.id, x, y0 + 300, 130, { paint: car.paint, trim: car.trim, cover: 1 });
+      drawCar(ctx, car.id, x + 160, y0 + 300, 130, { paint: car.paint, trim: car.trim, silhouette: true });
+    });
+  } else if (sheet === 'liveries') {
+    const RH = 150, cols = 4;
+    const ctx = size(LIVERIES.length * RH + 30);
+    const pick = ['hothatch', 'muscle', 'rally', 'proto'].map(look);
+    LIVERIES.forEach((lv, i) => {
+      const y0 = i * RH; bg(ctx, y0, RH);
+      ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${lv.name} (${lv.id})`, 10, y0 + 16);
+      pick.forEach((car, k) => drawCar(ctx, car.id, 10 + k * (W / cols), y0 + 125, W / cols - 40, { paint: car.paint, trim: car.trim, style: { livery: lv.id } }));
+    });
+  } else if (sheet === 'styles') {
+    const wheels = ['steel', 'turbine', 'fivespoke', 'dish', 'wire', 'aero', 'gravel', 'race'];
+    const mats = [undefined, 'metallic', 'pearl', 'candy', 'matte', 'chrome', 'flip'];
+    const ctx = size(430);
+    bg(ctx, 0, 430);
+    wheels.forEach((w, k) => { drawCar(ctx, 'gt', 10 + (k % 4) * (W / 4), 90 + Math.floor(k / 4) * 100, W / 4 - 40, { paint: '#d5dade', trim: '#d6202a', style: { wheel: w } }); ctx.fillStyle = '#dfe6ec'; ctx.fillText(w, 10 + (k % 4) * (W / 4), 100 + Math.floor(k / 4) * 100); });
+    mats.forEach((m, k) => { drawCar(ctx, 'tourer', 10 + (k % 4) * (W / 4), 300 + Math.floor(k / 4) * 110, W / 4 - 40, { paint: '#b0242a', trim: '#e9d8b4', style: { material: m } }); ctx.fillStyle = '#dfe6ec'; ctx.fillText(m ?? 'gloss', 10 + (k % 4) * (W / 4), 312 + Math.floor(k / 4) * 110); });
+  } else if (sheet === 'scenes') {
+    // phone-size race frames for every theme (390x420 css each)
+    const sw = 390, sh = 420, per = Math.max(1, Math.floor(W / sw));
+    const rows = Math.ceil(THEMES.length / per);
+    const ctx = size(rows * sh);
+    const t = Number(q.get('t') ?? 3);
+    THEMES.forEach((theme, i) => {
+      const ox = (i % per) * sw, oy = Math.floor(i / per) * sh;
+      ctx.save(); ctx.translate(ox, oy); ctx.beginPath(); ctx.rect(0, 0, sw, sh); ctx.clip();
+      const roadBot = sh * 0.84, roadTop = roadBot - sh * 0.36, horizon = roadTop - sh * 0.09;
+      const v = { ctx, W: sw, H: sh, dpr: 1, horizon, roadTop, roadBot, camX: 120 + t * 30, ppm: 15, t, theme, trackId: q.get('track') ?? theme, reduced: false };
+      drawBackdrop(v);
+      ctx.fillStyle = roadColors(theme).road; ctx.fillRect(0, roadTop, sw, roadBot - roadTop);
+      drawRoadDressing(v);
+      ctx.fillStyle = 'rgba(255,240,200,0.55)'; for (let l = 1; l < 4; l++) for (let x = 0; x < sw; x += 60) ctx.fillRect(x, roadTop + l * (roadBot - roadTop) / 4, 30, 3);
+      ctx.fillStyle = 'rgba(242,163,58,0.28)'; ctx.fillRect(250, roadTop, 120, roadBot - roadTop);
+      const lane = (roadBot - roadTop) / 4;
+      ['hothatch', 'rally', 'gt', 'proto'].map(look).forEach((car, k) => drawCar(ctx, car.id, 30 + k * 70, roadTop + (k + 0.85) * lane, 70, { paint: car.paint, trim: car.trim, cache: true, detail: false, headlights: theme === 'night' ? 1 : 0.3, nitro: k === 0 ? 1 : 0 }));
+      drawForeground(v);
+      ctx.fillStyle = '#fff'; ctx.font = '800 15px system-ui'; ctx.fillText(`${theme} · 2nd · 112 mph`, 12, 24);
+      ctx.restore();
+    });
+  }
 </script>
 </body>
 </html>
