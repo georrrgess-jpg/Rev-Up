@@ -1,3 +1,4 @@
+import { carStyle } from '../core/style';
 import { sfx, unlockAudio } from '../audio';
 import { computeLoadout } from '../core/loadout';
 import { CarId, ENABLED_CARS, carById, finishStripe } from '../data/tables';
@@ -205,7 +206,7 @@ export class RevealOverlay {
         cv.width = Math.round(bw * 1.25);
         cv.height = Math.round(bw * 0.6);
         const cc = cv.getContext('2d')!;
-        drawCar(cc, this.car, bw * 0.05, bw * 0.55, bw, { paint: this.paint, trim: c.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true });
+        drawCar(cc, this.car, bw * 0.05, bw * 0.55, bw, { paint: this.paint, trim: c.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true, style: carStyle(this.app.game.state, this.car) });
       }
     }
     const sc = cw / bw;

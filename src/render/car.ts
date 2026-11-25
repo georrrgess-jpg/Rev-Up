@@ -666,28 +666,37 @@ function nearPanel(c: Ctx) {
 function paintMaterial(c: Ctx) {
   const { ctx, d, paint } = c;
   if (c.mat === 'metallic') {
-    // fine flake: a deterministic scatter of bright points, denser where the light hits
-    for (let k = 0; k < 140; k++) {
-      const fx = ((k * 0.6180339) % 1) * d.L, fy = d.sill + (((k * 0.7548776) % 1) * (d.belt + 0.25 - d.sill));
-      ctx.fillStyle = k % 3 ? 'rgba(255,255,255,0.35)' : lit(paint, 0.55);
-      ctx.fillRect(fx, fy, 0.012, 0.012);
-    }
-    const sh = ctx.createLinearGradient(0, 0, d.L, 0);
-    sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.45, 'rgba(255,255,255,0.12)'); sh.addColorStop(0.6, 'rgba(255,255,255,0)');
+    // metallic: the paint brightens and cools along a broad lit band, with fine flake that only shows in the light
+    const sh = ctx.createLinearGradient(0, d.belt + 0.05, 0, d.sill);
+    sh.addColorStop(0, 'rgba(255,255,255,0.28)'); sh.addColorStop(0.35, 'rgba(255,255,255,0.06)'); sh.addColorStop(0.7, 'rgba(0,0,0,0.12)'); sh.addColorStop(1, 'rgba(0,0,0,0.3)');
     ctx.fillStyle = sh; ctx.fillRect(0, 0, d.L, 1.6);
+    for (let k = 0; k < 420; k++) {
+      const fx = ((k * 0.6180339) % 1) * d.L, fy = d.belt - 0.4 + ((k * 0.7548776) % 1) * 0.45;
+      ctx.fillStyle = `rgba(255,255,255,${0.18 + ((k * 0.37) % 1) * 0.3})`;
+      ctx.fillRect(fx, fy, 0.008, 0.008);
+    }
   } else if (c.mat === 'pearl') {
-    // a soft hue flip toward the ends of the car, as pearl does when the angle changes
-    const pg = ctx.createLinearGradient(0, 0, d.L, 0.6);
-    pg.addColorStop(0, 'rgba(255,170,220,0.22)'); pg.addColorStop(0.45, 'rgba(255,255,255,0.05)'); pg.addColorStop(1, 'rgba(120,230,255,0.24)');
+    // pearl: the colour flips toward rose at the tail and cyan at the nose, with a milky highlight band
+    const pg = ctx.createLinearGradient(0, 0, d.L, 0);
+    pg.addColorStop(0, 'rgba(255,140,210,0.34)'); pg.addColorStop(0.35, 'rgba(255,230,250,0.12)');
+    pg.addColorStop(0.65, 'rgba(210,255,250,0.12)'); pg.addColorStop(1, 'rgba(90,225,255,0.36)');
     ctx.fillStyle = pg; ctx.fillRect(0, 0, d.L, 1.6);
+    const milk = ctx.createLinearGradient(0, d.belt + 0.05, 0, d.belt - 0.35);
+    milk.addColorStop(0, 'rgba(255,255,255,0.28)'); milk.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = milk; ctx.fillRect(0, d.belt - 0.35, d.L, 0.4);
   } else if (c.mat === 'candy') {
-    // deep candy: darker, richer flanks with a bright core where the light lands
-    const cg = ctx.createLinearGradient(0, d.belt + 0.1, 0, d.sill);
-    cg.addColorStop(0, 'rgba(255,255,255,0.1)'); cg.addColorStop(0.35, 'rgba(0,0,0,0)'); cg.addColorStop(1, 'rgba(0,0,0,0.38)');
+    // candy: the colour is pushed deeper and more saturated (overlay), glows where the light lands, and has a wet highlight
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = paint; ctx.globalAlpha = 0.9; ctx.fillRect(0, 0, d.L, 1.6);
+    ctx.restore();
+    const core = ctx.createRadialGradient(d.L * 0.55, d.belt - 0.1, 0.05, d.L * 0.55, d.belt - 0.1, d.L * 0.45);
+    core.addColorStop(0, lit(paint, 0.55)); core.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.55; ctx.fillStyle = core; ctx.fillRect(0, 0, d.L, 1.6); ctx.globalAlpha = 1;
+    const cg = ctx.createLinearGradient(0, d.belt - 0.2, 0, d.sill);
+    cg.addColorStop(0, 'rgba(0,0,0,0)'); cg.addColorStop(1, 'rgba(0,0,0,0.35)');
     ctx.fillStyle = cg; ctx.fillRect(0, 0, d.L, 1.6);
-    const core = ctx.createRadialGradient(d.L * 0.55, d.belt - 0.15, 0.05, d.L * 0.55, d.belt - 0.15, d.L * 0.45);
-    core.addColorStop(0, lit(paint, 0.45) + '88'); core.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = core; ctx.fillRect(0, 0, d.L, 1.6);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(d.L * 0.18, d.belt - 0.07, d.L * 0.64, 0.016);
   }
 }
 

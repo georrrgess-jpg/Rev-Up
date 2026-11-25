@@ -1,3 +1,4 @@
+import * as S from './style';
 import type { UpgradeId } from '../data/tables';
 import { CREW_NITRO, CarId, Family, carById } from '../data/tables';
 import * as B from './board';
@@ -118,6 +119,13 @@ export class Game {
   orderPart(family: Family, tier: number, now = Date.now()) {
     this.input(now);
     return this.transact((d) => B.orderPart(d, family, tier), now);
+  }
+  buyStyle(itemId: string, car: CarId, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => S.buyStyle(d, itemId, car), now);
+  }
+  applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material', now = Date.now()) {
+    return this.transact((d) => S.applyStyle(d, itemId, car, kind), now);
   }
   buyUpgrade(id: UpgradeId, now = Date.now()) {
     this.input(now);

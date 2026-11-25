@@ -1,3 +1,4 @@
+import { carStyle } from '../core/style';
 import type { GameState } from '../core/state';
 import { EngineHum, resumeAudio, sfx, suspendAudio } from '../audio';
 import type { GameEvent } from '../core/events';
@@ -50,7 +51,7 @@ export class RaceView implements View {
     const paint = s.paints[s.activeCar];
     const length = Math.min(w * .83, hh * 1.85);
     drawCar(ctx, s.activeCar, (w - length * 1.06) / 2, hh * .91, length,
-      { paint: paint ?? cls.paint, trim: cls.trim, livery: finishStripe(s.activeCar, paint) });
+      { paint: paint ?? cls.paint, trim: cls.trim, livery: finishStripe(s.activeCar, paint), style: carStyle(s, s.activeCar) });
 
     const rec = P.recommendedEvent(s);
     const q = s.pendingQuick;
@@ -819,7 +820,7 @@ class RaceScreen {
       const braking = this.prevV[idx] !== undefined && r.v < this.prevV[idx] - 0.03 && r.finishTime === null;
       this.prevV[idx] = r.v;
       drawCar(ctx, r.car, sx, gy, len, {
-        paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, wheelAngle: r.x / 0.31,
+        paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, style: r.isPlayer ? carStyle(this.app.game.state, r.car) : undefined, wheelAngle: r.x / 0.31,
         blur: this.reduced ? 0 : Math.max(0, Math.min(1, (r.v - 7) / 10)), brake: braking,
         livery: finishStripe(r.car, livery ?? undefined), detail: false, cache: true,
         nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: theme === 'scrap' ? 0.25 : 0.55,

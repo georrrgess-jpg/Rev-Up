@@ -2,6 +2,13 @@
 import { CarId, STYLE_ITEMS, StyleItem, styleItem } from '../data/tables';
 import type { GameEvent } from './events';
 import type { GameState } from './state';
+import type { CarStyle, PaintMaterial, WheelSetId } from '../render/car';
+
+/** The cosmetic style a car is drawn with, everywhere it appears. */
+export function carStyle(s: GameState, car: CarId): CarStyle {
+  const st = s.style?.[car];
+  return st ? { wheel: st.wheel as WheelSetId | undefined, material: st.material as PaintMaterial | undefined, restore: st.restore } : {};
+}
 
 export const ownsKey = (item: StyleItem, car: CarId) => (item.kind === 'material' ? `${item.id}:${car}` : item.id);
 export const owned = (s: GameState, item: StyleItem, car: CarId) => (s.owns ?? []).includes(ownsKey(item, car));
