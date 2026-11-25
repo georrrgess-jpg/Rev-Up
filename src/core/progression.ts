@@ -643,12 +643,12 @@ export function recommendedEvent(s: GameState): RaceEvent {
   if (!open.length) return eventById(busy ?? EVENTS[0].id);
   if (s.knockout) return eventById('main-event'); // a Main Event run in progress comes first
   const final = open.find((e) => e.id === 'foundry-final' && !s.events[e.id]?.wins);
-  if (s.activeCar === 'muscle' && final) return final;
   // A first clear you keep losing is spaced out between other races instead of repeated back to back.
   const struggling = (e: RaceEvent) => {
     const r = s.events[e.id];
     return !!r && r.starts - r.wins >= 3 && (s.recentEvents ?? []).includes(e.id);
   };
+  if (s.activeCar === 'muscle' && final && !struggling(final)) return final;
   // First uncleared event, else boss if unbeaten, else the best-paying open one.
   const boss = open.find((e) => e.boss && !s.bosses.includes(e.boss.rival) && !struggling(e));
   const uncleared = open.find((e) => !e.boss && !(s.events[e.id]?.wins) && !struggling(e));

@@ -96,7 +96,7 @@ export const CRATE_TIER_ODDS: number[][] = [
   [0.75, 0.25, 0],
   [0.5, 0.45, 0.05],
   [0.25, 0.6, 0.15],
-  [0.1, 0.5, 0.3, 0.1], // endgame (Corvo Rally onward): T4 parts in crates
+  [0.15, 0.5, 0.35], // late: a third T3 parts
 ];
 
 export const UPGRADES: UpgradeDef[] = [
@@ -114,7 +114,7 @@ export const UPGRADES: UpgradeDef[] = [
       { cost: 450, label: '25% chance of T2 parts' },
       { cost: 1200, label: 'Half T2, a few T3 parts' },
       { cost: 2400, label: 'Mostly T2, 15% T3 parts' },
-      { cost: 6000, label: 'Mostly T2–T3, 10% T4 parts' },
+      { cost: 6000, label: 'Half T2, 35% T3 parts' },
     ],
   },
   {
@@ -276,19 +276,19 @@ export const CARS: CarClass[] = [
   // ---- Endgame: the Desert Proving Ground and the Summit (Rep + a crafted keystone + a won series or event each)
   {
     id: 'rally', name: 'Rally', model: 'Corvo Rally', district: 'desert', cap: 8,
-    base: { top: 41, accel: 8.4, grip: 1.25 }, unlock: { rep: 3500, family: 'tires', tier: 8, event: 'canyon-qualifier' }, enabled: true,
+    base: { top: 41, accel: 8.4, grip: 1.25 }, unlock: { rep: 6000, family: 'tires', tier: 8, event: 'canyon-qualifier' }, enabled: true,
     paint: '#1f62c9', trim: '#f5c518', blurb: 'A short, tough AWD rally coupe: roof scoop, a four-lamp light pod, mud flaps. Built to be thrown at gravel.',
     offlineRate: 11, rev: { base: 75, peak: 270 }, handling: 'All-wheel drive: the hardest launches and the best grip on loose, tight bends. Quick to its top speed, then it tops out (~150 mph).',
   },
   {
     id: 'gt', name: 'Endurance GT', model: 'Strata GTR', district: 'summit', cap: 8,
-    base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 4300, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
+    base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 9500, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
     paint: '#d5dade', trim: '#d6202a', blurb: 'A wide endurance racer with a splitter, a swan-neck wing and race numbers. Built to run flat out for hours.',
     offlineRate: 13, rev: { base: 70, peak: 260 }, handling: 'Aero grip: the fastest car through fast sweepers, strong at speed (~190 mph). Softer off the line than the Corvo.',
   },
   {
     id: 'proto', name: 'Prototype', model: 'Halcyon X', district: 'summit', cap: 9,
-    base: { top: 54, accel: 7.4, grip: 1.36 }, unlock: { rep: 5200, family: 'turbo', tier: 9, event: 'summit-1000' }, enabled: true,
+    base: { top: 54, accel: 7.4, grip: 1.36 }, unlock: { rep: 14000, family: 'turbo', tier: 9, event: 'summit-1000' }, enabled: true,
     paint: '#1d4e6b', trim: '#36f0d0', blurb: 'A closed-cockpit prototype with a shark fin and a light blade. The fastest thing in the game, and the hardest to drive well.',
     offlineRate: 16, rev: { base: 90, peak: 340 }, handling: 'The highest top speed (~225 mph) and strong everywhere, with the narrowest shift light in the game: missed shifts cost it the most.',
   },
@@ -686,17 +686,17 @@ export const EVENTS: RaceEvent[] = [
   },
   // ---- Time attack: beat the clock on courses you know (no rivals, medals pay once)
   {
-    id: 'ta-strip', name: 'Strip Time Attack', district: 'trials', track: 'scrapyard', rivals: [], timeAttack: { bronze: 17.4, silver: 14.6, gold: 13.1 },
+    id: 'ta-strip', name: 'Strip Time Attack', district: 'trials', track: 'scrapyard', rivals: [], timeAttack: { bronze: 16.4, silver: 15.9, gold: 15.5 },
     payout: { cash: [40, 40, 40, 40], rep: [6, 6, 6, 6], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { beatBoss: 'ray' }, blurb: 'Solo run on Scrapyard Strip. Launch hard and hit both windows.',
   },
   {
-    id: 'ta-maple', name: 'Highway Time Attack', district: 'trials', track: 'maple', rivals: [], timeAttack: { bronze: 20.6, silver: 18.4, gold: 16.6 },
+    id: 'ta-maple', name: 'Highway Time Attack', district: 'trials', track: 'maple', rivals: [], timeAttack: { bronze: 18.8, silver: 18.4, gold: 17.9 },
     payout: { cash: [50, 50, 50, 50], rep: [8, 8, 8, 8], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'hothatch' }, blurb: 'Solo run on Maple Highway. Top speed and two clean boosts.',
   },
   {
-    id: 'ta-cliffs', name: 'Esses Time Attack', district: 'trials', track: 'cliffs', rivals: [], timeAttack: { bronze: 22.3, silver: 21.5, gold: 19.9 },
+    id: 'ta-cliffs', name: 'Esses Time Attack', district: 'trials', track: 'cliffs', rivals: [], timeAttack: { bronze: 20.6, silver: 20.3, gold: 20.0 },
     payout: { cash: [60, 60, 60, 60], rep: [10, 10, 10, 10], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { afterWin: 'harbor-launch' }, blurb: 'Solo run through Cliffside Esses. Every bend exit counts.',
   },
@@ -704,25 +704,25 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'neon-mile', name: 'Neon Mile', district: 'downtown', track: 'downtown', rivals: ['jules', 'kai', 'rhea'],
     payout: { cash: [420, 300, 220, 165], rep: [60, 42, 30, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 500, crates: 3 },
-    requires: { car: 'tourer' }, goals: { par: 21.6 },
+    requires: { car: 'tourer' }, goals: { par: 23.1 },
     blurb: 'A night street circuit under shop signs. Four corners; the Altamar is wide for them.',
   },
   {
     id: 'bridge-trap', name: 'Bridge Speed Trap', district: 'downtown', track: 'bridge', rivals: [],
     payout: { cash: [90, 90, 90, 90], rep: [12, 12, 12, 12], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'tourer' }, speedTrap: { bronze: 134, silver: 142, gold: 158 },
+    requires: { car: 'tourer' }, speedTrap: { bronze: 150, silver: 195, gold: 208 },
     blurb: 'One run across the harbor bridge. Scored on your speed through the gate, not your time.',
   },
   {
     id: 'stock-cup', name: 'Stock Cup', district: 'downtown', track: 'downtown', rivals: ['stock1', 'stock2', 'stock3'],
     payout: { cash: [380, 270, 200, 150], rep: [40, 28, 20, 15], crates: [2, 1, 1, 0] }, firstClear: { cash: 450, crates: 2 },
-    requires: { afterWin: 'neon-mile' }, partCap: 4, trophy: 'Stock Cup', goals: { par: 23.3 },
+    requires: { afterWin: 'neon-mile' }, partCap: 4, trophy: 'Stock Cup', goals: { par: 23.4 },
     blurb: 'Every part runs as T4 at most, on any car. The base car decides it: light and grippy wins the corners.',
   },
   {
     id: 'skyline-run', name: 'Skyline Run', district: 'downtown', track: 'skyline', rivals: ['mina', 'rhea', 'ozzy'],
     payout: { cash: [480, 340, 250, 190], rep: [66, 46, 33, 25], crates: [3, 2, 1, 1] }, firstClear: { cash: 600, crates: 3 },
-    requires: { afterWin: 'neon-mile' }, goals: { par: 23.0 },
+    requires: { afterWin: 'neon-mile' }, goals: { par: 24.1 },
     blurb: 'Expressway sweepers into one tight exit ramp. Top speed first, then grip.',
   },
   {
@@ -751,20 +751,20 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'midnight-run', name: 'Midnight Run', district: 'downtown', track: 'bridge', rivals: ['nova2', 'rhea', 'mina'],
     payout: { cash: [700, 500, 360, 260], rep: [80, 56, 40, 30], crates: [4, 3, 2, 1] }, firstClear: { cash: 1000, crates: 4 },
-    requires: { car: 'super' }, goals: { par: 11.7 },
+    requires: { car: 'super' }, goals: { par: 11.8 },
     blurb: 'Bridge drag at 2 a.m. against the fastest cars in the city. Where a Surge-boosted Lumen belongs.',
   },
   // ---------------- Desert Proving Ground (after the Lumen RS): the Corvo Rally and the Canyon Rally ----------------
   {
     id: 'canyon-qualifier', name: 'Canyon Qualifier', district: 'desert', track: 'dunes', rivals: ['odin', 'yara', 'tomas'],
     payout: { cash: [600, 430, 320, 240], rep: [70, 50, 36, 26], crates: [3, 2, 1, 1] }, firstClear: { cash: 800, crates: 4 },
-    requires: { car: 'super' }, goals: { par: 18.6 },
+    requires: { car: 'super' }, goals: { par: 21.9 },
     blurb: 'Gravel, two loose bends, and rally cars that launch like catapults. Win it to earn a Corvo Rally.',
   },
   {
     id: 'mesa-trap', name: 'Mesa Speed Trap', district: 'desert', track: 'mesa', rivals: [],
     payout: { cash: [150, 150, 150, 150], rep: [16, 16, 16, 16], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'super' }, speedTrap: { bronze: 180, silver: 196, gold: 212 },
+    requires: { car: 'super' }, speedTrap: { bronze: 185, silver: 200, gold: 215 },
     blurb: 'Salt flats and a gate at the far end. Scored on your speed through it — bring your fastest car.',
   },
   {
@@ -793,7 +793,7 @@ export const EVENTS: RaceEvent[] = [
     requires: { car: 'rally' }, blurb: 'Ironhorse 455s only, flat out across the salt. A T5 V8 with every boost still has a chance.',
   },
   {
-    id: 'ta-canyon', name: 'Canyon Time Attack', district: 'trials', track: 'canyon', rivals: [], timeAttack: { bronze: 21.4, silver: 20.4, gold: 19.6 },
+    id: 'ta-canyon', name: 'Canyon Time Attack', district: 'trials', track: 'canyon', rivals: [], timeAttack: { bronze: 26.6, silver: 26.1, gold: 25.9 },
     payout: { cash: [120, 120, 120, 120], rep: [14, 14, 14, 14], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'rally' }, blurb: 'Solo run through Red Canyon. Four hairpins, four clean exits.',
   },
@@ -801,13 +801,13 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'glacier-pass', name: 'Glacier Pass', district: 'summit', track: 'pass', rivals: ['mirelle', 'kenji', 'nova3'],
     payout: { cash: [900, 640, 480, 360], rep: [96, 68, 48, 36], crates: [4, 2, 1, 1] }, firstClear: { cash: 1200, crates: 4 },
-    requires: { car: 'gt' }, goals: { par: 20.6 },
+    requires: { car: 'gt' }, goals: { par: 22.9 },
     blurb: 'Three fast sweepers above the snow line. Aero grip is worth more than horsepower here.',
   },
   {
     id: 'summit-1000', name: 'Summit 1000', district: 'summit', track: 'summit', rivals: ['bex', 'kenji', 'mirelle'],
     payout: { cash: [1000, 720, 540, 400], rep: [104, 72, 52, 40], crates: [4, 3, 2, 1] }, firstClear: { cash: 1500, crates: 5 },
-    requires: { afterWin: 'glacier-pass' }, goals: { par: 25.6 },
+    requires: { afterWin: 'glacier-pass' }, goals: { par: 34.0 },
     blurb: 'The endurance classic: the full Summit Circuit against the GT teams. Win it and the Halcyon X is yours to build.',
   },
   {
@@ -816,14 +816,14 @@ export const EVENTS: RaceEvent[] = [
     requires: { car: 'gt' }, blurb: 'Altamar GTs only, over Glacier Pass. The coastal tourer was made for roads like this.',
   },
   {
-    id: 'ta-summit', name: 'Summit Time Attack', district: 'trials', track: 'summit', rivals: [], timeAttack: { bronze: 27.0, silver: 26.0, gold: 25.2 },
+    id: 'ta-summit', name: 'Summit Time Attack', district: 'trials', track: 'summit', rivals: [], timeAttack: { bronze: 32.2, silver: 31.6, gold: 31.3 },
     payout: { cash: [150, 150, 150, 150], rep: [16, 16, 16, 16], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'gt' }, blurb: 'One lap of the Summit Circuit, alone. The record board every car can chase.',
   },
   {
     id: 'summit-gala', name: 'Summit Gala', district: 'summit', track: 'summit', rivals: ['sable', 'nova3', 'iver'],
     payout: { cash: [1500, 1000, 750, 550], rep: [150, 100, 70, 50], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'proto' }, goals: { par: 23.8 },
+    requires: { car: 'proto' }, goals: { par: 32.1 },
     boss: { rival: 'iver', reward: { cash: 6000, crates: 8, blueprint: 'Summit Ice', badge: 'Summit Champion' } },
     blurb: 'The grand finale. Every champion you have beaten, and Iver Kaas in the other Halcyon. Clean shifts or nothing.',
   },
@@ -848,31 +848,31 @@ export const RIVAL_PACE: Record<string, number> = {
   'yard-sprint': 0.978,
   'crusher-run': 0.967,
   'tapeback-trophy': 0.992,
-  'corsa-club': 0.994,
-  'rusty-ray': 1.060,
-  'cul-de-sac': 0.975,
-  'maple-mile': 1.042,
-  'foundry-final': 1.216,
+  'corsa-club': 0.992,
+  'rusty-ray': 1.031,
+  'cul-de-sac': 0.953,
+  'maple-mile': 1.020,
+  'foundry-final': 1.330,
   'hatch-attack': 0.986,
-  'harbor-launch': 0.897,
-  'cliff-esses': 0.966,
-  'coast-crown': 1.009,
-  'neon-mile': 0.876,
-  'stock-cup': 1.056,
-  'skyline-run': 0.991,
-  'main-event:1': 1.203,
-  'main-event:2': 1.041,
-  'main-event:3': 0.995,
-  'midnight-run': 0.939,
-  'canyon-qualifier': 0.845,
-  'dust-stage': 0.989,
+  'harbor-launch': 0.943,
+  'cliff-esses': 0.974,
+  'coast-crown': 0.965,
+  'neon-mile': 0.945,
+  'stock-cup': 1.002,
+  'skyline-run': 0.963,
+  'main-event:1': 1.190,
+  'main-event:2': 0.980,
+  'main-event:3': 0.957,
+  'midnight-run': 0.932,
+  'canyon-qualifier': 0.828,
+  'dust-stage': 0.976,
   'canyon-stage': 0.993,
-  'rally-final': 0.985,
-  'ironhorse-revival': 0.928,
-  'glacier-pass': 1.067,
-  'summit-1000': 1.085,
-  'altamar-tour': 0.936,
-  'summit-gala': 1.072,
+  'rally-final': 0.953,
+  'ironhorse-revival': 0.908,
+  'glacier-pass': 1.085,
+  'summit-1000': 1.055,
+  'altamar-tour': 0.919,
+  'summit-gala': 1.034,
 };
 const scaleStats = (st: Rival['stats'], k: number) => ({ top: +(st.top * k).toFixed(3), accel: +(st.accel * k).toFixed(3), grip: +(st.grip * k).toFixed(4) });
 for (const e of EVENTS) {

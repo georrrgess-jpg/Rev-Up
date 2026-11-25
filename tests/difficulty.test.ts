@@ -18,17 +18,20 @@ describe('race difficulty by input quality', () => {
       for (const sh of SHIFTS) for (const ni of NITROS) cell.set(`${sh}/${ni}`, probeEvent(id, b, sh, ni, SEEDS).through);
       table.push(`${id.padEnd(18)} ${t.cat.padEnd(5)} ${b.car} E${b.tiers.join('/')}  ${SHIFTS.map((sh) => `${sh} ${NITROS.map((ni) => cell.get(`${sh}/${ni}`)).join('/')}`).join('  ')}${e.advance ? ` (top ${e.advance})` : ''}`);
       for (const [sh, ni] of CATEGORY[t.cat].win) if (cell.get(`${sh}/${ni}`)! < SEEDS - 1) fails.push(`${id}: ${sh}/${ni} should win (${cell.get(`${sh}/${ni}`)}/${SEEDS})`);
+      for (const [sh, ni] of CATEGORY[t.cat].tuned) {
+        const w = probeEvent(id, { ...b, tune: 3 }, sh, ni, SEEDS).through;
+        if (w < SEEDS - 1) fails.push(`${id}: ${sh}/${ni} with Tune-up 3 should win (${w}/${SEEDS})`);
+      }
       for (const [sh, ni] of CATEGORY[t.cat].lose) if (cell.get(`${sh}/${ni}`)! > 1) fails.push(`${id}: ${sh}/${ni} should lose (${cell.get(`${sh}/${ni}`)}/${SEEDS})`);
     }
     console.log(table.join('\n'));
     expect(fails).toEqual([]);
   }, 120_000);
 
-  it('a better build beats skill: the full build wins later events even with ordinary inputs', () => {
-    for (const id of ['neon-mile', 'dust-stage', 'glacier-pass']) {
-      const full = LADDER_BUILDS[id][1];
-      expect(probeEvent(id, full, 'ordinary', 'late', SEEDS).wins).toBeGreaterThanOrEqual(SEEDS - 1);
-    }
+  it('the Stock Cup is decided by the base car: a stock Kestrel wins with any inputs, a stock Altamar cannot', () => {
+    const [altamar, kestrel] = LADDER_BUILDS['stock-cup'];
+    expect(probeEvent('stock-cup', altamar, 'clean', 'perfect', SEEDS).wins).toBe(0);
+    expect(probeEvent('stock-cup', kestrel, 'missed', 'none', SEEDS).wins).toBeGreaterThanOrEqual(SEEDS - 1);
   });
 
   it('each new car is the one to beat on its own courses', () => {

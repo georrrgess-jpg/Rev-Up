@@ -89,6 +89,8 @@ export function runBot(o: BotOpts): BotLog {
   let lastEvent = '';
   let repeat = 0;
   const lossStreak: Record<string, number> = {};
+  let lastStreak = 0;
+  let stuckCar: CarId | null = null;
   const countEvent = (id: string) => {
     L.perEvent[id] = (L.perEvent[id] ?? 0) + 1;
     repeat = id === lastEvent ? repeat + 1 : 1;
@@ -228,10 +230,11 @@ export function runBot(o: BotOpts): BotLog {
       if (c !== null && g.state.cash >= c + 40) { g.buyUpgrade(u.id, now); bought = true; log(`${t.toFixed(0)}s upgrade ${u.id} $${c}`); spend(COST.buy); break; }
     }
     if (bought) continue;
-    if (o.policy === 'none' || o.tune) {
-      const car = g.state.activeCar;
+    // Tune-ups: the no-nitro player buys them once losing; everyone else when stuck on one race (two losses running)
+    if (o.tune !== false && ((o.policy === 'none' || o.tune) ? L.lossRaces > 2 : lastStreak >= 2)) {
+      const car = lastStreak >= 2 && stuckCar ? stuckCar : g.state.activeCar;
       const st = g.state.tune?.[car] ?? 0;
-      if (st < TUNE_STAGES && g.state.cash >= tunePrice(car, st) + 100 && L.lossRaces > 2) { g.buyTune(car, now); log(`${t.toFixed(0)}s tune ${car} ${st + 1} $${tunePrice(car, st)}`); spend(COST.buy); continue; }
+      if (st < TUNE_STAGES && g.state.cash >= tunePrice(car, st) + 100) { g.buyTune(car, now); log(`${t.toFixed(0)}s tune ${car} ${st + 1} $${tunePrice(car, st)}`); spend(COST.buy); continue; }
     }
     const goal = P.goalStatus(g.state);
     // scrap → targeted crate toward the keystone
@@ -284,7 +287,9 @@ export function runBot(o: BotOpts): BotLog {
       const lostHeat = ev.knockout ? !!res?.heat && !res.heat.advanced : (res?.place ?? 1) > 1;
       lossStreak[ev.id] = lostHeat ? (lossStreak[ev.id] ?? 0) + 1 : 0;
       L.maxLossStreak = Math.max(L.maxLossStreak, lossStreak[ev.id]);
-    }
+      lastStreak = lossStreak[ev.id];
+      stuckCar = car;
+    } else lastStreak = 0;
     if (!L.milestones.firstRace) L.milestones.firstRace = Math.round(t);
     if (res?.boss) L.milestones[`boss-${raced.boss?.rival}`] = Math.round(t);
     if (res?.boss && raced.boss?.rival === 'ray') L.milestones.ray = Math.round(t);

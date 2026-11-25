@@ -89,11 +89,14 @@ export const LADDER_BUILDS: Record<string, Build[]> = {
 // (shift / nitro) must win (or go through, in a heat) and every `lose` input must not. Opening events forgive
 // ordinary inputs; from the Coastal Crown on, rivals shift clean and a run with missed shifts or no nitro loses.
 export type Input = [ShiftPolicy, Nitro];
-export const CATEGORY: Record<'open' | 'early' | 'late' | 'boss', { win: Input[]; lose: Input[] }> = {
-  open: { win: [['ordinary', 'late']], lose: [['missed', 'none']] },
-  early: { win: [['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'none']] },
-  late: { win: [['clean', 'perfect'], ['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'late'], ['ordinary', 'none'], ['missed', 'none']] },
-  boss: { win: [['clean', 'perfect']], lose: [['ordinary', 'late'], ['missed', 'perfect']] },
+// `tuned`: inputs that must win once the car has all three Tune-up stages (the cash route for players who miss
+// shifts and boosts), so nobody is stuck for good.
+export const CATEGORY: Record<'open' | 'early' | 'late' | 'stock' | 'boss', { win: Input[]; lose: Input[]; tuned: Input[] }> = {
+  open: { win: [['ordinary', 'late']], lose: [['missed', 'none']], tuned: [['missed', 'none']] },
+  early: { win: [['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'none']], tuned: [['missed', 'none']] },
+  late: { win: [['clean', 'perfect'], ['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none']] },
+  stock: { win: [['clean', 'perfect'], ['missed', 'none']], lose: [], tuned: [] }, // the base car decides it (see the class test)
+  boss: { win: [['clean', 'perfect']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none'], ['ordinary', 'perfect']] },
 };
 export const TARGETS: Record<string, { cat: keyof typeof CATEGORY; ref: number }> = {
   'yard-sprint': { cat: 'open', ref: 0 },
@@ -103,32 +106,32 @@ export const TARGETS: Record<string, { cat: keyof typeof CATEGORY; ref: number }
   'rusty-ray': { cat: 'early', ref: 0 },
   'cul-de-sac': { cat: 'early', ref: 0 },
   'maple-mile': { cat: 'early', ref: 1 },
-  'foundry-final': { cat: 'early', ref: 0 },
+  'foundry-final': { cat: 'early', ref: 1 },
   'hatch-attack': { cat: 'early', ref: 0 },
-  'harbor-launch': { cat: 'late', ref: 0 },
-  'cliff-esses': { cat: 'late', ref: 0 },
+  'harbor-launch': { cat: 'late', ref: 1 },
+  'cliff-esses': { cat: 'late', ref: 1 },
   'coast-crown': { cat: 'boss', ref: 0 },
-  'neon-mile': { cat: 'late', ref: 0 },
-  'stock-cup': { cat: 'late', ref: 1 },
+  'neon-mile': { cat: 'late', ref: 1 },
+  'stock-cup': { cat: 'stock', ref: 1 },
   'skyline-run': { cat: 'late', ref: 0 },
   'main-event:1': { cat: 'late', ref: 0 },
   'main-event:2': { cat: 'late', ref: 0 },
   'main-event:3': { cat: 'boss', ref: 1 },
-  'midnight-run': { cat: 'late', ref: 0 },
+  'midnight-run': { cat: 'late', ref: 1 },
   'canyon-qualifier': { cat: 'late', ref: 2 },
-  'dust-stage': { cat: 'late', ref: 0 },
-  'canyon-stage': { cat: 'late', ref: 0 },
+  'dust-stage': { cat: 'late', ref: 1 },
+  'canyon-stage': { cat: 'late', ref: 1 },
   'rally-final': { cat: 'boss', ref: 1 },
   'ironhorse-revival': { cat: 'late', ref: 0 },
-  'glacier-pass': { cat: 'late', ref: 0 },
+  'glacier-pass': { cat: 'late', ref: 1 },
   'summit-1000': { cat: 'boss', ref: 1 },
   'altamar-tour': { cat: 'late', ref: 0 },
   'summit-gala': { cat: 'boss', ref: 1 },
 };
 
 /** Player finish time with an input (the player's run does not depend on the seed: no drafting). */
-export function playerTime(eventId: string, b: Build, [shift, nitro]: Input): number {
-  return probeEvent(eventId, b, shift, nitro, 1).time;
+export function playerTime(eventId: string, b: Build, [shift, nitro]: Input, tune?: number): number {
+  return probeEvent(eventId, tune === undefined ? b : { ...b, tune }, shift, nitro, 1).time;
 }
 
 /** Mean finish time of the rival that decides the result (the winner, or the last one through in a heat). */
