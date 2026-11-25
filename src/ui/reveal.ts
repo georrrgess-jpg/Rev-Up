@@ -190,7 +190,10 @@ export class RevealOverlay {
     if (key !== this.bgKey) {
       this.bgKey = key;
       const spot = (0.08 + 0.4 * q).toFixed(2);
-      this.el.style.background = `radial-gradient(42% 30% at 50% 60%, rgba(255,228,186,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #0c0907 64%), radial-gradient(90% 70% at 50% 30%, rgb(${40 + 120 * q},${30 + 85 * q},${24 + 40 * q}), #050403 75%)`;
+      this.el.style.background = this.car === 'tourer'
+        // the marquee car gets its own stage: a dusk-teal room with a warm horizon behind it
+        ? `radial-gradient(42% 30% at 50% 60%, rgba(255,214,160,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #06100f 64%), linear-gradient(to bottom, rgba(0,0,0,0) 46%, rgba(240,170,110,${(0.35 * q).toFixed(2)}) 62%, rgba(0,0,0,0) 64%), radial-gradient(90% 70% at 50% 30%, rgb(${14 + 30 * q},${40 + 90 * q},${48 + 92 * q}), #020606 75%)`
+        : `radial-gradient(42% 30% at 50% 60%, rgba(255,228,186,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #0c0907 64%), radial-gradient(90% 70% at 50% 30%, rgb(${40 + 120 * q},${30 + 85 * q},${24 + 40 * q}), #050403 75%)`;
     }
     ctx.clearRect(0, 0, w, hh);
     // The car is cached once per size and finish; a silhouette copy lets the light cue fade it up.
@@ -214,6 +217,17 @@ export class RevealOverlay {
       ctx.globalAlpha = 1;
     }
     const headlights = this.phase === 'lights' ? Math.min(1, this.t * 2) * (0.6 + 0.4 * Math.sin(this.t * 14)) : this.phase === 'camera' || this.phase === 'done' ? 0.85 : 0;
+    if (this.car === 'tourer' && (this.phase === 'camera' || this.phase === 'done') && !this.reduced) {
+      // a slow highlight runs nose to tail along the paint (source-atop keeps it on the car)
+      const k = this.phase === 'camera' ? Math.min(1, this.t / 1.2) : 1;
+      if (k < 1) {
+        const sx = x + cw * (1.15 - 1.3 * k);
+        const g = ctx.createLinearGradient(sx - cw * 0.12, 0, sx + cw * 0.12, 0);
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,250,235,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.save(); ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = g;
+        ctx.fillRect(sx - cw * 0.12, 0, cw * 0.24, hh); ctx.restore();
+      }
+    }
     drawHeadlightBeam(ctx, this.car, x, y, cw, headlights);
     drawCarCover(ctx, this.car, x, y, cw, this.cover);
     // one headlight sweep across the room while the engine speaks

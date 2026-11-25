@@ -4,7 +4,7 @@ import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
 import { RaceSetup, RaceSim } from '../core/race';
 import type { LastResult } from '../core/state';
-import { DISTRICTS, EVENTS, NITRO_CAP, RACE, RIVALS, RaceEvent, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
+import { DISTRICTS, EVENTS, MEDAL_REWARDS, NITRO_CAP, RACE, RIVALS, RaceEvent, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
 import { carLengthM, drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h, ordinal } from './dom';
@@ -184,6 +184,9 @@ export class RaceView implements View {
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number }
 
 const sim0Launch = (sim: RaceSim) => sim.player.x < (sim.track.segments[0]?.length ?? 0) && sim.player.x > 0.5;
+
+const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
+const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
 
 function hash(n: number) {
   const x = Math.sin(n * 127.1) * 43758.5453;
@@ -501,7 +504,10 @@ class RaceScreen {
     const card = h('div', { class: 'card', role: 'dialog', 'aria-label': 'Race result' },
       h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
       h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
-      r.boss ? h('div', { class: 'boss' }, h('b', {}, 'Rusty Ray is beaten.'), ` The Suburbs are open. Ray hands over his signature blueprint: ${ev.boss!.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss!.reward.badge}” badge.`) : null,
+      r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ev.boss.rival === 'ray' ? ' The Suburbs are open.' : ' The coast road is yours.', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
+      r.newMedals?.length ? h('div', { class: 'finish-earned medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), h('div', {}, h('strong', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal`), h('div', {}, r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ') + ' · paid once'))) : null,
+      r.nextMedal ? h('p', { class: 'explain' }, `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
+      r.trophy ? h('div', { class: 'finish-earned' }, h('span', { class: 'trophy-ico', 'aria-hidden': 'true' }, '🏆'), h('div', {}, h('strong', {}, r.trophy), h('div', {}, 'Class trophy added to the Showroom'))) : null,
       h('div', { class: 'pays' }, ...pills),
       s.stats.races <= 1 ? h('p', { class: 'explain' }, 'Cash buys upgrades and crates · Rep unlocks new cars · Crates drop parts onto your bench.') : null,
       finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
@@ -549,7 +555,7 @@ class RaceScreen {
     }
     this.nitroBtn.classList.toggle('empty', c === 0);
     this.nitroBtn.setAttribute('aria-label', `Nitro, ${c} left`);
-    this.hintEl.textContent = this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : 'Tap nitro in the amber windows for a Perfect boost.';
+    this.hintEl.textContent = this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : this.app.game.state.stats.races < 6 || this.sim.perfects === 0 && this.sim.t < 4 && this.app.game.state.stats.races < 20 ? 'Tap nitro in the amber windows for a Perfect boost.' : '';
   }
 
   // ---------------- Drawing ----------------

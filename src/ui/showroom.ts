@@ -1,7 +1,7 @@
 import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
-import { CarId, DISTRICTS, ENABLED_CARS, RAY_FINISH, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
+import { BLUEPRINT_FINISHES, CROWN_FINISH, CarId, DISTRICTS, ENABLED_CARS, EVENTS, RAY_FINISH, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
 import { drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h } from './dom';
@@ -48,16 +48,18 @@ export class ShowroomView implements View {
   private grid: HTMLElement;
   private count: HTMLElement;
   private visible = false;
+  private milestones: HTMLElement;
   private closeDialog: (() => void) | null = null;
   private redrawInspect: (() => void) | null = null;
   private redrawCards: (() => void)[] = [];
 
   constructor(private app: App) {
     this.grid = h('div', { class: 'showgrid' });
+    this.milestones = h('div', { class: 'milestones' });
     this.count = h('span', { class: 'collection-count num' });
     this.el = h('section', { class: 'view', 'aria-label': 'Showroom' },
       h('div', { class: 'showtitle' }, h('h1', {}, 'Showroom'), this.count),
-      h('div', { class: 'scroll', style: 'flex:1;min-height:0' }, this.grid));
+      h('div', { class: 'scroll', style: 'flex:1;min-height:0' }, this.milestones, this.grid));
     window.addEventListener('resize', () => {
       if (!this.visible) return;
       for (const draw of this.redrawCards) draw();
@@ -73,6 +75,7 @@ export class ShowroomView implements View {
     const state = this.app.game.state;
     const next = P.goalStatus(state);
     this.count.textContent = `${state.owned.length} of ${ENABLED_CARS.length} collected`;
+    this.renderMilestones();
     this.redrawCards = [];
     const cards = ENABLED_CARS.map((car) => {
       const owned = state.owned.includes(car.id);
@@ -103,6 +106,32 @@ export class ShowroomView implements View {
     requestAnimationFrame(() => this.redrawCards.forEach((draw) => draw()));
   }
 
+  /** Collection goals: cars, finishes, medals and trophies, with the next one named. */
+  private renderMilestones() {
+    const s = this.app.game.state;
+    const sigTotal = ENABLED_CARS.filter((c) => SIGNATURE_FINISHES[c.id]).length;
+    const sigHave = ENABLED_CARS.filter((c) => SIGNATURE_FINISHES[c.id] && s.livePodiums.includes(c.id)).length;
+    const bpHave = BLUEPRINT_FINISHES.filter((b) => s.blueprints.includes(b.name)).length;
+    const ta = EVENTS.filter((e) => e.timeAttack);
+    const medals = ta.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0);
+    const trophies = EVENTS.filter((e) => e.trophy);
+    const trophyHave = trophies.filter((e) => s.badges.includes(e.trophy!)).length;
+    const row = (label: string, have: number, total: number) =>
+      h('div', { class: `ms${have >= total ? ' done' : ''}` }, h('span', { class: 'ms-l' }, label), h('span', { class: 'ms-v num' }, `${have}/${total}`),
+        h('span', { class: 'bar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round((have / Math.max(1, total)) * 100)}%` })));
+    const all = s.owned.length + sigHave + bpHave + medals + trophyHave;
+    const total = ENABLED_CARS.length + sigTotal + BLUEPRINT_FINISHES.length + ta.length * 3 + trophies.length;
+    this.milestones.replaceChildren(
+      h('div', { class: 'ms-head' }, h('strong', {}, 'Collection'), h('span', { class: 'num' }, `${Math.round((all / total) * 100)}%`)),
+      h('div', { class: 'ms-grid' },
+        row('Cars', s.owned.length, ENABLED_CARS.length),
+        row('Finishes', sigHave + bpHave, sigTotal + BLUEPRINT_FINISHES.length),
+        row('Time medals', medals, ta.length * 3),
+        row('Class trophies', trophyHave, trophies.length)),
+      ...(s.badges.length ? [h('div', { class: 'badges' }, ...s.badges.map((badge) => h('span', { class: 'badge-pill' }, badge)))] : []),
+    );
+  }
+
   private inspect(id: CarId) {
     this.closeDialog?.();
     const state = this.app.game.state;
@@ -121,7 +150,7 @@ export class ShowroomView implements View {
     } }, 'Lights');
     const options = [
       { name: 'Factory', paint: car.paint, value: null },
-      ...(state.blueprints.includes(RAY_FINISH.name) ? [{ ...RAY_FINISH, value: RAY_FINISH.paint }] : []),
+      ...BLUEPRINT_FINISHES.filter((b) => state.blueprints.includes(b.name)).map((b) => ({ ...b, value: b.paint })),
       ...(sig && state.livePodiums.includes(id) ? [{ ...sig, value: sig.paint }] : []),
     ];
     const applyFinish = (value: string | null) => {
@@ -137,6 +166,7 @@ export class ShowroomView implements View {
     const lockedFinishes = [
       ...(sig && !state.livePodiums.includes(id) ? [{ name: sig.name, paint: sig.paint, how: 'Top 3 in a live race with this car' }] : []),
       ...(!state.blueprints.includes(RAY_FINISH.name) ? [{ name: RAY_FINISH.name, paint: RAY_FINISH.paint, how: 'Beat Rusty Ray in a live race' }] : []),
+      ...(!state.blueprints.includes(CROWN_FINISH.name) && state.owned.includes('muscle') ? [{ name: CROWN_FINISH.name, paint: CROWN_FINISH.paint, how: 'Win the Coastal Crown in a live race' }] : []),
     ];
     for (const item of lockedFinishes) {
       finishButtons.append(h('button', {
@@ -163,11 +193,11 @@ export class ShowroomView implements View {
       h('h2', {}, car.model),
       h('div', { class: 'm' }, `${car.name} class · ${DISTRICTS[car.district].name} · Parts up to T${car.cap}`),
       h('p', {}, car.blurb),
+      car.handling ? h('p', { class: 'handling' }, car.handling) : null,
       h('div', { class: 'statrow' },
         h('span', { class: 'chip' }, `${Math.round(loadout.top * 3.6)} km/h`),
         h('span', { class: 'chip' }, `Accel ${loadout.accel.toFixed(1)}`),
         h('span', { class: 'chip' }, `Grip ${loadout.grip.toFixed(2)}`)),
-      state.badges.length && id === 'beater' ? h('div', { class: 'badges' }, ...state.badges.map((badge) => h('span', { class: 'badge-pill' }, badge))) : null,
       finishName, finishButtons,
       sig && !state.livePodiums.includes(id) ? h('p', { class: 'finish-goal' }, `Earn ${sig.name}: finish top 3 in a live race with this car.`) : null,
       h('div', { class: 'inspect-actions' },
