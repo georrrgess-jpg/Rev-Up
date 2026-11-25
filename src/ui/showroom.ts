@@ -6,7 +6,9 @@ import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
 import { STYLE_ITEMS, StyleItem, BLUEPRINT_FINISHES, CROWN_FINISH, CarId, DISTRICTS, ENABLED_CARS, EVENTS, RAY_FINISH, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
-import { drawCar, fitCanvas } from '../render/car';
+import { FACTORY_LOOKS, LIVERIES, drawCar, fitCanvas } from '../render/car';
+import { mph } from '../core/units';
+import { openFitParts } from './fit';
 import type { App, View } from './app';
 import { h } from './dom';
 import { fmt } from './dom';
@@ -17,13 +19,20 @@ const STAGES: Record<string, { wall: [string, string, string, string]; light: st
   tourer: { wall: ['#06181c', '#14454c', '#0c2a2f', '#051214'], light: '#ffd7a04a', floor: 'rgba(255,215,160,0.12)' },
   tuner: { wall: ['#0e0e10', '#2a2618', '#17150f', '#09090a'], light: '#ffc85a46', floor: 'rgba(255,200,90,0.12)' },
   super: { wall: ['#07051a', '#2a1555', '#140a2e', '#050312'], light: '#c08cff55', floor: 'rgba(200,140,255,0.20)' },
+  beater: { wall: ['#140c0a', '#3d2620', '#21140f', '#0c0706'], light: '#ffc9a046', floor: 'rgba(255,170,130,0.10)' },
+  hothatch: { wall: ['#0a0e1a', '#22304f', '#141b2e', '#070a12'], light: '#e6eeff4a', floor: 'rgba(255,70,80,0.12)' },
+  rally: { wall: ['#07101f', '#1d3b6b', '#10203d', '#050a14'], light: '#e8f0ff50', floor: 'rgba(245,197,24,0.14)' },
+  gt: { wall: ['#140707', '#4a1818', '#260c0c', '#0c0404'], light: '#ffe6dc4a', floor: 'rgba(255,60,46,0.16)' },
+  proto: { wall: ['#020b0d', '#0f3d44', '#082226', '#020809'], light: '#b8fff250', floor: 'rgba(54,240,208,0.18)' },
 };
+/** Factory look; the new cars use their art palette until the tables give them their own. */
+const lookOf = (id: CarId) => { const c = carById(id); const f = FACTORY_LOOKS[id]; return c.paint === '#555' && f ? f : { paint: c.paint, trim: c.trim }; };
 
 function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined, lit = 0, covered = false, locked = false, style?: CarStyle) {
   const { w, h: height } = fitCanvas(canvas, 1.5);
   if (w < 2 || height < 2) return;
   const ctx = canvas.getContext('2d')!;
-  const car = carById(id);
+  const car = lookOf(id);
   // stages: a plain garage bay for the early cars; prize cars get their own light (owned ones only)
   const st = locked || covered ? STAGES.junker : STAGES[id] ?? STAGES.junker;
   const wall = ctx.createLinearGradient(0, 0, 0, height);
@@ -49,7 +58,15 @@ function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined,
   }
   if (st.floor) { const fl = ctx.createRadialGradient(w * .5, height * .78, 0, w * .5, height * .78, w * .5); fl.addColorStop(0, st.floor); fl.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = fl; ctx.fillRect(0, height * .6, w, height * .4); }
   const length = Math.min(w * .8, height * 1.7, 740); // room for bumpers, wings and the far side
-  drawCar(ctx, id, (w - length * 1.12) / 2 + length * 0.02, height * (height > w * .8 ? .73 : .82), length, {
+  const gy = height * (height > w * .8 ? .73 : .82);
+  if (!locked) {
+    // a low display plinth under the car with a soft rim light in the stage colour
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = st.floor ?? 'rgba(210,230,240,0.14)'; ctx.lineWidth = Math.max(1, length * 0.006);
+    ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0.1, Math.PI - 0.1); ctx.stroke();
+  }
+  drawCar(ctx, id, (w - length * 1.12) / 2 + length * 0.02, gy, length, {
     paint: paint ?? car.paint,
     trim: car.trim,
     livery: finishStripe(id, paint),
@@ -167,12 +184,14 @@ export class ShowroomView implements View {
     let lit = false;
     // Paint shop preview: tapping an item you don't own shows it on the car before you buy.
     let preview: { item: StyleItem } | null = null;
+    const soonItems = new Map<string, StyleItem>();
     const draw = () => {
       const st = this.app.game.state;
       const style = { ...carStyle(st, id) };
       let paint = st.paints[id];
       if (preview) {
         const it = preview.item;
+        if ((it.kind as string) === 'livery') style.livery = it.value || undefined;
         if (it.kind === 'paint') paint = it.value;
         if (it.kind === 'wheel') style.wheel = it.value as WheelSetId;
         if (it.kind === 'material') style.material = it.value as PaintMaterial;
@@ -186,7 +205,7 @@ export class ShowroomView implements View {
       draw();
     } }, 'Lights');
     const options = [
-      { name: 'Factory', paint: car.paint, value: null },
+      { name: 'Factory', paint: lookOf(id).paint, value: null },
       ...BLUEPRINT_FINISHES.filter((b) => state.blueprints.includes(b.name)).map((b) => ({ ...b, value: b.paint })),
       ...(sig && state.livePodiums.includes(id) ? [{ ...sig, value: sig.paint }] : []),
       ...STYLE_ITEMS.filter((i) => i.kind === 'paint' && (state.owns ?? []).includes(i.id)).map((i) => ({ name: i.name, paint: i.value, value: i.value })),
@@ -236,7 +255,8 @@ export class ShowroomView implements View {
       const chip = (it: StyleItem) => {
         const own = S.owned(st, it, id);
         const on = (it.kind === 'paint' && st.paints[id] === it.value) || (it.kind === 'wheel' && cur.wheel === it.value)
-          || (it.kind === 'material' && cur.material === it.value) || (it.kind === 'restore' && (cur.restore ?? 0) >= Number(it.value));
+          || (it.kind === 'material' && cur.material === it.value) || (it.kind === 'restore' && (cur.restore ?? 0) >= Number(it.value))
+          || ((it.kind as string) === 'livery' && curLivery === it.value);
         const sw = it.kind === 'paint' ? h('span', { class: 'swatch', style: `--paint:${it.value}`, 'aria-hidden': 'true' }) : null;
         return h('button', {
           class: `btn shop-item${on ? ' on' : ''}${own ? ' own' : ''}${preview?.item === it ? ' previewing' : ''}`,
@@ -253,6 +273,30 @@ export class ShowroomView implements View {
         class: `btn shop-item${!cur[kind] ? ' on' : ''}`, 'aria-pressed': String(!cur[kind]),
         onclick: () => { preview = null; this.app.game.applyStyle(null, id, kind); renderShop(); draw(); },
       }, h('span', { class: 'stack' }, kind === 'wheel' ? 'Factory' : 'Gloss', h('small', {}, 'On car')));
+      // Liveries: catalogue items come from STYLE_ITEMS (kind 'livery'); any livery not yet in the catalogue can
+      // still be previewed on the car, marked as coming soon.
+      const curLivery = carStyle(st, id).livery;
+      const liveryItems = items.filter((i) => (i.kind as string) === 'livery');
+      const soon = (lv: (typeof LIVERIES)[number]) => {
+        let it = soonItems.get(lv.id);
+        if (!it) { it = { id: `livery:${lv.id}`, kind: 'livery' as StyleItem['kind'], name: lv.name, price: 0, value: lv.id, opens: 0, blurb: lv.blurb }; soonItems.set(lv.id, it); }
+        const item = it;
+        return h('button', {
+          class: `btn shop-item soon${preview?.item === item ? ' previewing' : ''}`, 'aria-label': `${lv.name}, preview`,
+          onclick: () => { preview = { item }; renderShop(); draw(); },
+        }, h('span', { class: 'stack' }, lv.name, h('small', {}, 'Preview')));
+      };
+      const liveryBlock = h('div', { class: 'shop-group' }, h('h3', {}, 'Liveries'), h('p', { class: 'd' }, 'Stripes, numbers and graphics in a colour that suits the paint. Looks only.'),
+        h('div', { class: 'shop-items' },
+          h('button', {
+            class: `btn shop-item${!curLivery ? ' on' : ''}`, 'aria-pressed': String(!curLivery),
+            onclick: () => { preview = null; this.app.game.applyStyle(null, id, 'livery' as 'wheel'); renderShop(); draw(); },
+          }, h('span', { class: 'stack' }, 'Clean', h('small', {}, 'No graphics'))),
+          ...LIVERIES.map((lv) => {
+            const it = liveryItems.find((i) => i.value === lv.id);
+            if (it) return chip(it);
+            return STYLE_ITEMS.some((i) => (i.kind as string) === 'livery' && i.value === lv.id) ? null : soon(lv);
+          })));
       const blocks = groups.map(([kind, title, note]) => {
         const list = items.filter((i) => i.kind === kind);
         if (!list.length) return null;
@@ -261,12 +305,18 @@ export class ShowroomView implements View {
       });
       const locked = STYLE_ITEMS.filter((i) => st.owned.length < i.opens && (i.kind !== 'restore' || id === 'junker'));
       const nextOpen = locked.length ? Math.min(...locked.map((i) => i.opens)) : 0;
-      shop.replaceChildren(h('h2', { class: 'shop-title' }, 'Paint shop'), ...blocks.filter((b): b is HTMLDivElement => !!b),
+      shop.replaceChildren(h('h2', { class: 'shop-title' }, 'Paint shop'), ...blocks.filter((b): b is HTMLDivElement => !!b), liveryBlock,
         ...(nextOpen ? [h('p', { class: 'd' }, `${locked.filter((i) => i.opens === nextOpen).length} more items open with your ${ordinalWord(nextOpen)} car.`)] : []), buyBar);
       if (preview) {
         const it = preview.item;
         const short = it.price - st.cash;
         buyBar.hidden = false;
+        if ([...soonItems.values()].includes(it)) {
+          buyBar.replaceChildren(
+            h('div', { class: 'grow' }, h('b', {}, it.name), h('div', { class: 'd' }, `${it.blurb} Coming to the Paint shop soon.`)),
+            h('button', { class: 'btn sm', onclick: () => { preview = null; renderShop(); draw(); } }, 'Done'));
+          return;
+        }
         buyBar.replaceChildren(
           h('div', { class: 'grow' }, h('b', {}, it.name), h('div', { class: 'd' }, it.blurb)),
           h('button', { class: 'btn sm', onclick: () => { preview = null; renderShop(); draw(); } }, 'Cancel'),
@@ -296,7 +346,7 @@ export class ShowroomView implements View {
       h('p', {}, car.blurb),
       car.handling ? h('p', { class: 'handling' }, car.handling) : null,
       h('div', { class: 'statrow' },
-        h('span', { class: 'chip' }, `${Math.round(loadout.top * 3.6)} km/h`),
+        h('span', { class: 'chip' }, `${mph(loadout.top)} mph`),
         h('span', { class: 'chip' }, `Accel ${loadout.accel.toFixed(1)}`),
         h('span', { class: 'chip' }, `Grip ${loadout.grip.toFixed(2)}`)),
       finishName, finishButtons,
@@ -307,6 +357,10 @@ export class ShowroomView implements View {
           close();
           this.app.replayReveal(id);
         } }, 'Replay reveal'),
+        h('button', { class: 'btn', onclick: () => {
+          close();
+          openFitParts(this.app, id);
+        } }, 'Fit parts'),
         h('button', { class: 'btn primary inspect-race', onclick: () => {
           if (!active) { this.app.game.setActiveCar(id); this.app.toast(`Racing the ${car.model} · parts up to T${car.cap} equip`); }
           close();
