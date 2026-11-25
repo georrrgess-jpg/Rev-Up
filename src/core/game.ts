@@ -1,3 +1,4 @@
+import { eventById } from '../data/tables';
 import * as S from './style';
 import type { UpgradeId } from '../data/tables';
 import { CREW_NITRO, CarId, Family, carById } from '../data/tables';
@@ -156,12 +157,13 @@ export class Game {
     this.transact((d) => {
       const r = P.startRace(d, eventId, now);
       if (!r.ok) return [{ type: 'invalid', reason: r.why }];
-      const lo = computeLoadout(d, d.activeCar);
+      const raced = eventById(r.eventId);
+      const lo = computeLoadout(d, d.activeCar, undefined, raced.partCap ?? eventById(raced.heatOf ?? raced.id).partCap);
       const cls = carById(d.activeCar);
       setup = {
-        eventId,
+        eventId: r.eventId,
         seed: d.pendingRace!.seed,
-        player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: d.paints[d.activeCar] ?? cls.paint },
+        player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: d.paints[d.activeCar] ?? cls.paint, perfectMul: cls.perfectMul },
         nitroCharges: d.nitro + CREW_NITRO,
         windowScale: d.stats.races === 0 ? 1.6 : 1, // the first race is practice: wider windows
       };
@@ -186,7 +188,7 @@ export class Game {
     return this.transact((d) => {
       const r = P.reserveQuick(d, eventId);
       if (!r.ok) return [{ type: 'invalid', reason: r.why }];
-      const lo = computeLoadout(d, d.activeCar);
+      const lo = computeLoadout(d, d.activeCar, undefined, eventById(eventId).partCap);
       const sim = new RaceSim({ eventId, seed: r.seed, player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: '#fff' }, nitroCharges: 0 });
       const out = sim.finish();
       const dur = (out.playerTime ?? sim.t) * 1000;

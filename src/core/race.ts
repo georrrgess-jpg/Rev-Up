@@ -7,7 +7,7 @@ export interface RacerStats { top: number; accel: number; grip: number }
 export interface RaceSetup {
   eventId: string;
   seed: number;
-  player: { name: string; car: CarId; stats: RacerStats; paint: string };
+  player: { name: string; car: CarId; stats: RacerStats; paint: string; perfectMul?: number };
   nitroCharges: number;
   /** Practice runs widen each nitro window (1 = normal). */
   windowScale?: number;
@@ -37,6 +37,8 @@ export interface RaceOutcome {
   nitroUsed: number;
   /** Charges still unused at the finish. */
   nitroLeft: number;
+  /** Player speed (m/s) crossing the line — the speed trap's score. */
+  trapSpeed: number | null;
   cutoff: boolean;
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
 }
@@ -84,6 +86,7 @@ export class RaceSim {
     this.length = trackLength(this.track);
     this.windows = nitroWindows(this.track, setup.windowScale ?? 1);
     this.charges = setup.nitroCharges;
+    this.perfectMul = setup.player.perfectMul ?? RACE.perfectMul;
     const rng = makeRng(setup.seed);
     const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean): Racer => ({
       id, name, car, paint, isPlayer, stats, x: 0, v: 0, finishTime: null, nitroLeft: 0, nitroMul: 1, splits: [],
@@ -99,6 +102,8 @@ export class RaceSim {
   }
 
   ghost!: Racer;
+  perfectMul: number;
+  trapSpeed: number | null = null;
   /** Seconds gained by the most recent boost, measured against the no-nitro ghost (set when it ends). */
   lastBoostGain: { seconds: number; perfect: boolean } | null = null;
   private boostStart: { gap: number; perfect: boolean } | null = null;
@@ -139,7 +144,7 @@ export class RaceSim {
     const perfect = !!active && !this.usedWindows.has(active.segIndex);
     if (active) this.usedWindows.add(active.segIndex);
     p.nitroLeft = RACE.nitroDurationS;
-    p.nitroMul = perfect ? RACE.perfectMul : 1;
+    p.nitroMul = perfect ? this.perfectMul : 1;
     if (perfect) this.perfects++;
     this.boostStart = { gap: p.x - this.ghost.x, perfect };
     this.lastBoostGain = null;
@@ -202,6 +207,7 @@ export class RaceSim {
     const boosting = this.player.nitroLeft > 0;
     for (const r of this.racers) this.stepRacer(r, dt);
     if (this.ghost.finishTime === null) this.stepRacer(this.ghost, dt);
+    if (this.trapSpeed === null && this.player.x >= this.length - 4) this.trapSpeed = this.player.v;
     if (boosting && this.player.nitroLeft <= 0 && this.boostStart) {
       const p = this.player;
       const metres = p.x - this.ghost.x - this.boostStart.gap;
@@ -248,7 +254,7 @@ export class RaceSim {
       else gapText = `${Math.round(first.x - p.x)} m behind first`;
     }
     return {
-      place, standings: st, playerTime: p.finishTime, gapText, perfects: this.perfects, nitroUsed: this.nitroUsed, nitroLeft: this.charges,
+      place, standings: st, playerTime: p.finishTime, gapText, perfects: this.perfects, nitroUsed: this.nitroUsed, nitroLeft: this.charges, trapSpeed: this.trapSpeed,
       cutoff: this.cutoff, advice: place === 1 ? null : this.advice(st[place - 2]),
     };
   }
@@ -292,7 +298,7 @@ export function runRace(setup: RaceSetup, policy: NitroPolicy = 'none'): RaceOut
 
 export function leanOutcome(o: RaceOutcome): LeanOutcome {
   return {
-    place: o.place, playerTime: o.playerTime, gapText: o.gapText, perfects: o.perfects, nitroUsed: o.nitroUsed, nitroLeft: o.nitroLeft,
+    place: o.place, playerTime: o.playerTime, gapText: o.gapText, perfects: o.perfects, nitroUsed: o.nitroUsed, nitroLeft: o.nitroLeft, trapSpeed: o.trapSpeed ?? undefined,
     standings: o.standings.map((r) => ({ name: r.name, time: r.finishTime, isPlayer: r.isPlayer })), advice: o.advice,
   };
 }

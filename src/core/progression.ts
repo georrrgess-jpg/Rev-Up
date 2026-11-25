@@ -11,6 +11,15 @@ export const PRINTER_BANK_CAP = 10; // printer pauses with this many unopened pr
 
 // ---------------- Goals ----------------
 
+/** Stars earned on Downtown Nights event goals (win · under par · a Perfect boost). */
+export function starsIn(s: GameState): number {
+  return EVENTS.filter((e) => e.goals && e.district === 'downtown').reduce((n, e) => n + bitCount(s.stars?.[e.id] ?? 0), 0);
+}
+const bitCount = (b: number) => (b & 1) + ((b >> 1) & 1) + ((b >> 2) & 1);
+export const STAR_LABELS = ['Win', 'Under par', 'A Perfect boost'];
+/** Each goal pays once: half the event's win purse. */
+export const starCash = (e: RaceEvent) => Math.round(e.payout.cash[0] * 0.5);
+
 export function nextCar(s: GameState): CarClass | null {
   return ENABLED_CARS.find((c) => !s.owned.includes(c.id)) ?? null;
 }
@@ -43,12 +52,16 @@ export function goalStatus(s: GameState): GoalStatus | null {
   const units = ingredients.reduce((sum, p) => sum + (p.t < u.tier ? 2 ** (p.t - 1) : 0), 0);
   const keyFrac = keystoneDone ? 1 : Math.min(1, units / 2 ** (u.tier - 1));
   const eventDone = !u.event || (s.events[u.event]?.wins ?? 0) > 0;
+  const starsHave = Math.min(starsIn(s), u.stars ?? 0);
+  const starsDone = starsHave >= (u.stars ?? 0);
   const keyPart = keystoneDone ? 1 : Math.min(0.95, craftedTier(s, u.family) / u.tier);
-  const progress = u.event ? (repFrac + keyPart + (eventDone ? 1 : 0)) / 3 : (repFrac + keyPart) / 2;
+  const legs = [repFrac, keyPart, ...(u.event ? [eventDone ? 1 : 0] : []), ...(u.stars ? [starsHave / u.stars] : [])];
+  const progress = legs.reduce((a, b) => a + b, 0) / legs.length;
   const fam = FAMILIES[u.family];
   const parts: string[] = [];
   if (!keystoneDone) parts.push(`Craft T${u.tier} ${fam.name}`);
-  if (!eventDone) parts.push(`Win the ${eventById(u.event!).name}`);
+  if (!eventDone) parts.push(`Win ${eventById(u.event!).name.startsWith('The ') ? '' : 'the '}${eventById(u.event!).name}`);
+  if (!starsDone) parts.push(`${u.stars! - starsHave} more star${u.stars! - starsHave > 1 ? 's' : ''}`);
   if (s.rep < u.rep) parts.push(`${u.rep - s.rep} more Rep`);
   const line = parts.length ? `${parts.join(' · ')} to unlock the ${car.model}` : `The ${car.model} is ready`;
   return { car, repHave, repNeed: u.rep, family: u.family, tier: u.tier, keystoneDone, bestHeld, keyProgress: keyFrac, progress, line, event: u.event ?? null, eventDone };
@@ -60,7 +73,7 @@ export function checkUnlocks(s: GameState, events: GameEvent[]) {
     const car = nextCar(s);
     if (!car || !car.unlock) return;
     const ev = car.unlock.event;
-    if (s.rep >= car.unlock.rep && craftedTier(s, car.unlock.family) >= car.unlock.tier && (!ev || (s.events[ev]?.wins ?? 0) > 0)) {
+    if (s.rep >= car.unlock.rep && craftedTier(s, car.unlock.family) >= car.unlock.tier && (!ev || (s.events[ev]?.wins ?? 0) > 0) && starsIn(s) >= (car.unlock.stars ?? 0)) {
       s.owned.push(car.id);
       s.activeCar = car.id;
       s.pendingReveal ??= car.id;
@@ -167,10 +180,12 @@ export function upgradeEffect(s: GameState, id: UpgradeId): { now: string; next:
 // ---------------- Events & payouts ----------------
 
 export function eventUnlocked(s: GameState, e: RaceEvent): { ok: boolean; why: string; switchCar?: CarId } {
+  if (e.heatOf) return { ok: false, why: `Raced as part of ${eventById(e.heatOf).name}` };
   if (e.requires.car && !s.owned.includes(e.requires.car)) return { ok: false, why: `Unlock the ${carById(e.requires.car).model}` };
   if (e.requires.beatBoss && !s.bosses.includes(e.requires.beatBoss)) return { ok: false, why: `Beat ${RIVALS[e.requires.beatBoss].name}` };
   if (e.requires.afterWin && !(s.events[e.requires.afterWin]?.wins)) return { ok: false, why: `Win ${eventById(e.requires.afterWin).name} first` };
   if (e.requires.rep && s.rep < e.requires.rep) return { ok: false, why: `${e.requires.rep - s.rep} more Rep` };
+  if (e.requires.stars && starsIn(s) < e.requires.stars) return { ok: false, why: `${e.requires.stars - starsIn(s)} more Downtown stars` };
   if (e.carOnly && s.activeCar !== e.carOnly) return { ok: false, why: `${carById(e.carOnly).model} only`, switchCar: e.carOnly };
   return { ok: true, why: '' };
 }
@@ -180,6 +195,20 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   const u = eventUnlocked(s, e);
   if (!u.ok) return u.why;
   const g = goalStatus(s);
+  if (e.knockout) {
+    const n = (s.knockout?.heat ?? 0);
+    const h0 = eventById(e.knockout.heats[n]);
+    return s.knockout ? `You're through — ${h0.name} is next (${n + 1} of ${e.knockout.heats.length}). Change cars if this course suits another.` : `Three heats in a row. Win the final against Nova Sato for the ${e.boss!.reward.blueprint} paint and the road to the Lumen RS.`;
+  }
+  if (e.speedTrap) {
+    const m = s.medals?.[e.id] ?? 0;
+    return m >= 3 ? `Gold won · record ${s.events[e.id]?.bestSpeed ?? 0} km/h` : `${['Bronze', 'Silver', 'Gold'][m]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m]} km/h through the gate${s.events[e.id]?.bestSpeed ? ` · best ${s.events[e.id]!.bestSpeed} km/h` : ''}`;
+  }
+  if (e.goals) {
+    const have = s.stars?.[e.id] ?? 0;
+    const left = STAR_LABELS.filter((_, k) => !(have & (1 << k)));
+    if (left.length) return `Goals left: ${left.map((l) => (l === 'Under par' ? `under ${e.goals!.par.toFixed(1)} s` : l.toLowerCase())).join(' · ')} — $${starCash(e)} each, once`;
+  }
   if (e.boss && !s.bosses.includes(e.boss.rival)) return `Beat ${RIVALS[e.boss.rival].name} for the ${e.boss.reward.blueprint} paint${e.boss.rival === 'ray' ? ' and to open the Suburbs' : ''}`;
   if (!s.events[e.id]?.wins) {
     const fam = g && !g.keystoneDone ? ` ${FAMILIES[g.family].name}` : '';
@@ -195,7 +224,7 @@ export function eventReason(s: GameState, e: RaceEvent): string {
 }
 
 export const canQuickRace = (s: GameState, e: RaceEvent) =>
-  !e.boss && !e.timeAttack && (s.events[e.id]?.wins ?? 0) > 0 && eventUnlocked(s, e).ok;
+  !e.boss && !e.timeAttack && !e.speedTrap && !e.knockout && !e.heatOf && (s.events[e.id]?.wins ?? 0) > 0 && eventUnlocked(s, e).ok;
 
 export interface Payout {
   cash: number;
@@ -239,7 +268,7 @@ export function computePayout(s: GameState, e: RaceEvent, place: number, mode: '
     p.cash += p.precision;
     const won = place === 1;
     const rec = s.events[e.id];
-    if (won && !(rec && rec.wins > 0) && !e.boss) {
+    if (won && !(rec && rec.wins > 0) && !e.boss && (e.firstClear.cash > 0 || e.firstClear.crates > 0)) {
       p.firstClear = true;
       p.cash += e.firstClear.cash;
       p.crates += e.firstClear.crates;
@@ -352,6 +381,56 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
       nextMedal = { name: ['Bronze', 'Silver', 'Gold'][best], target, gap: Number.isFinite(t) ? t - target : target };
     }
   }
+  // Event goals: a star each for a win, a live time under par and two Perfect boosts; each pays once.
+  const newStars: string[] = [];
+  let starPay = 0;
+  if (e.goals && input.mode === 'live') {
+    const bits = (o.place === 1 ? 1 : 0) | (o.playerTime !== null && o.playerTime <= e.goals.par ? 2 : 0) | (o.perfects >= 1 ? 4 : 0);
+    const had = s.stars[e.id] ?? 0;
+    const fresh = bits & ~had;
+    for (let k = 0; k < 3; k++) if (fresh & (1 << k)) { newStars.push(STAR_LABELS[k]); starPay += starCash(e); }
+    s.stars[e.id] = had | bits;
+    s.cash += starPay;
+  }
+  // Speed trap: medals by km/h through the gate; each medal pays once.
+  let trapKmh: number | undefined;
+  if (e.speedTrap && input.mode === 'live' && o.trapSpeed !== undefined) {
+    const st = e.speedTrap;
+    trapKmh = Math.round(o.trapSpeed * 3.6);
+    rec.bestSpeed = Math.max(rec.bestSpeed ?? 0, trapKmh);
+    medal = trapKmh >= st.gold ? 3 : trapKmh >= st.silver ? 2 : trapKmh >= st.bronze ? 1 : 0;
+    const prev = s.medals[e.id] ?? 0;
+    for (let m = prev + 1; m <= medal; m++) {
+      newMedals.push(m);
+      const r = MEDAL_REWARDS[MEDALS[m - 1]];
+      medalCash += r.cash * 2; // the speed trap is a late event: medals pay double
+      medalCrates += r.crates;
+    }
+    if (medal > prev) s.medals[e.id] = medal;
+    s.cash += newMedals.length ? medalCash : 0;
+    for (let k = 0; k < medalCrates; k++) s.crates.push({ kind: 'std', source: 'race' });
+    const best = s.medals[e.id] ?? 0;
+    if (best < 3) {
+      const target = [st.bronze, st.silver, st.gold][best];
+      nextMedal = { name: ['Bronze', 'Silver', 'Gold'][best], target, gap: target - trapKmh };
+    }
+  }
+  // Knockout: the top places of a heat go through; losing a heat ends the run, winning the final wins the event.
+  let heat: LastResult['heat'];
+  if (e.heatOf && input.mode === 'live') {
+    const parent = eventById(e.heatOf);
+    const heats = parent.knockout!.heats;
+    const idx = heats.indexOf(e.id);
+    const advanced = o.place <= (e.advance ?? 1);
+    const last = idx === heats.length - 1;
+    const prec = (s.events[parent.id] ??= { wins: 0, starts: 0, bestPlace: 4, bestTime: null });
+    if (idx === 0) prec.starts++;
+    const champion = advanced && last;
+    if (champion) { prec.wins++; prec.bestPlace = 1; s.knockout = null; }
+    else if (advanced) s.knockout = { heat: idx + 1 };
+    else s.knockout = null;
+    heat = { name: e.name, n: idx + 1, of: heats.length, advance: e.advance ?? 1, advanced, champion, next: advanced && !last ? eventById(heats[idx + 1]).name : undefined };
+  }
   // Class meet trophy: a Showroom badge for the first live win.
   let trophy: string | undefined;
   if (e.trophy && input.mode === 'live' && o.place === 1 && !s.badges.includes(e.trophy)) {
@@ -367,15 +446,16 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   openCrates(s).forEach((ev) => events.push(ev));
   const result: LastResult = {
     raceId: input.raceId, eventId: e.id, place: o.place, mode: input.mode, time: o.playerTime, gapText: o.gapText,
-    cash: pay.cash + bossCash + medalCash, rep: pay.rep, crates: pay.crates + (pay.bossReward?.crates ?? 0) + medalCrates, precision: pay.precision,
+    cash: pay.cash + bossCash + medalCash + starPay, rep: pay.rep, crates: pay.crates + (pay.bossReward?.crates ?? 0) + medalCrates, precision: pay.precision,
     firstClear: pay.firstClear, boss: pay.boss, perfects: o.perfects, nitroUsed: input.mode === 'live' ? o.nitroUsed : 0,
-    personalBest, signatureFinish, freshRep: pay.freshRep, medal, newMedals, nextMedal, trophy,
+    personalBest, signatureFinish, freshRep: pay.freshRep, medal, newMedals, nextMedal, trophy, newStars, trapKmh, heat,
     breakdown: [
       { label: input.mode === 'quick' ? `Crew purse · ${ordinalShort(o.place)}` : `Purse · ${ordinalShort(o.place)}`, cash: pay.cash - pay.precision - (pay.firstClear ? e.firstClear.cash : 0), kind: 'base' as const },
       ...(pay.precision ? [{ label: `Perfect boost${o.perfects > 1 ? 's' : ''} ×${Math.min(2, o.perfects)}`, cash: pay.precision, kind: 'skill' as const }] : []),
       ...(pay.firstClear && e.firstClear.cash ? [{ label: 'First win', cash: e.firstClear.cash, kind: 'once' as const }] : []),
       ...(bossCash ? [{ label: `Beat ${RIVALS[e.boss!.rival].name}`, cash: bossCash, kind: 'once' as const }] : []),
       ...(medalCash ? [{ label: 'Medal', cash: medalCash, kind: 'once' as const }] : []),
+      ...(starPay ? [{ label: `Goal${newStars.length > 1 ? 's' : ''}: ${newStars.join(', ')}`, cash: starPay, kind: 'once' as const }] : []),
     ],
     advice: adviceText(s, o),
     standings: o.standings,
@@ -384,13 +464,15 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   return result;
 }
 
-export function startRace(s: GameState, eventId: string, now: number): { ok: boolean; why: string } {
+export function startRace(s: GameState, eventId: string, now: number): { ok: boolean; why: string; eventId: string } {
   const e = eventById(eventId);
   const u = eventUnlocked(s, e);
-  if (!u.ok) return u;
+  if (!u.ok) return { ...u, eventId };
+  // The Main Event: race the next heat (the knockout starts at heat 1 when nothing is in progress)
+  const raceId = e.knockout ? e.knockout.heats[s.knockout?.heat ?? 0] : eventId;
   s.raceSeed = (Math.imul(s.raceSeed, 1664525) + 1013904223) >>> 0;
-  s.pendingRace = { id: s.raceSeed, eventId, car: s.activeCar, seed: s.raceSeed, startedAt: now };
-  return { ok: true, why: '' };
+  s.pendingRace = { id: s.raceSeed, eventId: raceId, car: s.activeCar, seed: s.raceSeed, startedAt: now };
+  return { ok: true, why: '', eventId: raceId };
 }
 
 /** Reserve a Quick Race. The caller simulates the outcome (no nitro) from the returned seed. */
@@ -413,6 +495,7 @@ export function recommendedEvent(s: GameState): RaceEvent {
   const busy = s.pendingQuick?.eventId;
   const open = EVENTS.filter((e) => eventUnlocked(s, e).ok && e.id !== busy);
   if (!open.length) return eventById(busy ?? EVENTS[0].id);
+  if (s.knockout) return eventById('main-event'); // a Main Event run in progress comes first
   const final = open.find((e) => e.id === 'foundry-final' && !s.events[e.id]?.wins);
   if (s.activeCar === 'muscle' && final) return final;
   // A first clear you keep losing is spaced out between other races instead of repeated back to back.
@@ -431,6 +514,10 @@ export function recommendedEvent(s: GameState): RaceEvent {
       && eventUnlocked({ ...s, activeCar: e.carOnly }, e).ok);
     if (meet) return meet;
   }
+  // Downtown Nights: goals not yet met are worth more than repeat Rep, and they open the next car.
+  // (the last two races are skipped, so unfinished goals rotate instead of repeating one event)
+  const starHunt = open.filter((e) => e.goals && (s.stars?.[e.id] ?? 0) !== 7 && !(s.recentEvents ?? []).includes(e.id));
+  if (starHunt.length) return starHunt[0];
   // Repeat races: the best Rep per race, counting the Fresh route bonus, so the pick rotates between routes.
   const pool = open.filter((e) => !e.boss && !struggling(e) && (s.activeCar === 'muscle' || e.id !== 'foundry-final'));
   const value = (e: RaceEvent) => e.payout.rep[0] * (isFreshRoute(s, e) ? 1 + FRESH_ROUTE_BONUS : 1) + EVENTS.indexOf(e) * 0.01;

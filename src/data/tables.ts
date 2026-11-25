@@ -6,7 +6,7 @@ export type Quality = 'std' | 'polished' | 'mint';
 export type CarId =
   | 'junker' | 'beater' | 'hothatch' | 'muscle'
   // Post-MVP ladder (data only, disabled):
-  | 'tourer' | 'rally' | 'gt' | 'super' | 'proto' | 'hyper';
+  | 'tourer' | 'tuner' | 'rally' | 'gt' | 'super' | 'proto' | 'hyper';
 
 export interface FamilyDef {
   id: Family;
@@ -30,7 +30,7 @@ export const FAMILIES: Record<Family, FamilyDef> = {
 export const ACTIVE_FAMILIES: Family[] = (Object.keys(FAMILIES) as Family[]).filter((f) => FAMILIES[f].active);
 
 /** Highest tier reachable in this release (data supports T10). */
-export const MAX_TIER = 6; // tunable — T6 opens with the Open Road chapter (Altamar GT, cap T6)
+export const MAX_TIER = 7; // tunable — T7 opens with Downtown Nights (Lumen RS, cap T7)
 export const DATA_MAX_TIER = 10;
 
 /** Stat contribution of a part by tier (index = tier). */
@@ -159,7 +159,9 @@ export interface CarClass {
   cap: number;
   base: { top: number; accel: number; grip: number };
   /** Rep + a crafted keystone, and optionally a won event (e.g. a rival series final). */
-  unlock: null | { rep: number; family: Family; tier: number; event?: string };
+  unlock: null | { rep: number; family: Family; tier: number; event?: string; stars?: number };
+  /** Perfect boosts on this car hit harder than the usual 1.5× (the Lumen RS's Surge). */
+  perfectMul?: number;
   enabled: boolean;
   paint: string;
   trim: string;
@@ -175,7 +177,7 @@ export type DistrictId = 'scrapyard' | 'suburbs' | 'meets' | 'trials' | 'downtow
 export const DISTRICTS: Record<DistrictId, { name: string; enabled: boolean }> = {
   scrapyard: { name: 'Scrapyard', enabled: true },
   suburbs: { name: 'Suburbs', enabled: true },
-  downtown: { name: 'Downtown', enabled: false },
+  downtown: { name: 'Downtown Nights', enabled: true },
   coastal: { name: 'Coastal Highway', enabled: true },
   meets: { name: 'Class meets', enabled: true },
   trials: { name: 'Time attack', enabled: true },
@@ -213,13 +215,24 @@ export const CARS: CarClass[] = [
   // Full campaign (data only). The hypercar is gated by reputation, a crafted T10 keystone, and the Summit Gala rival win.
   {
     id: 'tourer', name: 'Grand tourer', model: 'Altamar GT', district: 'coastal', cap: 6,
-    base: { top: 46, accel: 5.7, grip: 0.97 }, unlock: { rep: 5600, family: 'engine', tier: 6, event: 'coast-crown' }, enabled: true,
+    base: { top: 46, accel: 5.7, grip: 0.97 }, unlock: { rep: 2300, family: 'engine', tier: 6, event: 'coast-crown' }, enabled: true,
     paint: '#0f6b6b', trim: '#e9d8b4', blurb: 'A long-tailed coastal grand tourer with covered lamps and a cream-leather cabin. Built for the open road.',
     offlineRate: 6, rev: { base: 70, peak: 230 }, handling: 'Fastest on long straights and fast sweepers; heavier off the line.',
   },
+  {
+    id: 'tuner', name: 'Lightweight', model: 'Kestrel 1600', district: 'downtown', cap: 6,
+    base: { top: 40, accel: 7.0, grip: 1.25 }, unlock: { rep: 2700, family: 'tires', tier: 6, stars: 3 }, enabled: true,
+    paint: '#e9e4d8', trim: '#1b1d21', blurb: 'A stripped, high-revving coupe built for the city. Thin glass, no carpet, all corner.',
+    offlineRate: 7, rev: { base: 95, peak: 320 }, handling: 'Best off the line and through tight corners; runs out of top end on highways.',
+  },
+  {
+    id: 'super', name: 'Hypercar', model: 'Lumen RS', district: 'downtown', cap: 7,
+    base: { top: 50, accel: 6.8, grip: 0.95 }, unlock: { rep: 3800, family: 'turbo', tier: 7, event: 'main-event' }, enabled: true, perfectMul: 1.7,
+    paint: '#1a1430', trim: '#b9a6ff', blurb: 'A low, hybrid hypercar with a light-bar face and a violet Surge trail. Won, not bought.',
+    offlineRate: 9, rev: { base: 85, peak: 300 }, handling: 'Fastest car on any highway; its Surge makes Perfect boosts 1.7× instead of 1.5×. Heavier in tight corners than the Kestrel.',
+  },
   { id: 'rally', name: 'Rally', model: '—', district: 'coastal', cap: 7, base: { top: 48, accel: 6.5, grip: 0.95 }, unlock: { rep: 1400, family: 'aero', tier: 7 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 6, rev: { base: 60, peak: 200 } },
   { id: 'gt', name: 'GT', model: '—', district: 'riviera', cap: 8, base: { top: 52, accel: 7, grip: 1 }, unlock: { rep: 2200, family: 'engine', tier: 8 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 7, rev: { base: 60, peak: 200 } },
-  { id: 'super', name: 'Supercar', model: '—', district: 'neon', cap: 9, base: { top: 56, accel: 7.5, grip: 1.05 }, unlock: { rep: 3200, family: 'turbo', tier: 9 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 8, rev: { base: 60, peak: 200 } },
   { id: 'proto', name: 'Prototype', model: '—', district: 'desert', cap: 10, base: { top: 60, accel: 8, grip: 1.1 }, unlock: { rep: 4500, family: 'aero', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: '', offlineRate: 9, rev: { base: 60, peak: 200 } },
   { id: 'hyper', name: 'Hypercar', model: 'One-of-one', district: 'summit', cap: 10, base: { top: 64, accel: 8.5, grip: 1.15 }, unlock: { rep: 6000, family: 'engine', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: 'Requires the Summit Gala rival win.', offlineRate: 10, rev: { base: 60, peak: 200 } },
 ];
@@ -231,13 +244,17 @@ export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: st
   hothatch: { name: 'Apex Violet', paint: '#6247a4', stripe: '#9ee3c9' },
   muscle: { name: 'Midnight Bronze', paint: '#70442d', stripe: '#f3c975' },
   tourer: { name: 'Riviera Pearl', paint: '#e8e2d2', stripe: '#b0862f' },
+  tuner: { name: 'Street Orange', paint: '#e8641c', stripe: '#1b1d21' },
+  super: { name: 'Afterglow', paint: '#3a1d6e', stripe: '#ff5fb8' },
 };
 
 export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
 /** Won from Vale Moreau in the Coastal Crown; usable on any car. */
 export const CROWN_FINISH = { name: 'Crown Teal', paint: '#127c8a' };
+/** Won from Nova Sato in The Main Event; usable on any car. */
+export const MAIN_EVENT_FINISH = { name: 'Main Event Neon', paint: '#e2337a' };
 /** Blueprint finishes that any owned car can wear, by blueprint name. */
-export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH];
+export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH, MAIN_EVENT_FINISH];
 
 export function finishStripe(car: CarId, paint: string | undefined): string | undefined {
   const finish = SIGNATURE_FINISHES[car];
@@ -262,11 +279,11 @@ export interface Segment {
   window?: [number, number]; // nitro window as fraction of segment
 }
 export interface Track {
-  id: 'scrapyard' | 'maple' | 'foundry' | 'harbor' | 'cliffs' | 'coast';
+  id: 'scrapyard' | 'maple' | 'foundry' | 'harbor' | 'cliffs' | 'coast' | 'downtown' | 'bridge' | 'skyline';
   name: string;
   district: DistrictId;
   segments: Segment[];
-  theme: 'scrap' | 'suburb' | 'coast';
+  theme: 'scrap' | 'suburb' | 'coast' | 'night';
   /** Short player-facing course type and the part family it rewards. */
   course: string;
   favours: string;
@@ -331,6 +348,37 @@ export const TRACKS: Record<Track['id'], Track> = {
       { type: 'highway', length: 340, window: [0.15, 0.4] },
     ],
   },
+  downtown: {
+    id: 'downtown', name: 'Neon Mile', district: 'downtown', theme: 'night', course: 'Street circuit · four tight corners', favours: 'Grip and acceleration out of each corner',
+    segments: [
+      { type: 'launch', length: 70 },
+      { type: 'bend', length: 60, radius: 30 },
+      { type: 'straight', length: 120, window: [0.06, 0.42] },
+      { type: 'bend', length: 55, radius: 26 },
+      { type: 'straight', length: 110, window: [0.06, 0.42] },
+      { type: 'bend', length: 60, radius: 34 },
+      { type: 'straight', length: 140, window: [0.06, 0.4] },
+    ],
+  },
+  bridge: {
+    id: 'bridge', name: 'Harbor Bridge', district: 'downtown', theme: 'night', course: 'Bridge drag · speed trap at the far end', favours: 'Engine top speed and a well-timed boost',
+    segments: [
+      { type: 'launch', length: 90 },
+      { type: 'highway', length: 420, window: [0.1, 0.42] },
+      { type: 'highway', length: 120 },
+    ],
+  },
+  skyline: {
+    id: 'skyline', name: 'Skyline Run', district: 'downtown', theme: 'night', course: 'Expressway · sweepers, then a tight exit', favours: 'Top speed, then grip at the end',
+    segments: [
+      { type: 'launch', length: 80 },
+      { type: 'highway', length: 300, window: [0.15, 0.45] },
+      { type: 'hwbend', length: 120, radius: 120 },
+      { type: 'straight', length: 160, window: [0.1, 0.45] },
+      { type: 'bend', length: 60, radius: 40 },
+      { type: 'highway', length: 240, window: [0.1, 0.4] },
+    ],
+  },
 };
 
 export const trackLength = (t: Track) => t.segments.reduce((a, s) => a + s.length, 0);
@@ -369,6 +417,16 @@ export const RIVALS: Record<string, Rival> = {
   mara: { id: 'mara', name: 'Mara Quint', car: 'muscle', paint: '#3d3a6b', line: 'Drag-strip veteran. Wins most races in the first 100 m.', stats: { top: 50.0, accel: 8.75, grip: 1.22 } },
   dane: { id: 'dane', name: 'Dane Okoro', car: 'muscle', paint: '#7c2d2d', line: 'Hill-climb champion. Brakes later than anyone.', stats: { top: 50.6, accel: 8.2, grip: 1.42 } },
   lux: { id: 'lux', name: 'Lux Ferrin', car: 'tourer', paint: '#9a9fa8', line: 'Collects grand tourers. Races them on weekends.', stats: { top: 52.0, accel: 8.1, grip: 1.3 } },
+  kai: { id: 'kai', name: 'Kai Mercer', car: 'tuner', paint: '#20c4c4', line: 'Lives on the Neon Mile. Brakes later than anyone.', stats: { top: 50.5, accel: 9.6, grip: 1.75 } },
+  rhea: { id: 'rhea', name: 'Rhea Volk', car: 'tourer', paint: '#c0185b', line: 'Drives a black-cherry Altamar like it owes her money.', stats: { top: 55.0, accel: 9.0, grip: 1.55 } },
+  jules: { id: 'jules', name: 'Jules Ortega', car: 'hothatch', paint: '#ffb000', line: 'Night courier. Knows every shortcut and takes none of them.', stats: { top: 49.5, accel: 9.8, grip: 1.6 } },
+  mina: { id: 'mina', name: 'Mina Hart', car: 'muscle', paint: '#3b5bff', line: 'Electric-blue Ironhorse, rebuilt twice.', stats: { top: 56.5, accel: 9.2, grip: 1.5 } },
+  ozzy: { id: 'ozzy', name: 'Ozzy Lin', car: 'tuner', paint: '#8cff3a', line: 'Lime-green Kestrel and a laugh you hear over the engine.', stats: { top: 52.0, accel: 10.2, grip: 1.82 } },
+  stock1: { id: 'stock1', name: 'Dex', car: 'beater', paint: '#5b6f8c', line: 'Back from the Scrapyard for the Stock Cup.', stats: { top: 47.0, accel: 8.6, grip: 1.5 } },
+  stock2: { id: 'stock2', name: 'June', car: 'hothatch', paint: '#3e8e5a', line: 'Her Vexa on stock parts is still a Vexa.', stats: { top: 47.5, accel: 8.9, grip: 1.56 } },
+  stock3: { id: 'stock3', name: 'Mara', car: 'muscle', paint: '#8c2f2f', line: 'Stock Ironhorse; all torque, no manners.', stats: { top: 49.0, accel: 8.4, grip: 1.45 } },
+  nova: { id: 'nova', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Runs The Main Event. Drives the only other Lumen in the city.', stats: { top: 61.8, accel: 11.0, grip: 1.78 }, boss: true },
+  nova2: { id: 'nova2', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Back for a rematch on the bridge, Lumen against Lumen.', stats: { top: 68.0, accel: 11.4, grip: 1.75 } },
   vale: { id: 'vale', name: 'Vale Moreau', car: 'tourer', paint: '#16233a', line: 'Owns the coast road. Drives the only Altamar anyone has seen.', stats: { top: 53.6, accel: 8.6, grip: 1.38 }, boss: true },
   sol: { id: 'sol', name: 'Sol Ortega', car: 'muscle', paint: '#264653', line: 'Quiet, precise, already in fifth gear.', stats: { top: 44.0, accel: 6.6, grip: 1.0 } },
 };
@@ -381,7 +439,7 @@ export interface RaceEvent {
   rivals: string[]; // three rivals; a time attack has none
   payout: { cash: number[]; rep: number[]; crates: number[] }; // by placement 1..4
   firstClear: { cash: number; crates: number };
-  requires: { rep?: number; car?: CarId; beatBoss?: string; afterWin?: string };
+  requires: { rep?: number; car?: CarId; beatBoss?: string; afterWin?: string; stars?: number };
   /** Class-limited invitational: only this car may enter. */
   carOnly?: CarId;
   boss?: { rival: string; reward: { cash: number; crates: number; blueprint: string; badge: string } };
@@ -391,6 +449,17 @@ export interface RaceEvent {
   timeAttack?: { bronze: number; silver: number; gold: number };
   /** Class meet trophy badge, awarded on the first win. */
   trophy?: string;
+  /** Event goals (Downtown Nights): a star each for a win, a live time under par, and a Perfect boost. Each pays once. */
+  goals?: { par: number };
+  /** Speed trap: scored on km/h through the gate at the end of the course; medals at these speeds. */
+  speedTrap?: { bronze: number; silver: number; gold: number };
+  /** Stock class: every part runs at most this tier, on any car. */
+  partCap?: number;
+  /** Knockout: these heat events in order; the top `advance` places of each heat go through. */
+  knockout?: { heats: string[] };
+  /** A heat of a knockout (not listed on its own). */
+  heatOf?: string;
+  advance?: number;
   blurb: string;
 }
 
@@ -480,6 +549,60 @@ export const EVENTS: RaceEvent[] = [
     id: 'ta-cliffs', name: 'Esses Time Attack', district: 'trials', track: 'cliffs', rivals: [], timeAttack: { bronze: 22.3, silver: 21.5, gold: 19.9 },
     payout: { cash: [60, 60, 60, 60], rep: [10, 10, 10, 10], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { afterWin: 'harbor-launch' }, blurb: 'Solo run through Cliffside Esses. Every bend exit counts.',
+  },
+  // ---------------- Downtown Nights (after the Altamar GT) ----------------
+  {
+    id: 'neon-mile', name: 'Neon Mile', district: 'downtown', track: 'downtown', rivals: ['jules', 'kai', 'rhea'],
+    payout: { cash: [420, 300, 220, 165], rep: [60, 42, 30, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 500, crates: 3 },
+    requires: { car: 'tourer' }, goals: { par: 21.6 },
+    blurb: 'A night street circuit under shop signs. Four corners; the Altamar is wide for them.',
+  },
+  {
+    id: 'bridge-trap', name: 'Bridge Speed Trap', district: 'downtown', track: 'bridge', rivals: [],
+    payout: { cash: [90, 90, 90, 90], rep: [12, 12, 12, 12], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
+    requires: { car: 'tourer' }, speedTrap: { bronze: 215, silver: 228, gold: 255 },
+    blurb: 'One run across the harbor bridge. Scored on your speed through the gate, not your time.',
+  },
+  {
+    id: 'stock-cup', name: 'Stock Cup', district: 'downtown', track: 'downtown', rivals: ['stock1', 'stock2', 'stock3'],
+    payout: { cash: [380, 270, 200, 150], rep: [40, 28, 20, 15], crates: [2, 1, 1, 0] }, firstClear: { cash: 450, crates: 2 },
+    requires: { afterWin: 'neon-mile' }, partCap: 4, trophy: 'Stock Cup', goals: { par: 23.3 },
+    blurb: 'Every part runs as T4 at most, on any car. The base car decides it: light and grippy wins the corners.',
+  },
+  {
+    id: 'skyline-run', name: 'Skyline Run', district: 'downtown', track: 'skyline', rivals: ['mina', 'rhea', 'ozzy'],
+    payout: { cash: [480, 340, 250, 190], rep: [66, 46, 33, 25], crates: [3, 2, 1, 1] }, firstClear: { cash: 600, crates: 3 },
+    requires: { afterWin: 'neon-mile' }, goals: { par: 23.0 },
+    blurb: 'Expressway sweepers into one tight exit ramp. Top speed first, then grip.',
+  },
+  {
+    id: 'main-event', name: 'The Main Event', district: 'downtown', track: 'skyline', rivals: ['nova'],
+    payout: { cash: [900, 0, 0, 0], rep: [120, 0, 0, 0], crates: [4, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
+    requires: { car: 'tuner', stars: 5 }, knockout: { heats: ['main-event:1', 'main-event:2', 'main-event:3'] },
+    boss: { rival: 'nova', reward: { cash: 1500, crates: 6, blueprint: 'Main Event Neon', badge: 'Main Event Champion' } },
+    blurb: 'Three heats, one night. Top 3 go through the street heat, top 2 through the bridge, then a final against Nova Sato. Change cars between heats.',
+  },
+  {
+    id: 'main-event:1', name: 'Heat 1 · Street', district: 'downtown', track: 'downtown', rivals: ['kai', 'ozzy', 'jules'], heatOf: 'main-event', advance: 3,
+    payout: { cash: [260, 200, 150, 90], rep: [24, 18, 14, 8], crates: [1, 1, 0, 0] }, firstClear: { cash: 0, crates: 0 }, requires: {},
+    blurb: 'Neon Mile. Top 3 go through.',
+  },
+  {
+    id: 'main-event:2', name: 'Heat 2 · Bridge', district: 'downtown', track: 'bridge', rivals: ['rhea', 'mina'], heatOf: 'main-event', advance: 2,
+    payout: { cash: [300, 220, 120, 0], rep: [28, 20, 10, 0], crates: [1, 1, 0, 0] }, firstClear: { cash: 0, crates: 0 }, requires: {},
+    blurb: 'Harbor Bridge drag. Top 2 go through.',
+  },
+  {
+    id: 'main-event:3', name: 'Final · Skyline', district: 'downtown', track: 'skyline', rivals: ['nova'], heatOf: 'main-event', advance: 1,
+    payout: { cash: [900, 300, 0, 0], rep: [120, 30, 0, 0], crates: [4, 1, 0, 0] }, firstClear: { cash: 0, crates: 0 }, requires: {},
+    boss: { rival: 'nova', reward: { cash: 1500, crates: 6, blueprint: 'Main Event Neon', badge: 'Main Event Champion' } },
+    blurb: 'Skyline Run, one on one with Nova Sato.',
+  },
+  {
+    id: 'midnight-run', name: 'Midnight Run', district: 'downtown', track: 'bridge', rivals: ['nova2', 'rhea', 'mina'],
+    payout: { cash: [700, 500, 360, 260], rep: [80, 56, 40, 30], crates: [4, 3, 2, 1] }, firstClear: { cash: 1000, crates: 4 },
+    requires: { car: 'super' }, goals: { par: 11.7 },
+    blurb: 'Bridge drag at 2 a.m. against the fastest cars in the city. Where a Surge-boosted Lumen belongs.',
   },
 ];
 

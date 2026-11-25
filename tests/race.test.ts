@@ -97,7 +97,7 @@ describe('race simulation', () => {
   it('tracks have the expected length and both have nitro windows', () => {
     for (const t of Object.values(TRACKS)) {
       expect(trackLength(t)).toBeGreaterThan(400);
-      expect(t.segments.filter((s) => s.window).length).toBeGreaterThanOrEqual(2);
+      expect(t.segments.filter((s) => s.window).length).toBeGreaterThanOrEqual(t.id === 'bridge' ? 1 : 2); // the bridge drag has one boost window before the trap
     }
     expect(EVENTS.length).toBeGreaterThanOrEqual(5);
   });

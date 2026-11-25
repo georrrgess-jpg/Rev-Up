@@ -24,6 +24,8 @@ export interface EventRecord {
   starts: number;
   bestPlace: number;
   bestTime: number | null;
+  /** Speed trap record (km/h). */
+  bestSpeed?: number;
 }
 
 export interface LastResult {
@@ -46,6 +48,12 @@ export interface LastResult {
   newMedals?: number[];
   nextMedal?: { name: string; target: number; gap: number } | null;
   trophy?: string;
+  /** Event goals newly met this race. */
+  newStars?: string[];
+  /** Speed trap: km/h through the gate. */
+  trapKmh?: number;
+  /** Knockout heat result. */
+  heat?: { name: string; n: number; of: number; advance: number; advanced: boolean; champion: boolean; next?: string };
   signatureFinish?: CarId;
   perfects: number;
   nitroUsed: number;
@@ -62,6 +70,7 @@ export interface LeanOutcome {
   perfects: number;
   nitroUsed: number;
   nitroLeft?: number;
+  trapSpeed?: number;
   standings: { name: string; time: number | null; isPlayer: boolean }[];
   advice: { family: 'engine' | 'tires' | 'turbo'; segment: string; lost: number } | null;
 }
@@ -97,6 +106,10 @@ export interface GameState {
   paints: Partial<Record<CarId, string>>;
   /** Paint shop purchases (item ids; premium paint as `material:<kind>:<car>`) and each car's chosen style. */
   owns: string[];
+  /** Event goals met (Downtown Nights): bit 1 win, 2 under par, 4 a Perfect boost. */
+  stars: Record<string, number>;
+  /** The Main Event in progress: the next heat to race (0-based), or null. */
+  knockout: { heat: number } | null;
   style: Partial<Record<CarId, { wheel?: string; material?: string; restore?: number }>>;
   livePodiums: CarId[];
   /** last two events raced (live or quick), for the Fresh route Rep bonus */
@@ -153,6 +166,8 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     badges: [],
     paints: {},
     owns: [],
+    stars: {},
+    knockout: null,
     style: {},
     livePodiums: [],
     recentEvents: [],

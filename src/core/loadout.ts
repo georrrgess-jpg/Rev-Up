@@ -23,8 +23,8 @@ export const contributionOn = (p: Part, cap: number) => TIER_STAT[Math.min(p.t, 
  * tier, so earlier cars stay competitive after you craft higher tiers. `blocked` lists families whose
  * equipped part is running restricted to the cap (shown in the Garage).
  */
-export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?: number): Loadout {
-  const cap = carById(car).cap;
+export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?: number, partCap?: number): Loadout {
+  const cap = Math.min(carById(car).cap, partCap ?? Infinity);
   const equipped: Loadout['equipped'] = {};
   for (const p of allParts(s)) {
     if (p.id === exclude) continue;

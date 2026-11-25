@@ -14,10 +14,11 @@ describe('Open Road chapter playthrough (simulation)', () => {
   });
   it('reaches the Altamar GT with ordinary luck, without grinding one event', () => {
     for (const r of runs) {
-      expect(r.log.milestones.tourer).toBeGreaterThan(30 * 60);
-      expect(r.log.milestones.tourer).toBeLessThan(75 * 60);
+      expect(r.log.milestones.tourer).toBeGreaterThan(20 * 60);
+      expect(r.log.milestones.tourer).toBeLessThan(45 * 60);
       expect(r.log.maxRepeat).toBeLessThanOrEqual(5);
-      for (const id of ['harbor-launch', 'cliff-esses', 'coast-crown']) expect(r.log.perEvent[id] ?? 0).toBeLessThanOrEqual(22); // series routes double as the late Rep rotation
+      // the Coastal Crown win now brings the Altamar: no Rep grind on the coast after the boss
+      for (const id of ['harbor-launch', 'cliff-esses', 'coast-crown']) expect(r.log.perEvent[id] ?? 0).toBeLessThanOrEqual(4);
     }
   });
 });
