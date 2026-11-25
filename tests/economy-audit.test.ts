@@ -28,7 +28,7 @@ describe('economy audit (simulation)', () => {
       };
       let nextMark = 0;
       const L = runBot({
-        seed, policy, untilCar: 'tourer', maxS: 7200,
+        seed, policy, untilCar: 'super', maxS: 7200,
         onStep: (g, t) => {
           const s = g.state;
           if (prev >= 0) { if (s.cash > prev) earned += s.cash - prev; else spent += prev - s.cash; }
@@ -46,10 +46,11 @@ describe('economy audit (simulation)', () => {
         },
       });
       const gaps = rewards.map((r, i) => r - (rewards[i - 1] ?? 0));
-      lines.push(`\n== seed ${seed} (${policy}) — Altamar at ${L.milestones.tourer ? mmss(L.milestones.tourer) : 'not reached'}, ${L.races} races (${L.quick} quick)`);
+      lines.push(`\n== seed ${seed} (${policy}) — Altamar at ${L.milestones.tourer ? mmss(L.milestones.tourer) : 'not reached'}, Lumen at ${L.milestones.super ? mmss(L.milestones.super) : 'not reached'}, ${L.races} races (${L.quick} quick)`);
       lines.push(...marks);
       lines.push(`rewards: ${rewards.length}; longest gap ${mmss(Math.max(...gaps))}; median gap ${mmss(gaps.sort((a, b) => a - b)[Math.floor(gaps.length / 2)] ?? 0)}`);
       lines.push(`purchases: ${L.log.filter((l) => / upgrade /.test(l)).join(' · ')}`);
+      lines.push(`orders: ${L.log.filter((l) => / order /.test(l)).length} part orders logged`);
       expect(L.races).toBeGreaterThan(10);
     }
     lines.push('\n== payout by placement (cash, live) ==');

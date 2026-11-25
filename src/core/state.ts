@@ -106,6 +106,8 @@ export interface GameState {
   paints: Partial<Record<CarId, string>>;
   /** Paint shop purchases (item ids; premium paint as `material:<kind>:<car>`) and each car's chosen style. */
   owns: string[];
+  /** Tune-up stage per car (0–3). */
+  tune: Partial<Record<CarId, number>>;
   /** Event goals met (Downtown Nights): bit 1 win, 2 under par, 4 a Perfect boost. */
   stars: Record<string, number>;
   /** The Main Event in progress: the next heat to race (0-based), or null. */
@@ -166,6 +168,7 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     badges: [],
     paints: {},
     owns: [],
+    tune: {},
     stars: {},
     knockout: null,
     style: {},

@@ -7,7 +7,7 @@ import * as P from '../core/progression';
 import type { Part } from '../core/state';
 import {
   ACTIVE_FAMILIES, CRATE_SCRAP_COST, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_RACES, nitroCapFor,
-  PART_ORDER_PRICE, TARGETED_CRATE_SCRAP_COST, UPGRADES, carById, eventById,
+  PART_ORDER_PRICE, TARGETED_CRATE_SCRAP_COST, TUNE_STAGES, UPGRADES, tunePrice, carById, eventById,
 } from '../data/tables';
 import { drawCar, fitCanvas } from '../render/car';
 import { familyIcon, partSvg } from '../render/parts';
@@ -839,6 +839,20 @@ export class GarageView implements View {
               build();
             },
           }, short > 0 ? h('span', { class: 'stack' }, `Order T${tier} ${FAMILIES[fam].name} · $${fmt(price)}`, h('small', {}, `$${fmt(short)} more`)) : `Order T${tier} ${FAMILIES[fam].name} · $${fmt(price)}`),
+          h('h3', {}, `Tune-up · ${carById(s.activeCar).model}`),
+          (() => {
+            const stage = s.tune?.[s.activeCar] ?? 0;
+            const price = tunePrice(s.activeCar, stage);
+            return h('div', { class: 'row up-row' },
+              h('div', { class: 'grow' },
+                h('div', { class: 't' }, `Stage ${Math.min(stage + 1, TUNE_STAGES)} of ${TUNE_STAGES}`),
+                h('div', { class: 'd' }, stage < TUNE_STAGES ? h('span', {}, `+${stage * 2}% speed, acceleration and grip`, h('span', { class: 'arrow', 'aria-hidden': 'true' }, ' → '), h('b', {}, `+${(stage + 1) * 2}%`)) : `+${stage * 2}% · fully tuned`)),
+              stage < TUNE_STAGES ? h('button', {
+                class: `btn sm${s.cash < price ? ' off' : ' primary'}`,
+                onclick: () => { if (s.cash >= price) { game.buyTune(s.activeCar); sfx.cash(); this.app.toast(`${carById(s.activeCar).model} tuned to stage ${stage + 1}`); } else this.app.toast(`Need $${fmt(price - s.cash)} more for the tune-up`); build(); },
+              }, s.cash < price ? h('span', { class: 'stack' }, `$${fmt(price)}`, h('small', {}, `$${fmt(price - s.cash)} more`)) : `$${fmt(price)}`) : h('span', { class: 'd done' }, '✓'));
+          })(),
+          h('p', { class: 'd' }, 'For each car. Skill saves you the money: Perfect boosts gain more than a full tune.'),
           h('h3', {}, 'Scrap crates'),
           h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, 'Mystery crate'), h('div', { class: 'd' }, 'One part, any family, tier by your crate level')),
             h('button', { class: `btn sm${s.scrap < CRATE_SCRAP_COST ? ' off' : ''}`, onclick: () => { game.buyCrate('std'); build(); } }, `${CRATE_SCRAP_COST} scrap`)),

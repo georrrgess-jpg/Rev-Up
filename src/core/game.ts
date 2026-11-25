@@ -128,6 +128,10 @@ export class Game {
   applyStyle(itemId: string | null, car: CarId, kind?: 'wheel' | 'material', now = Date.now()) {
     return this.transact((d) => S.applyStyle(d, itemId, car, kind), now);
   }
+  buyTune(car: CarId, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => P.buyTune(d, car), now);
+  }
   buyUpgrade(id: UpgradeId, now = Date.now()) {
     this.input(now);
     return this.transact((d) => P.buyUpgrade(d, id), now);

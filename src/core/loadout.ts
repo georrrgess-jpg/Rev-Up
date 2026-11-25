@@ -1,5 +1,5 @@
 import {
-  ACTIVE_FAMILIES, CarId, Family, QUALITY_BONUS, STAT_SCALE, TIER_STAT, carById,
+  ACTIVE_FAMILIES, CarId, Family, QUALITY_BONUS, STAT_SCALE, TIER_STAT, TUNE_STEP, carById,
 } from '../data/tables';
 import type { GameState, Part } from './state';
 import { allParts } from './board';
@@ -36,7 +36,10 @@ export function computeLoadout(s: GameState, car: CarId = s.activeCar, exclude?:
   }
   const blocked: Loadout['blocked'] = {};
   for (const f of ACTIVE_FAMILIES) if (equipped[f] && equipped[f]!.t > cap) blocked[f] = equipped[f];
-  return { car, equipped, blocked, stats: statsFor(car, equipped, cap) };
+  // a Tune-up multiplies the car's stats; a stock-class race (partCap) runs untuned
+  const st = statsFor(car, equipped, cap);
+  const k = 1 + (partCap ? 0 : (s.tune?.[car] ?? 0)) * TUNE_STEP;
+  return { car, equipped, blocked, stats: { top: st.top * k, accel: st.accel * k, grip: st.grip * k } };
 }
 
 export function statsFor(car: CarId, equipped: Partial<Record<Family, Part>>, cap = carById(car).cap) {

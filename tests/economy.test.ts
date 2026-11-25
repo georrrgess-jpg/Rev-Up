@@ -201,6 +201,21 @@ describe('Downtown Nights rules', () => {
   });
 });
 
+describe('Tune-up', () => {
+  it('adds 2% per stage up to three, priced per car, and never applies in the Stock Cup', async () => {
+    const { computeLoadout } = await import('../src/core/loadout');
+    const s = late();
+    s.board[0] = { id: 900, f: 'engine', t: 6, q: 'std' };
+    const base = computeLoadout(s, 'tourer').stats.top;
+    s.cash = 100000;
+    P.buyTune(s, 'tourer'); P.buyTune(s, 'tourer');
+    expect(computeLoadout(s, 'tourer').stats.top).toBeCloseTo(base * 1.04, 5);
+    P.buyTune(s, 'tourer');
+    expect(P.buyTune(s, 'tourer')[0]).toMatchObject({ type: 'invalid', reason: 'Fully tuned' });
+    expect(computeLoadout(s, 'tourer', undefined, 4).stats.top).toBeLessThan(base);
+  });
+});
+
 describe('existing players', () => {
   it('a large 1.3 balance and owned upgrades load unchanged, with the new fields filled', () => {
     const kv = new MemoryKV();

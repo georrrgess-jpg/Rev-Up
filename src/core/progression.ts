@@ -1,7 +1,7 @@
 import {
   ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
-  PRINTER_INTERVAL_S, RACE_EFFORT, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor } from '../data/tables';
+  PRINTER_INTERVAL_S, RACE_EFFORT, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
 import type { GameEvent } from './events';
 import { computeLoadout } from './loadout';
@@ -151,6 +151,19 @@ export function buyUpgrade(s: GameState, id: UpgradeId): GameEvent[] {
   s.upgrades[id]++;
   if (id === 'grid') expandBoard(s);
   return openCrates(s);
+}
+
+/** Tune-up the active car one stage. */
+export function buyTune(s: GameState, car: CarId): GameEvent[] {
+  const stage = s.tune?.[car] ?? 0;
+  if (!s.owned.includes(car)) return [{ type: 'invalid', reason: 'Not your car' }];
+  if (stage >= TUNE_STAGES) return [{ type: 'invalid', reason: 'Fully tuned' }];
+  const price = tunePrice(car, stage);
+  if (s.cash < price) return [{ type: 'invalid', reason: `Need $${price - s.cash} more` }];
+  s.cash -= price;
+  s.stats.spent = (s.stats.spent ?? 0) + price;
+  (s.tune ??= {})[car] = stage + 1;
+  return [];
 }
 
 /** The Workshop shows each upgrade once it is relevant, so the early catalogue stays short. */

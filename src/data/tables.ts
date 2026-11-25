@@ -125,6 +125,12 @@ export const PERFECT_BONUS_SHARE = 0.1;
 /** Hours of away earnings that can build up, by Lock-up level. */
 export const OFFLINE_HOURS = [8, 12];
 export const nitroCapFor = (tankLevel: number) => NITRO_CAP + tankLevel;
+/** Tune-up: up to three stages per car, each +2% top speed, acceleration and grip. The cash route to a competitive
+ *  car for players who don't land Perfect boosts; skilled players can save the money. Not used in the Stock Cup. */
+export const TUNE_STAGES = 3;
+export const TUNE_STEP = 0.02;
+export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600 };
+export const tunePrice = (car: CarId, stage: number) => Math.round((TUNE_PRICE[car] ?? 1000) * (1 + stage * 0.6)); // stage 0→1, 1→2, 2→3
 
 /** Paint shop: cosmetic only, never performance. Colours and wheel sets are bought once and fit any car;
  *  premium paint is bought per car; the Tapeback restoration is three staged jobs. `opens`: cars owned. */
@@ -578,7 +584,7 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'main-event', name: 'The Main Event', district: 'downtown', track: 'skyline', rivals: ['nova'],
     payout: { cash: [900, 0, 0, 0], rep: [120, 0, 0, 0], crates: [4, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'tuner', stars: 5 }, knockout: { heats: ['main-event:1', 'main-event:2', 'main-event:3'] },
+    requires: { car: 'tuner', stars: 4 }, knockout: { heats: ['main-event:1', 'main-event:2', 'main-event:3'] },
     boss: { rival: 'nova', reward: { cash: 1500, crates: 6, blueprint: 'Main Event Neon', badge: 'Main Event Champion' } },
     blurb: 'Three heats, one night. Top 3 go through the street heat, top 2 through the bridge, then a final against Nova Sato. Change cars between heats.',
   },

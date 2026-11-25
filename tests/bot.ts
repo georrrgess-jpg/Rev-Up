@@ -6,7 +6,7 @@ import { computeLoadout } from '../src/core/loadout';
 import * as P from '../src/core/progression';
 import { NitroPolicy, RaceSim } from '../src/core/race';
 import { MemoryKV } from '../src/core/save';
-import { MAX_TIER, PART_ORDER_PRICE, UPGRADES, carById, eventById, Family } from '../src/data/tables';
+import { MAX_TIER, PART_ORDER_PRICE, TUNE_STAGES, UPGRADES, carById, eventById, Family, tunePrice } from '../src/data/tables';
 import type { SlotRef } from '../src/core/events';
 
 export interface BotLog {
@@ -37,6 +37,8 @@ export interface BotOpts {
   forceStd?: boolean;
   /** Order goal ingredients from the parts counter (default true). */
   buyParts?: boolean;
+  /** Buy Tune-ups when losing (always on for the no-nitro player). */
+  tune?: boolean;
   /** Called before every bot decision (audits: cash timelines, save snapshots). */
   onStep?: (g: Game, t: number) => void;
 }
@@ -158,6 +160,11 @@ export function runBot(o: BotOpts): BotLog {
       if (c !== null && g.state.cash >= c + 40) { g.buyUpgrade(id, now); bought = true; L.log.push(`${t.toFixed(0)}s upgrade ${id}`); spend(COST.buy); break; }
     }
     if (bought) continue;
+    if (o.policy === 'none' || o.tune) {
+      const car = g.state.activeCar;
+      const st = g.state.tune?.[car] ?? 0;
+      if (st < TUNE_STAGES && g.state.cash >= tunePrice(car, st) + 100 && L.lossRaces > 2) { g.buyTune(car, now); spend(COST.buy); continue; }
+    }
     const goal = P.goalStatus(g.state);
     // scrap → targeted crate toward the keystone
     if (goal && !goal.keystoneDone && g.state.scrap >= 15) { g.buyCrate('targeted', goal.family, now); spend(COST.buy); continue; }

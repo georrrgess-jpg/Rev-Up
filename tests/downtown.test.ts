@@ -24,6 +24,12 @@ describe('Downtown Nights playthrough (simulation)', () => {
       console.log(`${r.policy} seed ${r.seed}: Ironhorse ${f('muscle')} Altamar ${f('tourer')} Kestrel ${f('tuner')} T7 Turbo ${f('t7-turbo')} Lumen ${f('super')} | races ${r.log.races}, max repeat ${r.log.maxRepeat} | ${dt} | stars ${JSON.stringify((r.log as unknown as { stars: unknown }).stars)}`);
     }
   });
+  it('a player who never uses nitro still gets there, by spending on Tune-ups', () => {
+    const weak = runBot({ seed: 3, untilCar: 'super', maxS: 2 * 3600, policy: 'none' });
+    console.log(`no-nitro seed 3: Altamar ${(weak.milestones.tourer / 60).toFixed(1)}m Kestrel ${(weak.milestones.tuner / 60).toFixed(1)}m Lumen ${(weak.milestones.super / 60).toFixed(1)}m | races ${weak.races}, max repeat ${weak.maxRepeat}`);
+    expect(weak.milestones.super).toBeLessThan(90 * 60);
+    expect(weak.maxRepeat).toBeLessThanOrEqual(5);
+  });
   it('reaches the Lumen RS with ordinary luck, without grinding one event', () => {
     for (const r of runs) {
       expect(r.log.milestones.super).toBeGreaterThan(25 * 60);
