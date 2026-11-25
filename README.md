@@ -4,7 +4,15 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~37 KB JS + 6 KB CSS gzipped; all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~40 KB JS + 6 KB CSS gzipped; all art is drawn in code (no image downloads except the app icons).
+
+## Showroom update · 1.1
+
+- Four reworked car illustrations with distinct bodywork, wheels, paint, glass, and lighting. Showroom inspection includes headlights and paint selection.
+- A live podium earns each car's own signature finish. Finish choices persist across sessions and appear in races. Live results also surface personal bests.
+- The workbench shows available space and car unlock requirements. Event details expand on demand. The first race includes a starter nitro charge when the player has none banked.
+- Merge All unlocks after five finishes or ten active minutes. Live podium crates help the current craft, Hot hatch and Muscle require less Rep, and earned cars reveal in sequence.
+- The Foundry Invitational opens after earning the Muscle and beating Rusty Ray. Its tight bends reward tires before the two boost straights.
 
 ## Commands
 
@@ -45,11 +53,11 @@ Invalid drops return the part to where it was. The page never scrolls while drag
 - **Equip.** The active car auto-equips the strongest part per family up to its equip cap. Stronger parts above the cap stay on the bench and are flagged. Scrapping an equipped part asks first and names what equips next.
 - **Racing.** Three rivals, a fixed-timestep (60 Hz) simulation on segmented tracks (launch, straights or highway, a bend). Amber **nitro windows** on the two straights are telegraphed on the road, on the progress bar and with an optional beep; a tap inside a window is a **Perfect** (1.5× effect), outside it still boosts. Every finish pays cash, Rep and crates scaled by place, with the real time gap and one next step. Rewards are committed at the finish line, so closing the page cannot lose or double them.
 - **Quick Race.** After a live win, an ordinary event can be raced by your crew in the background: same simulation without nitro, the placement's base payout, finished after the race's real duration while you keep merging. First-win bonuses, precision bonuses and rival rewards need a live race.
-- **Cars.** Junker (start, cap T2) → Beater (45 Rep + crafted T3 Tires, cap T3) → Hot hatch (300 Rep + crafted T4 Turbo, cap T4) → Muscle (1000 Rep + crafted T5 Engine, cap T5). Keystones are recorded in a permanent ledger the moment you craft them (including tiers jumped by a Mint); crate drops never count. The next car sits under a cover above the board with the exact remaining goal.
+- **Cars.** Junker (start, cap T2) → Beater (45 Rep + crafted T3 Tires, cap T3) → Hot hatch (265 Rep + crafted T4 Turbo, cap T4) → Muscle (850 Rep + crafted T5 Engine, cap T5). Keystones are recorded in a permanent ledger the moment you craft them (including tiers jumped by a Mint); crate drops never count. The next car sits under a cover above the board with the exact remaining goal.
 - **Rusty Ray.** The Scrapyard rival (needs the Beater). First win: the Ray's Rust-Red paint blueprint, the "Scrapyard King" badge, $200, 4 crates, and the Suburbs open.
 - **Reveal.** Ownership is saved before the unveil. Drag the cover off (or tap), then a headlight sweep, a camera move and a per-car rev. Skip is always available; an interrupted reveal resumes on next launch.
 - **Catch-up.** After ~150 s of active play (and race finishes) without progress on the current keystone, one free crate of that family arrives (once per car). Idle time and reloads earn nothing toward it.
-- **Merge All** unlocks after 10 active minutes. It resolves every pair deterministically with normal rules in one transaction, counts toward keystones, and banks at most one nitro (if its longest chain is ≥ 3).
+- **Merge All** unlocks after five race finishes or 10 active minutes. It resolves every pair deterministically with normal rules in one transaction, counts toward keystones, and banks at most one nitro (if its longest chain is ≥ 3).
 - **Offline cash.** While away, owned cars earn $1–4/min each, as one claim covering up to 8 hours. The board is left alone.
 
 ## Code map
@@ -79,7 +87,7 @@ All in `src/data/tables.ts`:
 
 | Knob | Current | Effect |
 | --- | --- | --- |
-| `CARS[].unlock.rep` | 45 / 300 / 1000 | Rep per car (main pacing lever) |
+| `CARS[].unlock.rep` | 45 / 265 / 850 | Rep per car (main pacing lever) |
 | `CARS[].unlock.family/tier` | T3 Tires / T4 Turbo / T5 Engine | Keystones |
 | `QUALITY_ODDS`, `QUALITY_BONUS` | 2% / 10%, +15% | Mint / Polished |
 | `COMBO_WINDOW_MS`, `COMBO_NITRO_EVERY`, `NITRO_CAP` | 2000, 3, 3 | Combo → nitro |
@@ -89,7 +97,7 @@ All in `src/data/tables.ts`:
 | `RACE.*`, `STAT_SCALE` | see file | Physics, nitro strength, perfect multiplier, rival variance |
 | `RIVALS[].stats` | per rival | Difficulty |
 | `CATCHUP_EFFORT_THRESHOLD`, `RACE_EFFORT` | 150, 15 | Catch-up crate |
-| `MERGE_ALL_UNLOCK_ACTIVE_S` | 600 | Merge All unlock |
+| `MERGE_ALL_UNLOCK_RACES` / `MERGE_ALL_UNLOCK_ACTIVE_S` | 5 / 600 | Merge All unlock |
 | `OFFLINE_MAX_S`, `CARS[].offlineRate` | 8 h, $1–4/min | Offline claim |
 
 The data model already carries Transmission and Aero, T6–T10, all ten classes and the later districts (disabled). The full campaign's hypercar is gated by Rep, a crafted T10 keystone and a Summit Gala rival win — not by a Mint roll.
@@ -114,13 +122,13 @@ Source lives on the development branch; the compiled site is published to a dedi
 
 1. `npm run publish:pages` — builds with base `/Rev-Up/`, commits `dist/` onto `gh-pages` (keeping its history), and pushes with your own git credentials. (A push made with the default Actions `GITHUB_TOKEN` would not trigger a Pages build.)
 2. One-time repository setting: **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `gh-pages` / `(root)` → Save.**
-3. The site is served at `https://georrrgess-jpg.github.io/Rev-Up/` over HTTPS. The manifest `id`, `start_url` and `scope`, the icons and the service worker are all under `/Rev-Up/`, and navigation uses hash routes (`#garage`, `#race`, `#showroom`), so refreshing any view works on static hosting.
+3. After Pages is configured and deploys successfully, the site is served at `https://georrrgess-jpg.github.io/Rev-Up/` over HTTPS. The manifest `id`, `start_url` and `scope`, the icons and the service worker are all under `/Rev-Up/`, and navigation uses hash routes (`#garage`, `#race`, `#showroom`), so refreshing any view works on static hosting.
 
 ## Verification results
 
-Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; device checks below are emulation.
+Environment: Linux cloud container, Node 24, headless Chromium (Playwright), production build. **No physical phone was available**; device checks below are emulation.
 
-**Automated tests** (`npm test`): 54 passing — fusion and cascade (4-step cascade with stable order and part conservation), Polished +15%, Mint tier skip, cap-bound Mint, keystone ledger (Mint jumps, consumed keystones, crate drops excluded), combo/nitro window and cap, full board + full tray with crates waiting and scrap recovery, unprofitable crate recycling at every crate tier, targeted crates, auto-equip/cap/scrap warning, Merge All determinism and conservation, race determinism, weak vs strong build, perfect vs mistimed vs no nitro, stat roles per segment, real gaps, payouts by placement, Quick Race gating/duration/reload, single-award boss loot, exactly-once commits, save round-trip, corrupted/malformed/newer saves, stale-tab writes, namespacing, abandoned races, reveal ownership across reload, offline cap, repeated reloads, clock rollback.
+**Automated tests** (`npm test`): 57 passing — fusion and cascade (4-step cascade with stable order and part conservation), Polished +15%, Mint tier skip, cap-bound Mint, keystone ledger (Mint jumps, consumed keystones, crate drops excluded), combo/nitro window and cap, full board + full tray with crates waiting and scrap recovery, unprofitable crate recycling at every crate tier, targeted crates, auto-equip/cap/scrap warning, Merge All determinism and conservation, race determinism, weak vs strong build, perfect vs mistimed vs no nitro, stat roles per segment, real gaps, payouts by placement, Quick Race gating/duration/reload, single-award boss loot, exactly-once commits, save round-trip, corrupted/malformed/newer saves, stale-tab writes, namespacing, abandoned races, reveal ownership across reload, offline cap, repeated reloads, clock rollback.
 
 **Clean save → Muscle** (`npm run playthrough`, **simulation**: a scripted player through the real game API with modelled input time — 1.3 s per drag, race time + 7 s of menus per live race — and baseline luck, i.e. every roll Standard, zero Mint/Polished; 5 seeds):
 
@@ -128,10 +136,10 @@ Environment: Linux cloud container, Node 22, headless Chromium (Playwright), pro
 | --- | --- | --- |
 | First merge | ≤ 5 s | 2 s |
 | First race finished | ~30 s | 34–38 s |
-| Beater | ~3 min | 2:21–3:25 |
-| Rusty Ray beaten | — | 2:53–4:57 |
-| Hot hatch | ~12 min | 11:19–13:10 |
-| Muscle | ~25 min | 21:49–24:54 |
+| Beater | ~3 min | 2:21–3:37 |
+| Rusty Ray beaten | — | 2:53–5:25 |
+| Hot hatch | ~12 min | 11:23–12:37 |
+| Muscle | ~25 min | 20:47–22:38 |
 
 **Race checks** (seed 11, Junker with T2 parts, Crusher Run): no nitro 20.02 s (3rd, 0.3 s behind first), mistimed nitro 19.78 s (2nd, 0.1 s behind), perfect nitro 19.24 s (1st, 0.5 s ahead). A T1→T2 build is >0.5 s faster on all 20 tested seeds.
 
@@ -143,15 +151,15 @@ Environment: Linux cloud container, Node 22, headless Chromium (Playwright), pro
 
 | Measure | Result |
 | --- | --- |
-| Usable garage (first load, cold) | ~1.6 s; 127 KB transferred |
+| Usable garage (first load, cold) | ~1.5 s; 137 KB transferred |
 | Dragging on a full board | 60 fps avg, p95 16.7 ms |
-| Race | 46–56 fps avg, p95 33 ms (adaptive effects drop resolution first) |
-| Reveal | 31–42 fps avg, p95 33–50 ms |
+| Race | 60 fps avg, p95 16.8 ms |
+| Reveal | 58 fps avg, p95 16.8 ms |
 
-Headless software rendering is fill-rate bound and slower than a phone GPU, so these are conservative; **physical iPhone and Android profiling is still pending**.
+These are desktop Chromium emulation measurements. Physical iPhone and Android profiling is still pending.
 
 ## Known limitations
 
 - Not yet tested on a physical iPhone or Android device (Home Screen standalone launch, safe areas, pause/resume and save persistence after relaunch should be confirmed on hardware).
 - Quick Race and the Race button always race the active car; switch cars in the Showroom.
-- One model per class and two tracks in this release; Downtown onward, Transmission/Aero and T6–T10 exist in data only.
+- One model per class and three tracks in this release; Downtown onward, Transmission/Aero and T6–T10 exist in data only.

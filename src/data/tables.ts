@@ -49,7 +49,8 @@ export const COMBO_WINDOW_MS = 2000;
 export const COMBO_NITRO_EVERY = 3;
 export const NITRO_CAP = 3; // tunable
 
-export const MERGE_ALL_UNLOCK_ACTIVE_S = 600; // ~10 active minutes
+export const MERGE_ALL_UNLOCK_ACTIVE_S = 600; // fallback if the player hasn't raced yet
+export const MERGE_ALL_UNLOCK_RACES = 5;
 export const MERGE_ALL_NITRO_MIN_CHAIN = 3; // longest chain needed for its single nitro charge
 
 export const BOARD_BASE = { cols: 5, rows: 6 };
@@ -133,13 +134,13 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'hothatch', name: 'Hot hatch', model: 'Vexa GTi', district: 'suburbs', cap: 4,
-    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 300, family: 'turbo', tier: 4 }, enabled: true,
+    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 265, family: 'turbo', tier: 4 }, enabled: true,
     paint: '#e9e4d8', trim: '#d7262e', blurb: 'Short, sharp, and loud. A red pinstripe and a roof spoiler that means it.',
     offlineRate: 3, rev: { base: 80, peak: 260 },
   },
   {
     id: 'muscle', name: 'Muscle', model: 'Ironhorse 455', district: 'suburbs', cap: 5,
-    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1000, family: 'engine', tier: 5 }, enabled: true,
+    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 850, family: 'engine', tier: 5 }, enabled: true,
     paint: '#1f3a5f', trim: '#f2b33d', blurb: 'A restored long-hood coupe with twin stripes and a V8 you can feel in your chest.',
     offlineRate: 4, rev: { base: 45, peak: 160 },
   },
@@ -153,6 +154,20 @@ export const CARS: CarClass[] = [
 ];
 
 export const ENABLED_CARS = CARS.filter((c) => c.enabled);
+export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: string; stripe: string }>> = {
+  junker: { name: 'Petrol Blue', paint: '#237481', stripe: '#e6b366' },
+  beater: { name: 'Creamline', paint: '#d2b58b', stripe: '#394252' },
+  hothatch: { name: 'Apex Violet', paint: '#6247a4', stripe: '#9ee3c9' },
+  muscle: { name: 'Midnight Bronze', paint: '#70442d', stripe: '#f3c975' },
+};
+
+export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
+
+export function finishStripe(car: CarId, paint: string | undefined): string | undefined {
+  const finish = SIGNATURE_FINISHES[car];
+  return finish && finish.paint === paint ? finish.stripe : undefined;
+}
+
 export const carById = (id: CarId): CarClass => {
   const c = CARS.find((x) => x.id === id);
   if (!c) throw new Error(`Unknown car ${id}`);
@@ -171,7 +186,7 @@ export interface Segment {
   window?: [number, number]; // nitro window as fraction of segment
 }
 export interface Track {
-  id: 'scrapyard' | 'maple';
+  id: 'scrapyard' | 'maple' | 'foundry';
   name: string;
   district: DistrictId;
   segments: Segment[];
@@ -195,6 +210,16 @@ export const TRACKS: Record<Track['id'], Track> = {
       { type: 'highway', length: 230, window: [0.15, 0.45] },
       { type: 'hwbend', length: 130, radius: 85 },
       { type: 'highway', length: 260, window: [0.1, 0.4] },
+    ],
+  },
+  foundry: {
+    id: 'foundry', name: 'Foundry Circuit', district: 'suburbs', theme: 'scrap',
+    segments: [
+      { type: 'launch', length: 85 },
+      { type: 'bend', length: 100, radius: 49 },
+      { type: 'straight', length: 210, window: [0.12, 0.43] },
+      { type: 'bend', length: 130, radius: 60 },
+      { type: 'straight', length: 235, window: [0.17, 0.52] },
     ],
   },
 };
@@ -266,6 +291,12 @@ export const EVENTS: RaceEvent[] = [
     id: 'maple-mile', name: 'Maple Mile', district: 'suburbs', track: 'maple', rivals: ['priya', 'hank', 'sol'],
     payout: { cash: [200, 140, 105, 80], rep: [32, 22, 16, 12], crates: [2, 1, 1, 1] }, firstClear: { cash: 180, crates: 3 },
     requires: { beatBoss: 'ray', rep: 330 }, blurb: 'Top-speed country. Engines rule the highway.',
+  },
+  {
+    id: 'foundry-final', name: 'Foundry Invitational', district: 'suburbs', track: 'foundry', rivals: ['hank', 'sol', 'priya'],
+    payout: { cash: [240, 175, 130, 96], rep: [36, 26, 19, 15], crates: [3, 2, 1, 1] },
+    firstClear: { cash: 280, crates: 4 },
+    requires: { beatBoss: 'ray', car: 'muscle' }, blurb: 'Tight bends test your grip. Save nitro for the exits.',
   },
 ];
 

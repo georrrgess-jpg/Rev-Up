@@ -32,20 +32,22 @@ export class RevealOverlay {
     this.canvas = h('canvas', { 'aria-hidden': 'true' });
     this.textEl = h('div', { class: 'rtext' },
       h('div', { class: 'm' }, 'New car unlocked'),
-      h('div', { class: 'instr' }, 'Drag the cover off — or tap'));
+      h('div', { class: 'instr' }, 'Pull the cover or tap to unveil'));
     this.el = h('div', { class: 'reveal', role: 'dialog', 'aria-label': `Reveal the ${c.name}` },
       this.canvas, this.textEl,
       h('div', { class: 'rbtns' }, h('button', { class: 'btn sm', onclick: () => this.skip() }, 'Skip')));
     this.el.addEventListener('pointerdown', (e) => this.down(e));
     this.el.addEventListener('pointermove', (e) => this.move(e));
     this.el.addEventListener('pointerup', (e) => this.up(e));
-    this.el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.advance(); } if (e.key === 'Escape') this.skip(); });
-    this.el.tabIndex = 0;
-    requestAnimationFrame(() => {
-      this.el.focus();
-      this.last = performance.now();
-      this.raf = requestAnimationFrame((t) => this.frame(t));
+    this.el.addEventListener('pointercancel', () => {
+      this.dragX = null;
+      if (this.phase === 'cover') { this.cover = 1; this.requestDraw(); }
     });
+    this.el.addEventListener('keydown', (e) => { if (e.target === this.el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.advance(); } if (e.key === 'Escape') this.skip(); });
+    this.el.tabIndex = 0;
+    window.addEventListener('resize', this.requestDraw);
+    this.requestDraw();
+    requestAnimationFrame(() => this.el.focus());
   }
 
   private down(e: PointerEvent) {
@@ -61,6 +63,7 @@ export class RevealOverlay {
     const dx = this.dragX - e.clientX; // pull toward the rear (left)
     const dist = Math.abs(dx) > 0 ? Math.abs(dx) : 0;
     this.cover = Math.max(0, Math.min(1, this.dragCover - dist / (this.el.clientWidth * 0.6)));
+    this.requestDraw();
   }
   private up(e: PointerEvent) {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -68,7 +71,7 @@ export class RevealOverlay {
       const moved = this.dragX !== null && Math.abs(this.dragX - e.clientX) > 8;
       this.dragX = null;
       if (!moved || this.cover < 0.75) this.go('pull'); // tap-to-reveal, or enough of a pull
-      else this.cover = 1; // spring back
+      else { this.cover = 1; this.requestDraw(); }
     } else if (this.phase !== 'done') this.advance();
   }
 
@@ -80,18 +83,20 @@ export class RevealOverlay {
   private go(p: Phase) {
     this.phase = p;
     this.t = 0;
+    this.last = performance.now();
     const c = carById(this.car);
     if (p === 'pull') { sfx.cloth(); this.textEl.querySelector('.instr')!.textContent = ''; }
     if (p === 'lights') sfx.rev(c.rev.base, c.rev.peak);
     if (p === 'done') {
       this.cover = 0;
       this.textEl.replaceChildren(
-        h('h2', {}, c.name),
-        h('div', { class: 'm' }, `${c.model} · equip cap T${c.cap} · added to your Showroom`),
+        h('h2', {}, c.model),
+        h('div', { class: 'm' }, `${c.name} · Parts up to T${c.cap}`),
         h('div', { class: 'm', style: 'margin-top:6px' }, c.blurb),
         h('button', { class: 'btn primary done', onclick: () => this.finish() }, 'Back to the garage'));
       (this.textEl.querySelector('button') as HTMLButtonElement).focus();
     }
+    this.requestDraw();
   }
 
   private skip() {
@@ -101,14 +106,19 @@ export class RevealOverlay {
 
   private finish() {
     cancelAnimationFrame(this.raf);
+    window.removeEventListener('resize', this.requestDraw);
     this.app.game.finishReveal(this.car);
     this.el.remove();
     this.onDone();
   }
 
+  private requestDraw = () => {
+    if (!this.raf) this.raf = requestAnimationFrame((now) => this.frame(now));
+  };
+
   private frame(now: number) {
-    this.raf = requestAnimationFrame((t) => this.frame(t));
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    this.raf = 0;
+    const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000));
     this.last = now;
     this.t += dt;
     const speed = this.reduced ? 3 : 1;
@@ -118,6 +128,7 @@ export class RevealOverlay {
     } else if (this.phase === 'lights' && this.t > 1.0 / speed) this.go('camera');
     else if (this.phase === 'camera' && this.t > 1.3 / speed) this.go('done');
     this.draw();
+    if (this.phase !== 'cover' && this.phase !== 'done') this.requestDraw();
   }
 
   private draw() {
@@ -134,7 +145,7 @@ export class RevealOverlay {
       zoom = 1.22 - 0.22 * e;
       pan = (1 - e) * w * 0.08;
     } else if (this.phase === 'lights') { zoom = 1.22; pan = w * 0.08; }
-    const cw = Math.min(w * 0.88, hh * 1.5) * zoom;
+    const cw = Math.min(w * .83, hh * 1.5, 790 * dpr) * zoom;
     const x = (w - cw) / 2 - pan;
     const y = hh * 0.64;
     // Room lighting is a CSS gradient (composited by the browser), updated only when it changes.
@@ -146,10 +157,10 @@ export class RevealOverlay {
     ctx.clearRect(0, 0, w, hh);
     const headlights = this.phase === 'lights' ? Math.min(1, this.t * 2) * (0.6 + 0.4 * Math.sin(this.t * 14)) : this.phase === 'camera' || this.phase === 'done' ? 0.8 : 0;
     // The car body is cached once per size; cover and beams are drawn live on top.
-    const baseW = Math.round(Math.min(w * 0.88, hh * 1.5) * 1.22);
+    const baseW = Math.round(Math.min(w * .83, hh * 1.5, 790 * dpr) * 1.22);
     if (this.cacheW !== baseW) {
       this.cacheW = baseW;
-      this.carCache.width = Math.round(baseW * 1.1);
+      this.carCache.width = Math.round(baseW * 1.19);
       this.carCache.height = Math.round(baseW * 0.56);
       const cc = this.carCache.getContext('2d')!;
       drawCar(cc, this.car, baseW * 0.05, baseW * 0.52, baseW, { paint: c.paint, trim: c.trim });

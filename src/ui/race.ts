@@ -4,7 +4,7 @@ import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
 import { RaceSetup, RaceSim } from '../core/race';
 import type { LastResult } from '../core/state';
-import { EVENTS, NITRO_CAP, RACE, RIVALS, TRACKS, carById, eventById, trackLength } from '../data/tables';
+import { DISTRICTS, EVENTS, NITRO_CAP, RACE, RIVALS, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
 import { drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h, ordinal } from './dom';
@@ -42,19 +42,23 @@ export class RaceView implements View {
     const s = this.app.game.state;
     const cls = carById(s.activeCar);
     const lo = computeLoadout(s);
-    this.head.innerHTML = `<b>${cls.name}</b> · cap T${cls.cap}<br>Top <b>${kmh(lo.stats.top)}</b> km/h · Accel <b>${lo.stats.accel.toFixed(1)}</b> · Grip <b>${lo.stats.grip.toFixed(2)}</b><br>Nitro <b>${s.nitro}/${NITRO_CAP}</b>`;
+    this.head.replaceChildren(h('strong', {}, cls.model), h('div', {}, `${kmh(lo.stats.top)} km/h · Nitro ${s.nitro}/${NITRO_CAP}`));
     const { w, h: hh } = fitCanvas(this.headCanvas);
     const ctx = this.headCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, hh);
-    drawCar(ctx, s.activeCar, w * 0.04, hh * 0.9, w * 0.92, { paint: s.paints[s.activeCar] ?? cls.paint, trim: cls.trim });
+    const paint = s.paints[s.activeCar];
+    const length = Math.min(w * .83, hh * 1.85);
+    drawCar(ctx, s.activeCar, (w - length * 1.06) / 2, hh * .91, length,
+      { paint: paint ?? cls.paint, trim: cls.trim, livery: finishStripe(s.activeCar, paint) });
 
     const rec = P.recommendedEvent(s);
     const out: HTMLElement[] = [];
+    const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details[open]')).map((detail) => detail.dataset.event));
     let district = '';
     for (const e of EVENTS) {
       if (e.district !== district) {
         district = e.district;
-        out.push(h('div', { class: 'district' }, district === 'scrapyard' ? 'Scrapyard · Scrapyard Strip' : 'Suburbs · Maple Highway'));
+        out.push(h('div', { class: 'district' }, DISTRICTS[e.district].name));
       }
       const u = P.eventUnlocked(s, e);
       const rec2 = s.events[e.id];
@@ -75,16 +79,22 @@ export class RaceView implements View {
         : null;
       out.push(h('div', { class: `evt${e.id === rec.id && u.ok ? ' rec' : ''}${u.ok ? '' : ' locked'}` },
         h('div', { class: 'top' }, h('span', { class: 'name' }, e.name), ...tags),
-        h('div', { class: 'meta' }, `${TRACKS[e.track].name} · ${e.blurb}${rec2 ? ` · Best ${ordinal(rec2.bestPlace)}${rec2.bestTime ? ` (${rec2.bestTime.toFixed(1)} s)` : ''}` : ''}`),
-        h('div', { class: 'rivals' }, ...rivals.map((r) => h('div', {}, h('b', {}, r.name), ` — ${r.line}`))),
-        h('div', { class: 'pay' }, `Pays every finish: 1st $${pay.cash[0]} · ${pay.rep[0]} Rep${pay.crates[0] ? ` · ${pay.crates[0]} crate${pay.crates[0] > 1 ? 's' : ''}` : ''}  …  4th $${pay.cash[3]} · ${pay.rep[3]} Rep`),
-        bonus ? h('div', { class: 'pay', style: 'color:var(--amber2)' }, bonus) : null,
+        h('div', { class: 'meta' }, TRACKS[e.track].name, rec2 ? ` · Best ${ordinal(rec2.bestPlace)}${rec2.bestTime !== null ? ` · ${rec2.bestTime.toFixed(2)} s` : ''}` : ''),
+        u.ok ? h('div', { class: 'event-rewards' }, h('span', {}, `Win $${pay.cash[0]}`), h('span', {}, `${pay.rep[0]} Rep`),
+          pay.crates[0] ? h('span', {}, `${pay.crates[0]} ${pay.crates[0] > 1 ? 'crates' : 'crate'}`) : null,
+          e.id === 'foundry-final' && !cleared ? h('span', {}, 'Finale') : null) : null,
         u.ok
           ? h('div', { class: 'btns' },
-            h('button', { class: `btn primary${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, h('span', { class: 'stack' }, 'Race', h('small', {}, s.nitro ? `with ${s.nitro} nitro` : 'no nitro banked'))),
+            h('button', { class: `btn primary${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, h('span', { class: 'stack' }, 'Race', h('small', {}, s.nitro ? `with ${s.nitro} nitro` : s.stats.races === 0 ? 'Starter nitro included' : 'No nitro banked'))),
             canQuick ? h('button', { class: `btn${q ? ' off' : ''}`, onclick: () => this.startQuick(e.id) },
               h('span', { class: 'stack' }, quickHere ? 'Crew racing' : 'Quick Race', h('small', {}, quickHere ? `${Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000))} s left` : 'base payout · keep merging'))) : null)
-          : h('div', { class: 'pay' }, `🔒 ${u.why}`),
+          : h('div', { class: 'lock-reason' }, u.why),
+        u.ok ? h('details', { class: 'event-detail', 'data-event': e.id, ...(expanded.has(e.id) ? { open: '' } : {}) },
+          h('summary', {}, 'Event details'),
+          h('p', {}, e.blurb),
+          h('div', { class: 'rivals' }, ...rivals.map((r) => h('div', {}, h('b', {}, r.name), ` · ${r.line}`))),
+          h('p', {}, `All places pay. 4th earns $${pay.cash[3]} and ${pay.rep[3]} Rep.`),
+          bonus ? h('p', { class: 'event-bonus' }, bonus) : null) : null,
         quickHere ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null,
       ));
     }
@@ -148,7 +158,7 @@ class RaceScreen {
   private pauseEl: HTMLElement | null = null;
   private finished = false;
   private particles: Particle[] = [];
-  private hum = new EngineHum();
+  private hum: EngineHum;
   private lastHud = 0;
   private cueDone = new Set<number>();
   private calloutTimer = 0;
@@ -160,6 +170,8 @@ class RaceScreen {
 
   constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
     this.sim = new RaceSim(setup);
+    const rev = carById(setup.player.car).rev;
+    this.hum = new EngineHum(rev.base, rev.peak);
     this.reduced = app.game.state.settings.reducedMotion;
     this.countdown = this.reduced ? 1.2 : 2.4;
     this.eventName = eventById(setup.eventId).name;
@@ -353,6 +365,8 @@ class RaceScreen {
     if (r.perfects) pills.push(h('span', { class: 'chip nitro' }, `Perfect ×${r.perfects}${r.precision ? ` (+$${r.precision})` : ''}`));
     if (r.firstClear) pills.push(h('span', { class: 'chip', style: 'color:var(--gold)' }, 'First win bonus'));
     const g = P.goalStatus(s);
+    const finish = r.signatureFinish ? SIGNATURE_FINISHES[r.signatureFinish] : undefined;
+    if (r.personalBest) pills.push(h('span', { class: 'chip best' }, 'Personal best'));
     const nextLabel = s.pendingReveal ? 'Car unlocked' : 'Next step';
     const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).name} is ready to reveal.` : r.advice;
     const card = h('div', { class: 'card', role: 'dialog', 'aria-label': 'Race result' },
@@ -360,13 +374,17 @@ class RaceScreen {
       h('div', { class: 'gap' }, `${ev.name} · ${r.gapText}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`),
       r.boss ? h('div', { class: 'boss' }, h('b', {}, 'Rusty Ray is beaten.'), ` The Suburbs are open. Ray hands over his signature blueprint: ${ev.boss!.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss!.reward.badge}” badge.`) : null,
       h('div', { class: 'pays' }, ...pills),
+      finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
+      ev.id === 'foundry-final' && r.firstClear ? h('div', { class: 'finish-earned' }, 'Campaign finale won') : null,
       h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),
       h('button', { class: 'next', onclick: () => { this.close(); if (!s.pendingReveal) this.app.go('garage'); } }, h('small', {}, nextLabel), nextText,
         g && !s.pendingReveal ? h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(g.progress * 100)}%` })) : null),
       r.firstClear ? h('p', { class: 'pay', style: 'margin:-4px 0 10px' }, 'Quick Race is now available for this event.') : null,
       h('div', { class: 'btns' },
-        h('button', { class: 'btn', onclick: () => { this.close(); this.app.go('garage'); } }, 'Garage'),
-        h('button', { class: 'btn primary', onclick: () => this.retry(r.eventId) }, 'Race again')),
+        s.pendingReveal
+          ? h('button', { class: 'btn primary', onclick: () => this.close() }, 'Reveal car')
+          : h('button', { class: 'btn primary', onclick: () => { this.close(); this.app.go('garage'); } }, 'Back to Garage'),
+        !s.pendingReveal ? h('button', { class: 'btn', onclick: () => this.retry(r.eventId) }, 'Race again') : null),
     );
     const wrap = h('div', { class: 'result' }, card);
     this.el.append(wrap);
@@ -391,7 +409,14 @@ class RaceScreen {
     const L = sim.length;
     sim.racers.forEach((r, i) => { this.dots[i].style.left = `${Math.min(100, (r.x / L) * 100)}%`; });
     const c = sim.charges;
-    this.nitroBtn.innerHTML = `<span class="n num">${c}</span>NITRO`;
+    const active = sim.windowState().active;
+    const ready = !this.finished && c > 0 && sim.player.nitroLeft <= 0 && active && !sim.usedWindows.has(active.segIndex);
+    const nitroLabel = ready ? 'Tap now' : sim.player.nitroLeft > 0 ? 'Boosting' : 'Nitro';
+    const labelKey = `${c}:${nitroLabel}`;
+    if (this.nitroBtn.dataset.label !== labelKey) {
+      this.nitroBtn.dataset.label = labelKey;
+      this.nitroBtn.replaceChildren(h('span', { class: 'n num' }, c), nitroLabel);
+    }
     this.nitroBtn.classList.toggle('empty', c === 0);
     this.nitroBtn.setAttribute('aria-label', `Nitro, ${c} left`);
     this.hintEl.textContent = this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : 'Tap nitro in the amber windows for a Perfect boost.';
@@ -426,7 +451,8 @@ class RaceScreen {
 
     // sky
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    if (theme === 'scrap') { sky.addColorStop(0, '#2b1d2e'); sky.addColorStop(0.6, '#7a3f2a'); sky.addColorStop(1, '#d9813f'); }
+    if (sim.track.id === 'foundry') { sky.addColorStop(0, '#10182c'); sky.addColorStop(.65, '#47324b'); sky.addColorStop(1, '#b3614c'); }
+    else if (theme === 'scrap') { sky.addColorStop(0, '#2b1d2e'); sky.addColorStop(0.6, '#7a3f2a'); sky.addColorStop(1, '#d9813f'); }
     else { sky.addColorStop(0, '#16233d'); sky.addColorStop(0.6, '#3d5a7a'); sky.addColorStop(1, '#e0a165'); }
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, horizon + 2);
@@ -578,6 +604,7 @@ class RaceScreen {
       const livery = r.isPlayer ? this.app.game.state.paints[r.car] : null;
       drawCar(ctx, r.car, sx, gy, len, {
         paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, wheelAngle: r.x / 0.33,
+        livery: finishStripe(r.car, livery ?? undefined), detail: false,
         nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: theme === 'scrap' ? 0.25 : 0.55,
       });
       if (r.isPlayer) {

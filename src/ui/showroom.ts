@@ -1,161 +1,186 @@
 import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
-import { CarId, ENABLED_CARS, FAMILIES, carById } from '../data/tables';
-import { carBodyPath, drawCar, fitCanvas } from '../render/car';
+import { CarId, DISTRICTS, ENABLED_CARS, RAY_FINISH, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
+import { drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h } from './dom';
 
-const RUST_RED = '#a8432a';
+function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined, lit = 0, covered = false, locked = false) {
+  const { w, h: height } = fitCanvas(canvas, 1.5);
+  if (w < 2 || height < 2) return;
+  const ctx = canvas.getContext('2d')!;
+  const car = carById(id);
+  const wall = ctx.createLinearGradient(0, 0, 0, height);
+  wall.addColorStop(0, '#10161e');
+  wall.addColorStop(.63, '#243442');
+  wall.addColorStop(.64, '#19212b');
+  wall.addColorStop(1, '#0c111a');
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, w, height);
+  const light = ctx.createRadialGradient(w * .56, height * .38, 0, w * .56, height * .38, w * .58);
+  light.addColorStop(0, lit ? '#d8b58972' : '#b2d3e046');
+  light.addColorStop(1, '#212e4000');
+  ctx.fillStyle = light;
+  ctx.fillRect(0, 0, w, height);
+  ctx.strokeStyle = '#d2e3eb24';
+  ctx.lineWidth = 1;
+  for (const x of [.12, .34, .66, .88]) {
+    ctx.beginPath();
+    ctx.moveTo(w * x, 0);
+    ctx.lineTo(w * x, height * .64);
+    ctx.lineTo(w * (.5 + (x - .5) * 1.9), height);
+    ctx.stroke();
+  }
+  const length = Math.min(w * .78, height * 1.5, 680);
+  drawCar(ctx, id, (w - length * 1.06) / 2, height * (height > w * .8 ? .73 : .82), length, {
+    paint: paint ?? car.paint,
+    trim: car.trim,
+    livery: finishStripe(id, paint),
+    headlights: lit,
+    cover: covered ? 1 : 0,
+    silhouette: locked,
+  });
+}
 
 export class ShowroomView implements View {
   el: HTMLElement;
   private grid: HTMLElement;
+  private count: HTMLElement;
   private visible = false;
-  private inspectEl: HTMLElement | null = null;
-  private raf = 0;
+  private closeDialog: (() => void) | null = null;
+  private redrawInspect: (() => void) | null = null;
+  private redrawCards: (() => void)[] = [];
 
   constructor(private app: App) {
     this.grid = h('div', { class: 'showgrid' });
+    this.count = h('span', { class: 'collection-count num' });
     this.el = h('section', { class: 'view', 'aria-label': 'Showroom' },
-      h('div', { class: 'showtitle' }, h('h1', {}, 'Showroom'), h('span', { class: 'chip', id: 'showcount' }, '')),
+      h('div', { class: 'showtitle' }, h('h1', {}, 'Showroom'), this.count),
       h('div', { class: 'scroll', style: 'flex:1;min-height:0' }, this.grid));
+    window.addEventListener('resize', () => {
+      if (!this.visible) return;
+      for (const draw of this.redrawCards) draw();
+      this.redrawInspect?.();
+    });
   }
 
   show() { this.visible = true; this.render(); }
-  hide() { this.visible = false; this.closeInspect(); }
+  hide() { this.visible = false; this.closeDialog?.(); }
   onEvents(ev: GameEvent[]) { if (this.visible && ev.some((e) => e.type === 'unlock')) this.render(); }
 
   render() {
-    const s = this.app.game.state;
-    const owned = ENABLED_CARS.filter((c) => s.owned.includes(c.id)).length;
-    (this.el.querySelector('#showcount') as HTMLElement).textContent = `${owned}/${ENABLED_CARS.length} cars`;
-    const next = P.nextCar(s);
-    const cards = ENABLED_CARS.map((c) => {
-      const has = s.owned.includes(c.id);
+    const state = this.app.game.state;
+    const next = P.goalStatus(state);
+    this.count.textContent = `${state.owned.length} of ${ENABLED_CARS.length} collected`;
+    this.redrawCards = [];
+    const cards = ENABLED_CARS.map((car) => {
+      const owned = state.owned.includes(car.id);
+      const pending = state.pendingReveal === car.id;
+      const isNext = next?.car.id === car.id;
+      const active = state.activeCar === car.id;
       const canvas = h('canvas', { 'aria-hidden': 'true' });
-      const isNext = next?.id === c.id;
+      const label = pending ? 'Ready to reveal' : active ? 'Current car' : owned ? 'Inspect' : isNext ? 'Next unlock' : 'Locked';
       const card = h('button', {
-        class: `carcard${has ? '' : ' locked'}${s.activeCar === c.id ? ' active' : ''}`,
-        'aria-label': has ? `${c.name}, ${c.model}. Inspect` : `Locked: ${c.name}`,
+        class: `carcard${owned ? '' : ' locked'}${active ? ' active' : ''}`,
+        'aria-label': `${car.model}, ${label}`,
+        'data-car': car.id,
         onclick: () => {
-          if (s.pendingReveal === c.id) this.app.openReveal(c.id);
-          else if (has) this.inspect(c.id);
-          else this.app.toast(isNext ? P.goalStatus(s)!.line : `Unlock the cars before the ${c.name} first`);
+          if (pending) this.app.openReveal(car.id);
+          else if (owned) this.inspect(car.id);
+          else if (isNext) this.app.toast(next.line, { label: 'Garage', run: () => this.app.go('garage') });
+          else this.app.toast(`Collect the previous cars to reach the ${car.model}`);
         },
-      },
-      canvas,
-      h('div', { class: 'cn' }, has ? c.name : isNext ? `${c.name} (next)` : '???'),
-      h('div', { class: 'cm' }, has ? `${c.model} · cap T${c.cap}` : c.unlock ? `${c.unlock.rep} Rep + crafted T${c.unlock.tier} ${FAMILIES[c.unlock.family].name}` : ''),
-      s.activeCar === c.id ? h('span', { class: 'chip act' }, 'Racing') : null,
-      s.pendingReveal === c.id ? h('span', { class: 'chip act', style: 'color:var(--amber2)' }, 'Reveal!') : null);
-      requestAnimationFrame(() => {
-        const { w, h: hh } = fitCanvas(canvas);
-        const ctx = canvas.getContext('2d')!;
-        ctx.clearRect(0, 0, w, hh);
-        // bolder lighting as cars improve
-        const tier = ENABLED_CARS.indexOf(c);
-        if (has) {
-          const g = ctx.createRadialGradient(w / 2, hh * 0.2, 4, w / 2, hh * 0.6, w * 0.6);
-          g.addColorStop(0, `rgba(255,${200 - tier * 10},${140 - tier * 20},${0.25 + tier * 0.08})`);
-          g.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = g;
-          ctx.fillRect(0, 0, w, hh);
-        }
-        const cw = Math.min(w * 0.9, hh * 2.1);
-        drawCar(ctx, c.id, (w - cw) / 2, hh * 0.92, cw, {
-          paint: s.paints[c.id] ?? c.paint, trim: c.trim,
-          silhouette: !has && !isNext, cover: (!has && isNext) || s.pendingReveal === c.id ? 1 : 0,
-        });
-      });
+      }, canvas,
+      h('div', { class: 'carcard-info' },
+        h('div', { class: 'cn' }, car.model),
+        h('div', { class: 'cm' }, `${car.name} · Parts up to T${car.cap}`),
+        h('div', { class: 'car-status' }, label)));
+      this.redrawCards.push(() => studio(canvas, car.id, state.paints[car.id], 0, pending || isNext, !owned && !isNext));
       return card;
     });
     this.grid.replaceChildren(...cards);
+    requestAnimationFrame(() => this.redrawCards.forEach((draw) => draw()));
   }
 
-  inspect(id: CarId) {
-    const s = this.app.game.state;
-    const c = carById(id);
+  private inspect(id: CarId) {
+    this.closeDialog?.();
+    const state = this.app.game.state;
+    const car = carById(id);
+    const loadout = computeLoadout(state, id).stats;
+    const sig = SIGNATURE_FINISHES[id];
     const canvas = h('canvas', { 'aria-hidden': 'true' });
-    const lo = computeLoadout(s, id);
-    const hasRust = s.blueprints.length > 0;
-    const paintBtn = hasRust
-      ? h('button', { class: 'btn sm', onclick: () => {
-        const cur = this.app.game.state.paints[id];
-        const btn = paintBtn!;
-        this.app.game.setPaint(id, cur ? null : RUST_RED);
-        btn.textContent = this.app.game.state.paints[id] ? 'Factory paint' : 'Apply Ray’s Rust-Red';
-      } }, s.paints[id] ? 'Factory paint' : 'Apply Ray’s Rust-Red')
-      : null;
-    this.inspectEl = h('div', { class: 'inspect', role: 'dialog', 'aria-label': `${c.name} inspect view` },
-      h('button', { class: 'btn sm topx', onclick: () => this.closeInspect() }, 'Close'),
-      canvas,
-      h('div', { class: 'info' },
-        h('h2', {}, c.name),
-        h('div', { class: 'm' }, `${c.model} · ${c.district === 'scrapyard' ? 'Scrapyard' : 'Suburbs'} · equip cap T${c.cap}`),
-        s.badges.length && id === 'beater' ? h('div', { class: 'badges' }, ...s.badges.map((b) => h('span', { class: 'badge-pill' }, `🏅 ${b}`))) : null,
-        h('p', {}, c.blurb),
-        h('div', { class: 'statrow' },
-          h('span', { class: 'chip' }, `Top ${Math.round(lo.stats.top * 3.6)} km/h`),
-          h('span', { class: 'chip' }, `Accel ${lo.stats.accel.toFixed(1)}`),
-          h('span', { class: 'chip' }, `Grip ${lo.stats.grip.toFixed(2)}`)),
-        h('div', { class: 'fams' },
-          paintBtn,
-          s.activeCar === id
-            ? h('button', { class: 'btn primary', onclick: () => { this.closeInspect(); this.app.go('race'); } }, 'Race it')
-            : h('button', { class: 'btn primary', onclick: () => { this.app.game.setActiveCar(id); this.closeInspect(); this.app.toast(`Racing the ${c.name} (parts up to T${c.cap} equip)`); this.app.go('race'); } }, `Race the ${c.name}`)),
-      ));
-    this.app.root.append(this.inspectEl);
-    const t0 = performance.now();
-    const reduced = s.settings.reducedMotion;
-    let lastDraw = 0;
-    const draw = (t: number) => {
-      if (!reduced) this.raf = requestAnimationFrame(draw);
-      if (t - lastDraw < 30) return; // a slow light sweep does not need more than ~30 fps
-      lastDraw = t;
-      const { w, h: hh, dpr } = fitCanvas(canvas, 1.5);
-      const ctx = canvas.getContext('2d')!;
-      const tier = ENABLED_CARS.findIndex((x) => x.id === id);
-      const bg = ctx.createRadialGradient(w / 2, hh * 0.25, 10, w / 2, hh * 0.6, Math.max(w, hh) * 0.8);
-      bg.addColorStop(0, ['#4a3a2a', '#5a3a2a', '#3a4a5a', '#2a3550'][tier] ?? '#333');
-      bg.addColorStop(1, '#0b0907');
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, hh);
-      // floor
-      ctx.fillStyle = '#16110d';
-      ctx.fillRect(0, hh * 0.72, w, hh);
-      const el = (t - t0) / 1000;
-      const sweep = reduced ? 0.5 : (Math.sin(el * 0.8) + 1) / 2;
-      const cw = Math.min(w * 0.86, hh * 1.6);
-      const x = (w - cw) / 2;
-      const y = hh * 0.72;
-      // spotlight
-      const sp = ctx.createRadialGradient(w / 2, y, 10, w / 2, y, cw * 0.7);
-      sp.addColorStop(0, `rgba(255,220,170,${0.18 + tier * 0.05})`);
-      sp.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = sp;
-      ctx.fillRect(0, 0, w, hh);
-      drawCar(ctx, id, x, y, cw, { paint: s.paints[id] ?? c.paint, trim: c.trim, headlights: 0.6, wheelAngle: 0 });
-      // light sweep across the body
-      const lx = x + cw * (sweep * 1.4 - 0.2);
-      const lg = ctx.createLinearGradient(lx - 40 * dpr, 0, lx + 40 * dpr, 0);
-      lg.addColorStop(0, 'rgba(255,255,255,0)');
-      lg.addColorStop(0.5, 'rgba(255,255,255,0.18)');
-      lg.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.save();
-      carBodyPath(ctx, id, x, y, cw);
-      ctx.clip();
-      ctx.fillStyle = lg;
-      ctx.fillRect(x, y - cw * 0.46, cw, cw * 0.4);
-      ctx.restore();
+    const finishButtons = h('div', { class: 'finish-options' });
+    const finishName = h('div', { class: 'finish-title' });
+    let lit = false;
+    const draw = () => studio(canvas, id, this.app.game.state.paints[id], lit ? 1 : 0);
+    const lights = h('button', { class: 'btn sm', 'aria-pressed': 'false', onclick: () => {
+      lit = !lit;
+      lights.setAttribute('aria-pressed', String(lit));
+      draw();
+    } }, 'Lights');
+    const options = [
+      { name: 'Factory', paint: car.paint, value: null },
+      ...(state.blueprints.includes(RAY_FINISH.name) ? [{ ...RAY_FINISH, value: RAY_FINISH.paint }] : []),
+      ...(sig && state.livePodiums.includes(id) ? [{ ...sig, value: sig.paint }] : []),
+    ];
+    const applyFinish = (value: string | null) => {
+      this.app.game.setPaint(id, value);
+      updateFinish();
+      draw();
     };
-    requestAnimationFrame(draw);
-  }
+    for (const item of options) {
+      finishButtons.append(h('button', {
+        class: 'btn finish-choice', 'data-finish': item.value ?? '', onclick: () => applyFinish(item.value),
+      }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), item.name));
+    }
+    const updateFinish = () => {
+      const paint = this.app.game.state.paints[id] ?? '';
+      const name = options.find((option) => (option.value ?? '') === paint)?.name ?? 'Custom';
+      finishName.textContent = `Finish · ${name}`;
+      for (const button of finishButtons.querySelectorAll('button')) {
+        button.setAttribute('aria-pressed', String(button.dataset.finish === paint));
+      }
+    };
+    const closeBtn = h('button', { class: 'btn sm topx', onclick: () => close() }, 'Close');
+    const active = state.activeCar === id;
+    const dialog = h('div', {
+      class: 'inspect', role: 'dialog', 'aria-modal': 'true', 'aria-label': car.model,
+      onkeydown: (event) => { if ((event as KeyboardEvent).key === 'Escape') close(); },
+    }, closeBtn,
+    h('div', { class: 'inspect-stage' }, canvas, lights),
+    h('div', { class: 'info scroll' },
+      h('h2', {}, car.model),
+      h('div', { class: 'm' }, `${car.name} · ${DISTRICTS[car.district].name} · Parts up to T${car.cap}`),
+      h('p', {}, car.blurb),
+      h('div', { class: 'statrow' },
+        h('span', { class: 'chip' }, `${Math.round(loadout.top * 3.6)} km/h`),
+        h('span', { class: 'chip' }, `Accel ${loadout.accel.toFixed(1)}`),
+        h('span', { class: 'chip' }, `Grip ${loadout.grip.toFixed(2)}`)),
+      state.badges.length && id === 'beater' ? h('div', { class: 'badges' }, ...state.badges.map((badge) => h('span', { class: 'badge-pill' }, badge))) : null,
+      finishName, finishButtons,
+      sig && !state.livePodiums.includes(id) ? h('p', { class: 'finish-goal' }, `Place in the top 3 in a live race with this car to earn ${sig.name}.`) : null,
+      h('button', { class: 'btn primary wide inspect-race', onclick: () => {
+        this.app.game.setActiveCar(id);
+        close();
+        this.app.go('race');
+      } }, active ? 'Browse races' : 'Race this car'),
+    ));
+    const close = () => {
+      dialog.remove();
+      this.closeDialog = null;
+      this.redrawInspect = null;
+      if (this.visible) {
+        this.render();
+        this.grid.querySelector<HTMLButtonElement>(`[data-car="${id}"]`)?.focus();
+      }
+    };
 
-  closeInspect() {
-    cancelAnimationFrame(this.raf);
-    this.inspectEl?.remove();
-    this.inspectEl = null;
-    if (this.visible) this.render();
+    this.closeDialog = close;
+    this.redrawInspect = draw;
+    this.app.root.append(dialog);
+    updateFinish();
+    draw();
+    closeBtn.focus();
   }
 }

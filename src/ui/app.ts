@@ -46,11 +46,11 @@ export class App {
     };
     const top = h('header', { class: 'topbar' },
       chip('cash', 'cash', '$', 'Cash'),
-      chip('rep', 'rep', '★', 'Reputation'),
-      chip('scrap', 'scrap', '⚙', 'Scrap'),
-      chip('nitro', 'nitro', '🔥', 'Nitro charges'),
+      chip('rep', 'rep', 'Rep', 'Reputation'),
+      chip('scrap', 'scrap', 'Scrap', 'Scrap'),
+      chip('nitro', 'nitro', 'Nitro', 'Nitro charges'),
       h('span', { class: 'spacer' }),
-      h('button', { class: 'iconbtn', 'aria-label': 'Settings', onclick: () => openSettings(this) }, '☰'),
+      h('button', { class: 'iconbtn', 'aria-label': 'Settings', onclick: () => openSettings(this) }, '⚙'),
     );
 
     const views = h('main', { class: 'views' });
@@ -63,7 +63,7 @@ export class App {
 
     const navBtn = (r: Route, icon: string, label: string) =>
       h('button', { 'aria-label': label, onclick: () => this.go(r) }, h('span', { class: 'ni', 'aria-hidden': 'true' }, icon), label);
-    this.navBtns = { garage: navBtn('garage', '🔧', 'Garage'), race: navBtn('race', '🏁', 'Race'), showroom: navBtn('showroom', '🏆', 'Showroom') };
+    this.navBtns = { garage: navBtn('garage', '▦', 'Garage'), race: navBtn('race', '⚑', 'Race'), showroom: navBtn('showroom', '◇', 'Showroom') };
     const nav = h('nav', { class: 'nav' }, this.navBtns.garage, this.navBtns.race, this.navBtns.showroom);
 
     this.root.append(top, views, nav);
@@ -148,13 +148,14 @@ export class App {
   }
 
   openReveal(car: NonNullable<Game['state']['pendingReveal']>) {
-    if (this.reveal) return;
+    if (this.reveal || this.busy || this.game.state.pendingReveal !== car) return;
     this.busy = true;
     this.reveal = new RevealOverlay(this, car, () => {
       this.reveal = null;
       this.busy = false;
       this.views[this.route].show();
-      this.maybeShowUpdate();
+      if (this.game.state.pendingReveal) this.promptReveal();
+      else this.maybeShowUpdate();
     });
     this.root.append(this.reveal.el);
   }
@@ -171,7 +172,12 @@ export class App {
 
   sheet(build: (close: () => void) => HTMLElement): () => void {
     const back = h('div', { class: 'sheet-back' });
-    const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+    const opener = document.activeElement;
+    const close = () => {
+      back.remove();
+      document.removeEventListener('keydown', onKey);
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
     back.addEventListener('click', (e) => { if (e.target === back) close(); });

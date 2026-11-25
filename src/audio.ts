@@ -126,10 +126,14 @@ export class EngineHum {
   private o: OscillatorNode | null = null;
   private g: GainNode | null = null;
   private f: BiquadFilterNode | null = null;
+
+  constructor(private idle = 50, private redline = 190) {}
+
   start() {
     if (!ctx || !master || muted || this.o) return;
     this.o = ctx.createOscillator();
     this.o.type = 'sawtooth';
+    this.o.frequency.value = this.idle;
     this.f = ctx.createBiquadFilter();
     this.f.type = 'lowpass';
     this.f.frequency.value = 600;
@@ -141,8 +145,8 @@ export class EngineHum {
   set(speedFrac: number, boost: boolean) {
     if (!this.o || !ctx) return;
     const now = ctx.currentTime;
-    this.o.frequency.setTargetAtTime(50 + speedFrac * 140 + (boost ? 40 : 0), now, 0.05);
-    this.f!.frequency.setTargetAtTime(500 + speedFrac * 1200, now, 0.05);
+    this.o.frequency.setTargetAtTime(this.idle + speedFrac * (this.redline - this.idle) + (boost ? 32 : 0), now, 0.05);
+    this.f!.frequency.setTargetAtTime(500 + speedFrac * 1200 + (boost ? 260 : 0), now, 0.05);
   }
   stop() {
     if (!this.o || !ctx) return;

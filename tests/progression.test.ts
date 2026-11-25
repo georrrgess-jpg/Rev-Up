@@ -4,7 +4,7 @@ import { Game } from '../src/core/game';
 import * as P from '../src/core/progression';
 import { RaceSim, runRace } from '../src/core/race';
 import { MemoryKV, decodeSave, encodeSave, exportText, importText, loadGame, saveKey, writeGame } from '../src/core/save';
-import { newGame, validateState } from '../src/core/state';
+import { migrate, newGame, validateState } from '../src/core/state';
 import { CATCHUP_EFFORT_THRESHOLD, OFFLINE_MAX_S, carById, eventById } from '../src/data/tables';
 import { at, emptyGame, put } from './helpers';
 
@@ -75,6 +75,59 @@ describe('unlocks and keystones', () => {
     // repeatable route still exists after the catch-up crate
     s.scrap = 100;
     expect(B.buyCrate(s, 'targeted', 'turbo').some((e) => e.type === 'invalid')).toBe(false);
+  });
+});
+
+describe('expanded career', () => {
+  it('queues multiple earned cars and preserves their reveal order across reload', () => {
+    const kv = new MemoryKV();
+    const g = mkGame(kv);
+    g.transact((s) => {
+      s.rep = 1000;
+      s.crafted = ['tires:3', 'turbo:4', 'engine:5'];
+      const events: Parameters<typeof P.checkUnlocks>[1] = [];
+      P.checkUnlocks(s, events);
+      return events;
+    }, T0);
+    expect(g.state.pendingReveal).toBe('beater');
+    expect(g.state.owned).toEqual(['junker', 'beater', 'hothatch', 'muscle']);
+    g.finishReveal('beater', T0);
+    const reopened = mkGame(kv, T0 + 1000);
+    expect(reopened.state.pendingReveal).toBe('hothatch');
+    reopened.finishReveal('hothatch', T0 + 1000);
+    expect(reopened.state.pendingReveal).toBe('muscle');
+  });
+
+  it('rewards a live podium once, tracks live records, and preserves old saves', () => {
+    const { livePodiums: _oldField, ...old } = newGame(T0);
+    const g = new Game(new MemoryKV(), '/Rev-Up/', T0, migrate(old)!);
+    expect(g.state.livePodiums).toEqual([]);
+    g.state.events['yard-sprint'] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 60 };
+    const outcome = { place: 3, playerTime: 30, gapText: '', perfects: 0, nitroUsed: 0, standings: [], advice: null };
+    g.quickRace('yard-sprint', T0);
+    const quickId = g.state.pendingQuick!.id;
+    const quick = P.commitRace(g.state, { raceId: quickId, mode: 'quick', outcome }, []);
+    expect(quick?.signatureFinish).toBeUndefined();
+    expect(g.state.events['yard-sprint'].bestTime).toBe(60);
+    const setup = g.startRace('yard-sprint', T0);
+    expect(setup?.nitroCharges).toBe(0);
+    const live = P.commitRace(g.state, { raceId: g.pendingRaceId!, mode: 'live', outcome }, []);
+    expect(live?.signatureFinish).toBe('junker');
+    expect(live?.personalBest).toBe(true);
+    expect(g.state.livePodiums).toEqual(['junker']);
+    g.startRace('yard-sprint', T0);
+    const repeat = P.commitRace(g.state, { raceId: g.pendingRaceId!, mode: 'live', outcome }, []);
+    expect(repeat?.signatureFinish).toBeUndefined();
+    expect(repeat?.personalBest).toBe(false);
+  });
+
+  it('offers an opening boost and unlocks tools through races', () => {
+    const g = mkGame();
+    expect(g.startRace('yard-sprint', T0)?.nitroCharges).toBe(1);
+    expect(g.state.nitro).toBe(0);
+    expect(P.mergeAllUnlocked(g.state)).toBe(false);
+    g.state.stats.races = 5;
+    expect(P.mergeAllUnlocked(g.state)).toBe(true);
   });
 });
 

@@ -105,7 +105,7 @@ export class Game {
   }
   mergeAll(now = Date.now()) {
     this.input(now);
-    if (!P.mergeAllUnlocked(this.state)) return [{ type: 'invalid', reason: 'Merge All unlocks after 10 active minutes' } as GameEvent];
+    if (!P.mergeAllUnlocked(this.state)) return [{ type: 'invalid', reason: 'Finish five races to unlock Merge All' } as GameEvent];
     return this.transact((d) => {
       const ev = B.mergeAll(d);
       ev.push(...B.openCrates(d));
@@ -147,7 +147,7 @@ export class Game {
         eventId,
         seed: d.pendingRace!.seed,
         player: { name: 'You', car: d.activeCar, stats: lo.stats, paint: d.paints[d.activeCar] ?? cls.paint },
-        nitroCharges: d.nitro,
+        nitroCharges: d.stats.races === 0 ? Math.max(1, d.nitro) : d.nitro,
       };
       return [];
     }, now);
@@ -198,8 +198,9 @@ export class Game {
   // ---------- Cars ----------
   finishReveal(car: CarId, now = Date.now()) {
     this.transact((d) => {
-      if (d.pendingReveal === car) d.pendingReveal = null;
+      if (d.pendingReveal !== car) return [];
       if (!d.revealed.includes(car)) d.revealed.push(car);
+      d.pendingReveal = d.owned.find((id) => !d.revealed.includes(id)) ?? null;
       return [];
     }, now);
   }
@@ -211,6 +212,7 @@ export class Game {
   }
   setPaint(car: CarId, paint: string | null, now = Date.now()) {
     this.transact((d) => {
+      if (!d.owned.includes(car)) return [];
       if (paint) d.paints[car] = paint;
       else delete d.paints[car];
       return [];

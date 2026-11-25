@@ -100,7 +100,7 @@ try {
   const place = await page.locator('.result .place').textContent();
   const gap = await page.locator('.result .gap').textContent();
   ok('completes a race offline with a measured result', true, `${place} · ${gap}`);
-  await page.click('.result .btn:not(.primary)');
+  await page.getByRole('button', { name: 'Back to Garage' }).click();
   const cashOffline = await page.locator('.chip.cash .v').textContent();
   await ctx.setOffline(false);
 

@@ -6,7 +6,7 @@ import { computeLoadout, scrapImpact } from '../core/loadout';
 import * as P from '../core/progression';
 import type { Part } from '../core/state';
 import {
-  ACTIVE_FAMILIES, CRATE_SCRAP_COST, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, NITRO_CAP,
+  ACTIVE_FAMILIES, CRATE_SCRAP_COST, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_RACES, NITRO_CAP,
   TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST, UPGRADES, carById, eventById,
 } from '../data/tables';
 import { drawCar, fitCanvas } from '../render/car';
@@ -23,6 +23,8 @@ export class GarageView implements View {
   private goalTitle: HTMLElement;
   private goalLine: HTMLElement;
   private goalBar: HTMLElement;
+  private benchStatus: HTMLElement;
+  private goalArtKey = '';
   private equipEl: HTMLElement;
   private capEl: HTMLElement;
   private boardEl: HTMLElement;
@@ -49,6 +51,7 @@ export class GarageView implements View {
       h('div', { class: 'gtxt' }, this.goalTitle, this.goalLine, h('div', { class: 'bar' }, this.goalBar)));
     this.equipEl = h('div', { class: 'equip', 'aria-label': 'Equipped parts' });
     this.capEl = h('div', { class: 'capnote' });
+    this.benchStatus = h('span', { class: 'num' });
     this.boardEl = h('div', { class: 'board', role: 'grid', 'aria-label': 'Parts board' });
     this.trayEl = h('div', { class: 'tray', role: 'grid', 'aria-label': 'Overflow tray' });
     this.pressEl = h('button', { class: 'press', 'data-press': '1', 'aria-label': 'Scrap press: drop or select a part, then tap here to scrap it' },
@@ -59,13 +62,15 @@ export class GarageView implements View {
     this.cratesBtn = h('button', { class: 'btn crates', onclick: () => this.onCrates() });
     this.mergeAllBtn = h('button', { class: 'btn', onclick: () => this.onMergeAll() });
     this.raceBtn = h('button', { class: 'btn primary race', onclick: () => this.onRace() });
-    const shopBtn = h('button', { class: 'btn', 'aria-label': 'Workshop: crates and upgrades', onclick: () => this.openWorkshop() }, h('span', { class: 'stack' }, '🛠', h('small', {}, 'Shop')));
+    const shopBtn = h('button', { class: 'btn', 'aria-label': 'Workshop: crates and upgrades', onclick: () => this.openWorkshop() }, 'Shop');
 
     this.el = h('section', { class: 'view garage', 'aria-label': 'Garage' },
-      this.goalBtn, this.equipEl, this.capEl,
-      h('div', { class: 'boardwrap' }, this.boardEl),
-      h('div', { class: 'trayrow' }, this.trayEl, this.pressEl),
-      this.hintEl,
+      h('div', { class: 'garage-body scroll' },
+        this.goalBtn, this.equipEl, this.capEl,
+        h('div', { class: 'benchhead' }, h('strong', {}, 'Workbench'), this.benchStatus),
+        h('div', { class: 'boardwrap' }, this.boardEl),
+        h('div', { class: 'trayrow' }, h('span', { class: 'traycaption' }, 'Overflow'), this.trayEl, this.pressEl),
+        this.hintEl),
       h('div', { class: 'actions' }, this.cratesBtn, shopBtn, this.mergeAllBtn, this.raceBtn),
     );
     this.bindPointer();
@@ -93,8 +98,8 @@ export class GarageView implements View {
     const vw = this.el.clientWidth - 24;
     const gap = 5;
     const cellW = (Math.min(vw, 520) - 14 - gap * (s.cols - 1)) / s.cols;
-    const others = [this.goalBtn, this.equipEl, this.capEl, this.hintEl, this.el.querySelector('.actions') as HTMLElement]
-      .reduce((a, e) => a + e.offsetHeight, 0) + 34;
+    const others = [this.goalBtn, this.equipEl, this.capEl, this.hintEl, this.el.querySelector('.benchhead')!, this.el.querySelector('.actions')!]
+      .reduce((a, e) => a + (e as HTMLElement).offsetHeight, 0) + 30;
     const H = this.el.clientHeight - others;
     const cellH = (H - 14 - gap * (s.rows - 1) - 14) / (s.rows + 0.86);
     const cell = Math.max(38, Math.min(84, Math.floor(Math.min(cellW, cellH))));
@@ -201,20 +206,22 @@ export class GarageView implements View {
     this.goalBtn.classList.toggle('ready', !!s.pendingReveal);
     if (s.pendingReveal) {
       const c = carById(s.pendingReveal);
-      this.goalTitle.textContent = 'Unlocked';
-      this.goalLine.innerHTML = `Tap to reveal the <b>${c.name}</b>`;
+      this.goalTitle.textContent = 'Car ready';
+      this.goalBtn.setAttribute('aria-label', `Reveal the ${c.model}`);
+      this.goalLine.innerHTML = `Unveil the <b>${c.model}</b>`;
       this.goalBar.style.width = '100%';
     } else if (g) {
-      this.goalTitle.textContent = `Next car · ${g.car.name}`;
-      const parts: string[] = [];
-      if (!g.keystoneDone) parts.push(`Craft <b>T${g.tier} ${FAMILIES[g.family].name}</b>`);
-      if (s.rep < g.repNeed) parts.push(`<b>${g.repNeed - s.rep}</b> more Rep`);
-      this.goalLine.innerHTML = parts.length ? parts.join(' · ') : `The ${g.car.name} is ready`;
+      this.goalTitle.textContent = `Next car · ${g.car.model}`;
+      this.goalLine.replaceChildren(
+        h('span', { class: g.keystoneDone ? 'met' : '' }, `${g.keystoneDone ? '✓' : 'Craft'} T${g.tier} ${FAMILIES[g.family].name}`),
+        h('span', { class: s.rep >= g.repNeed ? 'met' : '' }, s.rep >= g.repNeed ? '✓ Rep' : `${g.repNeed - s.rep} more Rep`));
+
       this.goalBar.style.width = `${Math.round(g.progress * 100)}%`;
       this.goalBtn.setAttribute('aria-label', `Next car: ${g.line}`);
     } else {
       this.goalTitle.textContent = 'Showroom';
-      this.goalLine.textContent = 'Every car in this release is yours. Race to bank cash.';
+      this.goalBtn.setAttribute('aria-label', 'Open the Showroom');
+      this.goalLine.textContent = 'Collection complete';
       this.goalBar.style.width = '100%';
     }
     this.drawGoal();
@@ -224,12 +231,15 @@ export class GarageView implements View {
     const s = this.s;
     const { w, h: hh } = fitCanvas(this.goalCanvas, 2);
     const ctx = this.goalCanvas.getContext('2d')!;
-    ctx.clearRect(0, 0, w, hh);
     const id = s.pendingReveal ?? P.nextCar(s)?.id ?? s.activeCar;
     const cls = carById(id);
-    const cw = w * 0.92;
+    const cw = Math.min(w * .89, hh * 1.92);
     const covered = !!(s.pendingReveal || P.nextCar(s));
-    drawCar(ctx, id, (w - cw) / 2, hh * 0.92, cw, { paint: cls.paint, trim: cls.trim, cover: covered ? 1 : 0 });
+    const key = [w, hh, id, covered, s.paints[id]].join('|');
+    if (this.goalArtKey === key) return;
+    this.goalArtKey = key;
+    ctx.clearRect(0, 0, w, hh);
+    drawCar(ctx, id, (w - cw) / 2, hh * .93, cw, { paint: s.paints[id] ?? cls.paint, trim: cls.trim, cover: covered ? 1 : 0 });
   }
 
   private renderEquip(lo: ReturnType<typeof computeLoadout>) {
@@ -242,7 +252,7 @@ export class GarageView implements View {
         h('span', {}, p ? `T${p.t} ${FAMILIES[f].name}` : `No ${FAMILIES[f].name}`));
     }));
     const blocked = (Object.keys(lo.blocked) as Family[])[0];
-    this.capEl.textContent = blocked ? `T${lo.blocked[blocked]!.t} ${FAMILIES[blocked].name} is stored above the ${cls.name} cap (T${cls.cap}) — the next car can use it.` : '';
+    this.capEl.textContent = blocked ? `Stored · T${lo.blocked[blocked]!.t} ${FAMILIES[blocked].name} exceeds this car’s T${cls.cap} cap` : '';
     this.capEl.style.display = blocked ? '' : 'none';
   }
 
@@ -251,23 +261,27 @@ export class GarageView implements View {
     const n = s.crates.length;
     const printerCrates = s.crates.filter((c) => c.source === 'printer').length;
     const paused = printerCrates >= P.PRINTER_BANK_CAP;
-    this.cratesBtn.replaceChildren(h('span', { class: 'stack' }, '📦', h('small', {}, paused ? 'Printer full' : 'Crates')),
-      ...[n ? h('span', { class: 'count num' }, n) : '', h('span', { class: 'printer' }, this.printerBar)]);
+    this.cratesBtn.replaceChildren(
+      h('span', { class: 'stack' }, 'Crates', h('small', {}, paused ? 'Printer full' : n ? `${n} queued` : 'Printing')),
+      h('span', { class: 'printer' }, this.printerBar));
     this.cratesBtn.setAttribute('aria-label', `Crates: ${n} waiting${paused ? ', printer paused until you open some' : ''}`);
     this.cratesBtn.classList.toggle('pulse', n > 0 && B.freeSlots(s) > 0);
     this.updatePrinter();
     const unlocked = P.mergeAllUnlocked(s);
-    const left = Math.max(0, MERGE_ALL_UNLOCK_ACTIVE_S - s.activeS);
-    this.mergeAllBtn.replaceChildren(h('span', { class: 'stack' }, '⚡', h('small', {}, unlocked ? 'Merge All' : `${Math.ceil(left / 60)} min`)));
-    this.mergeAllBtn.classList.toggle('off', !unlocked || !B.hasAnyPair(s));
-    this.mergeAllBtn.setAttribute('aria-label', unlocked ? 'Merge All' : `Merge All unlocks in ${Math.ceil(left / 60)} active minutes`);
+    const racesLeft = Math.max(0, MERGE_ALL_UNLOCK_RACES - s.stats.races);
+    const hasPair = unlocked && B.hasAnyPair(s);
+    this.mergeAllBtn.replaceChildren(h('span', { class: 'stack' }, 'Merge All', h('small', {}, unlocked ? (hasPair ? 'Pairs ready' : 'No pairs') : `${racesLeft} races left`)));
+    this.mergeAllBtn.classList.toggle('off', !hasPair);
+    this.mergeAllBtn.setAttribute('aria-label', unlocked ? 'Merge All' : `Merge All unlocks after ${racesLeft} more finishes`);
+    const open = B.freeSlots(s);
+    this.benchStatus.textContent = open ? `${open} slots free` : 'Full · scrap or merge';
     const q = s.pendingQuick;
     if (q) {
       const left2 = Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000));
       this.raceBtn.replaceChildren(h('span', { class: 'stack' }, 'Crew racing', h('small', {}, `${eventById(q.eventId).name} · ${left2} s`)));
     } else {
       const ev = P.recommendedEvent(s);
-      this.raceBtn.replaceChildren(h('span', { class: 'stack' }, '🏁 RACE', h('small', {}, `${ev.name}${s.nitro ? ` · 🔥${s.nitro}` : ''}`)));
+      this.raceBtn.replaceChildren(h('span', { class: 'stack' }, 'Race', h('small', {}, ev.name)));
     }
   }
 
@@ -283,8 +297,11 @@ export class GarageView implements View {
     if (!s.stats.milestones.firstMerge) t = 'Drag one Engine onto the other to merge them';
     else if (s.stats.races === 0 && !s.pendingRace) t = 'Merged! Tap Race to earn cash and Rep';
     else if (B.freeSlots(s) === 0) t = 'Board full. Merge a pair or scrap a part';
-    else if (s.nitro > 0 && !s.tips.nitro) t = `Nitro ${s.nitro}/${NITRO_CAP} banked. Tap it in the amber windows`;
-    this.hintEl.textContent = t;
+    else if (this.sel) {
+      const part = B.getPart(s, this.sel);
+      if (part) t = `T${part.t} ${FAMILIES[part.f].name} selected. Tap a matching part.`;
+    } else if (s.nitro > 0 && !s.tips.nitro) t = `Nitro ready. Use it when the race button turns amber.`;
+    if (this.hintEl.textContent !== t) this.hintEl.textContent = t;
     this.raceBtn.classList.toggle('pulse', !!s.stats.milestones.firstMerge && s.stats.races === 0);
   }
 
@@ -471,6 +488,7 @@ export class GarageView implements View {
   private setSel(r: SlotRef | null) {
     this.sel = r;
     this.renderHighlights();
+    this.renderHint();
   }
 
   private doMove(from: SlotRef, to: SlotRef) {
@@ -558,10 +576,15 @@ export class GarageView implements View {
     if (s.rep < g.repNeed) tips.push(`Earn ${g.repNeed - s.rep} more Rep from races. Every finish pays Rep — wins pay most.`);
     this.app.sheet((close) => h('div', {},
       h('button', { class: 'btn sm close', onclick: close }, 'Close'),
-      h('h2', {}, `Next: the ${g.car.name}`),
+      h('h2', {}, g.car.model),
       h('p', {}, g.car.blurb),
+      h('div', { class: 'goal-requirement' }, h('strong', {}, `Craft T${g.tier} ${FAMILIES[g.family].name}`),
+        h('span', {}, g.keystoneDone ? 'Complete' : g.keyProgress >= 1 ? 'Ingredients ready' : `${Math.round(g.keyProgress * 100)}% of ingredients`)),
+      h('div', { class: 'goal-requirement' }, h('strong', {}, 'Earn reputation'),
+        h('span', {}, `${g.repHave} / ${g.repNeed} Rep`)),
       ...tips.map((t) => h('p', {}, t)),
       !g.keystoneDone ? h('button', { class: 'btn wide', onclick: () => { close(); this.openWorkshop(); } }, `Get ${FAMILIES[g.family].name} crates`) : null,
+      s.rep < g.repNeed ? h('button', { class: 'btn wide goal-race', onclick: () => { close(); this.app.go('race'); } }, 'Browse races') : null,
     ));
   }
 
@@ -583,7 +606,7 @@ export class GarageView implements View {
   private onMergeAll() {
     const s = this.s;
     if (!P.mergeAllUnlocked(s)) {
-      this.app.toast(`Merge All unlocks after 10 active minutes · ${Math.ceil((MERGE_ALL_UNLOCK_ACTIVE_S - s.activeS) / 60)} min to go`);
+      this.app.toast(`Finish ${MERGE_ALL_UNLOCK_RACES - s.stats.races} more races to unlock Merge All.`);
       return;
     }
     if (!B.hasAnyPair(s)) { this.app.toast('No pairs to merge'); return; }

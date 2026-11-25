@@ -39,6 +39,8 @@ export interface LastResult {
   precision: number;
   firstClear: boolean;
   boss: boolean;
+  personalBest?: boolean;
+  signatureFinish?: CarId;
   perfects: number;
   nitroUsed: number;
   advice: string;
@@ -84,6 +86,7 @@ export interface GameState {
   blueprints: string[];
   badges: string[];
   paints: Partial<Record<CarId, string>>;
+  livePodiums: CarId[];
   activeS: number;
   catchup: { goal: CarId | null; effort: number; bestTier: number; claimed: CarId[] };
   offline: { lastSeenAt: number; pendingCash: number; pendingS: number };
@@ -133,6 +136,7 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     blueprints: [],
     badges: [],
     paints: {},
+    livePodiums: [],
     activeS: 0,
     catchup: { goal: null, effort: 0, bestTier: 0, claimed: [] },
     offline: { lastSeenAt: now, pendingCash: 0, pendingS: 0 },
@@ -189,6 +193,7 @@ export function validateState(s: unknown): string[] {
   if (!Array.isArray(g.owned) || !g.owned.includes('junker')) errs.push('owned');
   if (!Array.isArray(g.owned) || !g.owned.includes(g.activeCar)) errs.push('activeCar');
   if (!Array.isArray(g.crafted)) errs.push('crafted');
+  if (!Array.isArray(g.livePodiums) || !Array.isArray(g.owned) || g.livePodiums.some((id) => !g.owned.includes(id))) errs.push('car podiums');
   if (!g.offline || !isNum(g.offline.lastSeenAt) || !isNum(g.offline.pendingCash)) errs.push('offline');
   if (!g.settings || typeof g.settings.muted !== 'boolean') errs.push('settings');
   if (!g.upgrades || !isNum(g.upgrades.grid)) errs.push('upgrades');
