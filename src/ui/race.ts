@@ -655,13 +655,13 @@ class RaceScreen {
     // Camera frames the pack: zoom out when rivals spread, keep the player between 22% and 70% of the width.
     // Camera: frame the player with the nearest rival (or the whole pack if it fits); before a nitro window,
     // shift to show more road ahead; a short shake at the launch and a kick when a boost fires.
-    const ppm0 = Math.min(W * 0.34, H * 0.24) / 4.3;
+    const ppm0 = Math.min(W * 0.42, H * 0.27) / 4.3; // closer camera: the cars read at phone size (art review)
     const rivals = sim.racers.filter((r) => !r.isPlayer);
     const nearest = rivals.reduce((b, r) => (Math.abs(r.x - player.x) < Math.abs(b.x - player.x) ? r : b), rivals[0] ?? player);
     const xs = sim.racers.map((r) => r.x);
     const packSpan = Math.max(...xs) - Math.min(...xs);
     const span = packSpan * ppm0 * 0.45 < W * 0.8 ? packSpan : Math.abs(nearest.x - player.x);
-    const target = Math.max(ppm0 * 0.45, Math.min(ppm0, (W * 0.78) / (span + 9)));
+    const target = Math.max(ppm0 * 0.5, Math.min(ppm0, (W * 0.78) / (span + 9)));
     // Zoom only retargets on a clear change and eases slowly: car sprites are cached per size step, so a zoom
     // that wanders re-renders every car mid-race.
     if (!this.zoomTarget || Math.abs(target / this.zoomTarget - 1) > 0.1) this.zoomTarget = target;
