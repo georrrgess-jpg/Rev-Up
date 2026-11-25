@@ -646,7 +646,8 @@ export function recommendedEvent(s: GameState): RaceEvent {
   // A first clear you keep losing is spaced out between other races instead of repeated back to back.
   const struggling = (e: RaceEvent) => {
     const r = s.events[e.id];
-    return !!r && r.starts - r.wins >= 3 && (s.recentEvents ?? []).includes(e.id);
+    const recent = s.recentEvents ?? [];
+    return !!r && r.starts - r.wins >= 3 && (recent.includes(e.id) || !!e.knockout?.heats.some((h) => recent.includes(h)));
   };
   if (s.activeCar === 'muscle' && final && !struggling(final)) return final;
   // First uncleared event, else boss if unbeaten, else the best-paying open one.

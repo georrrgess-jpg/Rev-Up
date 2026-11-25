@@ -6,7 +6,7 @@ import * as S from '../src/core/style';
 import { MemoryKV, encodeSave, saveKey } from '../src/core/save';
 import { newGame } from '../src/core/state';
 import type { GameState, LeanOutcome } from '../src/core/state';
-import { PART_ORDER_PRICE, SCRAP_VALUE, eventById, nitroCapFor } from '../src/data/tables';
+import { EVENTS, MEDAL_REWARDS, MERGE_CASH, PART_ORDER_PRICE, SCRAP_VALUE, STYLE_ITEMS, TARGETED_CRATE_CASH_COST, TUNE_STAGES, UPGRADES, CARS, cashStep, eventById, floorCash, nitroCapFor, onCashStep, roundCash, tunePrice } from '../src/data/tables';
 import { emptyGame } from './helpers';
 
 const T0 = 1_700_000_000_000;
@@ -84,9 +84,9 @@ describe('payouts: every place pays, live beats the crew, and the breakdown adds
   it('Quick Race pays 70% of the live purse, 85% with the Pit crew', () => {
     const s = emptyGame();
     const e = eventById('crusher-run');
-    expect(P.computePayout(s, e, 1, 'quick', 0).cash).toBe(Math.round(e.payout.cash[0] * 0.7));
+    expect(P.computePayout(s, e, 1, 'quick', 0).cash).toBe(roundCash(e.payout.cash[0] * 0.7));
     s.upgrades.crew = 1;
-    expect(P.computePayout(s, e, 1, 'quick', 0).cash).toBe(Math.round(e.payout.cash[0] * 0.85));
+    expect(P.computePayout(s, e, 1, 'quick', 0).cash).toBe(roundCash(e.payout.cash[0] * 0.85));
     expect(P.computePayout(s, e, 4, 'live', 0).cash).toBeGreaterThan(0);
   });
   it('the result breakdown sums to the cash paid', () => {
@@ -183,15 +183,27 @@ describe('Downtown Nights rules', () => {
     expect(s.blueprints).toContain('Main Event Neon');
     expect(P.canQuickRace(s, eventById('main-event'))).toBe(false);
   });
-  it('the speed trap scores km/h, and each medal pays once', () => {
+  it('the speed trap scores mph, and each medal pays once', () => {
     const s = late();
     const e = eventById('bridge-trap');
-    const r = commit(s, 'bridge-trap', { place: 1, trapSpeed: (e.speedTrap!.silver + 1) / 3.6 })!;
-    expect(r.trapKmh).toBe(e.speedTrap!.silver + 1);
+    const ms = (mph: number) => mph / 2.23694;
+    const r = commit(s, 'bridge-trap', { place: 1, trapSpeed: ms(e.speedTrap!.silver + 1) })! as ReturnType<typeof commit> & { trapMph?: number };
+    expect(r.trapMph).toBe(e.speedTrap!.silver + 1);
     expect(r.newMedals).toEqual([1, 2]);
-    const again = commit(s, 'bridge-trap', { place: 1, trapSpeed: (e.speedTrap!.silver + 2) / 3.6 })!;
+    expect(r.nextMedal).toMatchObject({ name: 'Gold', target: e.speedTrap!.gold, gap: e.speedTrap!.gold - e.speedTrap!.silver - 1 });
+    const again = commit(s, 'bridge-trap', { place: 1, trapSpeed: ms(e.speedTrap!.silver + 2) })!;
     expect(again.newMedals).toEqual([]);
-    expect(s.events['bridge-trap'].bestSpeed).toBe(e.speedTrap!.silver + 2);
+    expect(P.bestTrapMph(s.events['bridge-trap'])).toBe(e.speedTrap!.silver + 2);
+    expect(P.eventReason(s, e)).toContain(`${e.speedTrap!.gold} mph`);
+  });
+  it('an older save’s km/h speed-trap record reads as mph', () => {
+    const s = late();
+    s.events['bridge-trap'] = { wins: 1, starts: 1, bestPlace: 1, bestTime: null, bestSpeed: 241 };
+    expect(P.bestTrapMph(s.events['bridge-trap'])).toBe(150);
+    s.medals['bridge-trap'] = 1;
+    const r = commit(s, 'bridge-trap', { place: 1, trapSpeed: 140 / 2.23694 })!;
+    expect(r.newMedals).toEqual([]);
+    expect(P.bestTrapMph(s.events['bridge-trap'])).toBe(150); // a slower run keeps the converted record
   });
   it('the Stock Cup runs every part at T4 on any car', async () => {
     const { computeLoadout } = await import('../src/core/loadout');
@@ -232,5 +244,117 @@ describe('existing players', () => {
     // and there is something worth buying: the Paint shop and the new upgrades
     expect(S.shopItems(g.state, 'tourer').length).toBeGreaterThan(10);
     expect(P.upgradeCost(g.state, 'nitroTank')).toBeGreaterThan(0);
+  });
+});
+
+describe('cash steps: $5 up to $100, $10 up to $1,000, $50 above', () => {
+  const steps = (xs: number[]) => xs.filter((x) => !onCashStep(x));
+  it('rounds to the step of the amount', () => {
+    expect([36, 38.5, 99, 102, 996, 1020, 1234].map(roundCash)).toEqual([35, 40, 100, 100, 1000, 1000, 1250]);
+    expect([cashStep(100), cashStep(101), cashStep(1000), cashStep(1001)]).toEqual([5, 10, 10, 50]);
+    expect([99, 104, 1049].map(floorCash)).toEqual([95, 100, 1000]);
+  });
+  it('every price in the tables is on a step', () => {
+    expect(steps(PART_ORDER_PRICE.slice(1))).toEqual([]);
+    expect(steps(UPGRADES.flatMap((u) => u.levels.map((l) => l.cost)))).toEqual([]);
+    expect(steps(STYLE_ITEMS.map((i) => i.price))).toEqual([]);
+    expect(steps(CARS.filter((c) => c.enabled).flatMap((c) => Array.from({ length: TUNE_STAGES }, (_, k) => tunePrice(c.id, k))))).toEqual([]);
+    expect(onCashStep(TARGETED_CRATE_CASH_COST)).toBe(true);
+    expect(steps(Object.values(MEDAL_REWARDS).flatMap((m) => [m.cash, m.cash * 2]))).toEqual([]);
+    expect(steps([2, 3, 4, 5, 6, 7, 8, 9].map(MERGE_CASH))).toEqual([]);
+  });
+  it('every payout is on a step, and the preview equals what is paid', () => {
+    for (const e of EVENTS) {
+      expect(steps([...e.payout.cash, e.firstClear.cash, e.boss?.reward.cash ?? 0])).toEqual([]);
+      for (const crew of [0, 1]) {
+        const s = emptyGame();
+        s.upgrades.crew = crew;
+        const pv = P.purse(s, e);
+        expect(steps([...pv.live, ...pv.quick, pv.perfect, pv.firstClear, P.starCash(e)])).toEqual([]);
+        for (let place = 1; place <= 4; place++) {
+          expect(P.computePayout(s, e, place, 'quick', 0).cash).toBe(pv.quick[place - 1]);
+          const live = P.computePayout(s, e, place, 'live', 2);
+          const once = live.firstClear ? pv.firstClear : 0;
+          expect(live.cash).toBe(pv.live[place - 1] + 2 * pv.perfect + once);
+        }
+      }
+    }
+  });
+  it('an early Quick Race pays a round amount ($35 or $40, never $36)', () => {
+    const s = emptyGame();
+    const q = P.purse(s, eventById('yard-sprint')).quick[0];
+    expect([35, 40]).toContain(q);
+  });
+  it('a live race’s wallet change equals its breakdown, and every line is on a step', () => {
+    const s = late();
+    s.owned.push('tuner', 'super');
+    s.activeCar = 'super';
+    const r = commit(s, 'midnight-run', { place: 1, perfects: 2, playerTime: 1 })!;
+    expect(steps(r.breakdown!.map((b) => b.cash))).toEqual([]);
+    expect(r.breakdown!.reduce((a, b) => a + b.cash, 0)).toBe(r.cash);
+    expect(s.cash).toBe(r.cash);
+  });
+  it('away earnings are paid on a step, never more than accrued', () => {
+    const s = emptyGame();
+    s.owned = ['junker', 'beater'];
+    s.offline.lastSeenAt = T0;
+    P.accrueOffline(s, T0 + 37 * 60_000);
+    expect(s.offline.pendingCash).toBe(110); // 37 min × $3/min = $111 → $110
+    expect(onCashStep(P.claimOffline(s))).toBe(true);
+  });
+  it('the first race plus its merges affords a useful part (a T2 order)', () => {
+    const e = eventById('yard-sprint');
+    expect(P.purse(emptyGame(), e).live[0] + e.firstClear.cash).toBeGreaterThanOrEqual(PART_ORDER_PRICE[2]);
+  });
+  it('preserves balances: an off-step wallet is never rounded', () => {
+    const s = late();
+    s.cash = 36564;
+    commit(s, 'neon-mile', { place: 4 });
+    expect(s.cash % 5).toBe((36564 + P.purse(s, eventById('neon-mile')).live[3]) % 5);
+  });
+});
+
+describe('endgame unlocks and earned style', () => {
+  it('each new car needs Rep, a crafted keystone and a won event — Rep alone never unlocks it', () => {
+    for (const id of ['rally', 'gt', 'proto'] as const) {
+      const c = CARS.find((x) => x.id === id)!;
+      expect(c.enabled).toBe(true);
+      expect(c.unlock?.event).toBeTruthy();
+      const s = emptyGame();
+      s.owned = CARS.filter((x) => x.enabled && CARS.indexOf(x) < CARS.indexOf(c)).map((x) => x.id);
+      s.rep = c.unlock!.rep + 1;
+      P.checkUnlocks(s, []);
+      expect(s.owned).not.toContain(id);
+      s.crafted.push(`${c.unlock!.family}:${c.unlock!.tier}`);
+      P.checkUnlocks(s, []);
+      expect(s.owned).not.toContain(id);
+      s.events[c.unlock!.event!] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
+      P.checkUnlocks(s, []);
+      expect(s.owned).toContain(id);
+    }
+  });
+  it('a Corvo Rally podium earns the Rally livery and a Downtown win the Neon livery, once each', () => {
+    const s = late();
+    s.owned.push('tuner', 'super', 'rally');
+    s.activeCar = 'rally';
+    const r = commit(s, 'dust-stage', { place: 3 })! as ReturnType<typeof commit> & { earnedStyle?: string[] };
+    expect(r.earnedStyle).toEqual(['livery:rally']);
+    expect(s.owns).toContain('livery:rally');
+    s.activeCar = 'tourer';
+    commit(s, 'neon-mile', { place: 1 });
+    expect(s.owns).toContain('livery:neon');
+    expect(s.owns.filter((x) => x.startsWith('livery:'))).toHaveLength(2);
+    expect(S.applyStyle(s, 'livery:rally', 'junker')).toEqual([]);
+    expect(S.carStyle(s, 'junker').livery).toBe('rally');
+  });
+  it('per-car mastery records stay current and are readable through masteryFor', () => {
+    const s = late();
+    commit(s, 'neon-mile', { place: 1, playerTime: 22.5, shifts: 5, shiftsClean: 4, topSpeed: 50, perfects: 1 });
+    commit(s, 'neon-mile', { place: 2, playerTime: 22.9, shifts: 5, shiftsClean: 2, topSpeed: 52 });
+    const m = P.masteryFor(s, 'tourer');
+    expect(m).toMatchObject({ races: 2, wins: 1, podiums: 2, perfects: 1, shifts: 10, shiftsClean: 6, eventsRaced: 1, topMph: 116 });
+    expect(m.best['neon-mile']).toBe(22.5);
+    expect(m.shiftRate).toBeCloseTo(0.6);
+    expect(P.masteryFor(s, 'proto').races).toBe(0);
   });
 });

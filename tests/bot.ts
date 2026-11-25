@@ -276,7 +276,7 @@ export function runBot(o: BotOpts): BotLog {
     spend((out.playerTime ?? 30) + COST.raceOverhead);
     const wonBefore = (g.state.events[ev.id]?.wins ?? 0) > 0;
     const res = g.commitRace(g.pendingRaceId!, out, now);
-    const car = g.state.activeCar;
+    const car = setup.player.car;
     g.setActiveCar(g.state.owned.includes(home) ? home : car, now);
     if (g.state.pendingReveal) g.setActiveCar(g.state.pendingReveal, now);
     L.races++;

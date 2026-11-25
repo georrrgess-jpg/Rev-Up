@@ -616,39 +616,39 @@ export interface RaceEvent {
 export const EVENTS: RaceEvent[] = [
   {
     id: 'yard-sprint', name: 'Yard Sprint', district: 'scrapyard', track: 'scrapyard', rivals: ['gus', 'dex', 'mo'],
-    payout: { cash: [55, 40, 30, 22], rep: [10, 7, 5, 4], crates: [1, 1, 0, 0] }, firstClear: { cash: 40, crates: 2 },
+    payout: { cash: [55, 40, 30, 20], rep: [10, 7, 5, 4], crates: [1, 1, 0, 0] }, firstClear: { cash: 40, crates: 2 },
     requires: {}, blurb: 'Loose gravel, short straights. A good first race.',
   },
   {
     id: 'crusher-run', name: 'Crusher Run', district: 'scrapyard', track: 'scrapyard', rivals: ['lina', 'tug', 'bolt'],
-    payout: { cash: [90, 65, 48, 36], rep: [15, 10, 8, 6], crates: [1, 1, 1, 0] }, firstClear: { cash: 70, crates: 2 },
+    payout: { cash: [90, 65, 50, 35], rep: [15, 10, 8, 6], crates: [1, 1, 1, 0] }, firstClear: { cash: 70, crates: 2 },
     requires: { rep: 20 }, blurb: 'Past the car crusher. Launches decide it.',
   },
   {
     id: 'rusty-ray', name: 'Rusty Ray', district: 'scrapyard', track: 'scrapyard', rivals: ['tug', 'bolt', 'ray'],
-    payout: { cash: [130, 90, 65, 48], rep: [22, 15, 11, 8], crates: [2, 1, 1, 0] }, firstClear: { cash: 0, crates: 0 },
+    payout: { cash: [130, 90, 65, 50], rep: [22, 15, 11, 8], crates: [2, 1, 1, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'beater' },
     boss: { rival: 'ray', reward: { cash: 200, crates: 4, blueprint: 'Ray’s Rust-Red', badge: 'Scrapyard King' } },
     blurb: 'Beat the king of the Scrapyard to open the Suburbs.',
   },
   {
     id: 'cul-de-sac', name: 'Cul-de-sac Dash', district: 'suburbs', track: 'maple', rivals: ['bolt', 'june', 'priya'],
-    payout: { cash: [140, 100, 75, 56], rep: [24, 16, 12, 9], crates: [1, 1, 0, 0] }, firstClear: { cash: 120, crates: 3 },
+    payout: { cash: [140, 100, 75, 55], rep: [24, 16, 12, 9], crates: [1, 1, 0, 0] }, firstClear: { cash: 120, crates: 3 },
     requires: { beatBoss: 'ray' }, blurb: 'Sprinklers, speed bumps, and a long on-ramp.',
   },
   {
     id: 'maple-mile', name: 'Maple Mile', district: 'suburbs', track: 'maple', rivals: ['priya', 'hank', 'sol'],
-    payout: { cash: [200, 140, 105, 80], rep: [32, 22, 16, 12], crates: [1, 1, 1, 0] }, firstClear: { cash: 180, crates: 3 },
+    payout: { cash: [200, 140, 100, 80], rep: [32, 22, 16, 12], crates: [1, 1, 1, 0] }, firstClear: { cash: 180, crates: 3 },
     requires: { beatBoss: 'ray', rep: 330 }, blurb: 'Top-speed country. Engines rule the highway.',
   },
   {
     id: 'tapeback-trophy', name: 'Tapeback Trophy', district: 'scrapyard', track: 'scrapyard', rivals: ['nell', 'oz', 'pip'], carOnly: 'junker',
-    payout: { cash: [120, 85, 62, 46], rep: [14, 10, 8, 6], crates: [2, 1, 1, 0] }, firstClear: { cash: 150, crates: 3 },
+    payout: { cash: [120, 85, 60, 45], rep: [14, 10, 8, 6], crates: [2, 1, 1, 0] }, firstClear: { cash: 150, crates: 3 },
     requires: { car: 'beater' }, blurb: 'Tapebacks only. Bring your first car back for a grudge match.',
   },
   {
     id: 'foundry-final', name: 'Foundry Invitational', district: 'suburbs', track: 'foundry', rivals: ['hank', 'sol', 'priya'],
-    payout: { cash: [240, 175, 130, 96], rep: [36, 26, 19, 15], crates: [3, 2, 1, 1] },
+    payout: { cash: [240, 180, 130, 95], rep: [36, 26, 19, 15], crates: [3, 2, 1, 1] },
     firstClear: { cash: 280, crates: 4 },
     requires: { beatBoss: 'ray', car: 'muscle' }, blurb: 'Tight bends test your grip. Save nitro for the exits.',
   },
@@ -668,7 +668,7 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'coast-crown', name: 'Coastal Crown', district: 'coastal', track: 'coast', rivals: ['lux', 'dane', 'vale'],
     series: { id: 'crown', name: 'Coastal Crown', round: 3, of: 3 },
-    payout: { cash: [360, 250, 185, 140], rep: [52, 36, 28, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 0, crates: 0 },
+    payout: { cash: [360, 250, 180, 140], rep: [52, 36, 28, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { afterWin: 'cliff-esses' },
     boss: { rival: 'vale', reward: { cash: 600, crates: 5, blueprint: 'Crown Teal', badge: 'Coastal Crown' } },
     blurb: 'Final round on the open Coast Road. Beat Vale Moreau to earn the right to an Altamar GT.',
@@ -676,12 +676,12 @@ export const EVENTS: RaceEvent[] = [
   // ---- Class meets: earlier cars come back off the shelf
   {
     id: 'corsa-club', name: 'Corsa Club Run', district: 'meets', track: 'maple', rivals: ['ines', 'bram', 'otto'], carOnly: 'beater', trophy: 'Sedan Club',
-    payout: { cash: [190, 135, 100, 75], rep: [26, 18, 14, 10], crates: [2, 1, 1, 0] }, firstClear: { cash: 260, crates: 3 },
+    payout: { cash: [190, 140, 100, 75], rep: [26, 18, 14, 10], crates: [2, 1, 1, 0] }, firstClear: { cash: 260, crates: 3 },
     requires: { car: 'hothatch' }, blurb: 'Corsa Rojos only, on the highway. A tuned sedan needs a strong engine here.',
   },
   {
     id: 'hatch-attack', name: 'Hatch Attack', district: 'meets', track: 'cliffs', rivals: ['zoe', 'rafa', 'kit'], carOnly: 'hothatch', trophy: 'Hatch Hero',
-    payout: { cash: [260, 185, 140, 105], rep: [34, 24, 18, 14], crates: [2, 1, 1, 0] }, firstClear: { cash: 340, crates: 3 },
+    payout: { cash: [260, 180, 140, 100], rep: [34, 24, 18, 14], crates: [2, 1, 1, 0] }, firstClear: { cash: 340, crates: 3 },
     requires: { afterWin: 'harbor-launch' }, blurb: 'Vexa GTis only, through the cliff esses. Nimble beats powerful here.',
   },
   // ---- Time attack: beat the clock on courses you know (no rivals, medals pay once)
@@ -703,7 +703,7 @@ export const EVENTS: RaceEvent[] = [
   // ---------------- Downtown Nights (after the Altamar GT) ----------------
   {
     id: 'neon-mile', name: 'Neon Mile', district: 'downtown', track: 'downtown', rivals: ['jules', 'kai', 'rhea'],
-    payout: { cash: [420, 300, 220, 165], rep: [60, 42, 30, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 500, crates: 3 },
+    payout: { cash: [420, 300, 220, 160], rep: [60, 42, 30, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 500, crates: 3 },
     requires: { car: 'tourer' }, goals: { par: 23.1 },
     blurb: 'A night street circuit under shop signs. Four corners; the Altamar is wide for them.',
   },
@@ -845,10 +845,10 @@ export const MEDAL_REWARDS: Record<Medal, { cash: number; crates: number }> = {
  * shift × nitro targets in `tests/ladder.ts` (missed / ordinary / clean inputs at the build a player brings).
  */
 export const RIVAL_PACE: Record<string, number> = {
-  'yard-sprint': 0.978,
-  'crusher-run': 0.967,
-  'tapeback-trophy': 0.992,
-  'corsa-club': 0.992,
+  'yard-sprint': 0.992,
+  'crusher-run': 0.991,
+  'tapeback-trophy': 1.011,
+  'corsa-club': 1.011,
   'rusty-ray': 1.031,
   'cul-de-sac': 0.953,
   'maple-mile': 1.020,
