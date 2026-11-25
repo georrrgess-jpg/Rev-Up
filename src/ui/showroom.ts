@@ -102,7 +102,7 @@ export class ShowroomView implements View {
       const isNext = next?.car.id === car.id;
       const active = state.activeCar === car.id;
       const canvas = h('canvas', { 'aria-hidden': 'true' });
-      const label = pending ? 'Ready to reveal' : active ? 'Current car' : owned ? 'Inspect' : isNext ? 'Next unlock' : 'Locked';
+      const label = pending ? 'Ready to reveal' : active ? 'Current car' : owned ? 'View' : isNext ? 'Next car' : 'Locked';
       const card = h('button', {
         class: `carcard${owned ? '' : ' locked'}${active ? ' active' : ''}`,
         'aria-label': `${car.model}, ${label}`,
@@ -116,7 +116,7 @@ export class ShowroomView implements View {
       }, canvas,
       h('div', { class: 'carcard-info' },
         h('div', { class: 'cn' }, car.model),
-        h('div', { class: 'cm' }, `${car.name} class · parts up to T${car.cap}`),
+        h('div', { class: 'cm' }, `${car.name} · T${car.cap} parts`),
         h('div', { class: 'car-status' }, label)));
       this.redrawCards.push(() => studio(canvas, car.id, state.paints[car.id], 0, pending || isNext, !owned && !isNext, owned ? carStyle(state, car.id) : undefined));
       return card;

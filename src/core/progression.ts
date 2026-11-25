@@ -216,9 +216,9 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   }
   const sig = SIGNATURE_FINISHES[s.activeCar];
   if (sig && !s.livePodiums.includes(s.activeCar)) return `A live top-3 earns the ${sig.name} finish for your ${carById(s.activeCar).model}`;
-  const fresh = isFreshRoute(s, e) ? ` (Fresh route +${Math.ceil(e.payout.rep[0] * FRESH_ROUTE_BONUS)})` : '';
+  const fresh = isFreshRoute(s, e) ? ` (new track bonus +${Math.ceil(e.payout.rep[0] * FRESH_ROUTE_BONUS)})` : '';
   if (g && s.rep < g.repNeed) return `Win for ${Math.ceil(e.payout.rep[0] * (fresh ? 1 + FRESH_ROUTE_BONUS : 1))} Rep${fresh} · ${g.repNeed - s.rep} more unlocks the ${g.car.model}`;
-  if (fresh) return `Fresh route: +75% Rep on this event`;
+  if (fresh) return `New track bonus: +75% Rep on this event`;
   const best = s.events[e.id]?.bestTime;
   return best ? `Beat your record of ${best.toFixed(2)} s` : `Pays $${e.payout.cash[0]} for a win`;
 }
@@ -237,7 +237,7 @@ export interface Payout {
   freshRep: number;
 }
 
-/** Fresh route: +50% Rep for an event that isn't one of your last two races. */
+/** New track bonus ("fresh route" in code): +75% Rep for an event that isn't one of your last two races. */
 export function isFreshRoute(s: GameState, e: RaceEvent): boolean {
   return s.stats.races >= FRESH_ROUTE_AFTER_RACES && !(s.recentEvents ?? []).includes(e.id);
 }
@@ -297,13 +297,13 @@ export function adviceText(s: GameState, o: LeanOutcome): string {
   const fam = FAMILIES[a.family];
   const eq = lo.equipped[a.family];
   const have = eq ? eq.t : 0;
-  if ((o.nitroLeft ?? 0) > 0 && o.perfects === 0) return `You finished with ${o.nitroLeft} nitro unused. Tap NITRO inside the amber zones: a Perfect boost is 1.5× stronger.`;
+  if ((o.nitroLeft ?? 0) > 0 && o.perfects === 0) return `You finished with ${o.nitroLeft} nitro unused. Tap NITRO inside a boost zone: a Perfect boost is 1.5× stronger.`;
   const lost = a.lost > 0.05 ? ` — you lost ${a.lost.toFixed(1)} s on the ${a.segment}` : '';
   if (have < cls.cap) return `Build a T${have + 1} ${fam.name} for the ${a.segment}${lost}.`;
-  if (o.perfects === 0) return `Tap nitro inside the amber windows: a Perfect boost is 1.5× stronger${lost}.`;
+  if (o.perfects === 0) return `Tap NITRO inside a boost zone: a Perfect boost is 1.5× stronger${lost}.`;
   const g = goalStatus(s);
   if (g) return `${fam.name} is maxed for the ${cls.model} (T${cls.cap})${lost}. ${g.line}.`;
-  return `Your ${fam.name.toLowerCase()} is maxed${lost}. Hit every amber window for Perfect boosts.`;
+  return `Your ${fam.name.toLowerCase()} is maxed${lost}. Hit every boost zone for Perfect boosts.`;
 }
 
 export interface CommitInput {

@@ -35,7 +35,7 @@ export function openSettings(app: App) {
       h('h2', {}, 'Settings'),
       toggle('Sound', 'Merge clicks, nitro, and engine revs', () => !game.state.settings.muted, (v) => { game.setSetting('muted', !v); setMuted(!v); }),
       toggle('Reduced motion', 'Shorter, calmer animations', () => game.state.settings.reducedMotion, (v) => { game.setSetting('reducedMotion', v); document.documentElement.classList.toggle('reduced', v); }),
-      toggle('Nitro window cue', 'A beep when a nitro window opens', () => game.state.settings.nitroCue, (v) => game.setSetting('nitroCue', v)),
+      toggle('Boost zone cue', 'A beep when a boost zone opens', () => game.state.settings.nitroCue, (v) => game.setSetting('nitroCue', v)),
       h('h3', {}, 'Install'),
       installHelp,
       h('p', {}, offline),

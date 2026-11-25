@@ -78,8 +78,8 @@ export class RaceView implements View {
     // Featured: one recommended event with a reason to run it now (a knockout shows the heat you race next).
     const shown = rec.knockout ? eventById(rec.knockout.heats[s.knockout?.heat ?? 0]) : rec;
     const fr = s.events[rec.id];
-    const featured = h('section', { class: 'featured', 'aria-label': 'Recommended event' },
-      h('div', { class: 'feat-label' }, 'Recommended'),
+    const featured = h('section', { class: 'featured', 'aria-label': 'Up next' },
+      h('div', { class: 'feat-label' }, 'Up next'),
       h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
       h('div', { class: 'meta' }, course(rec), ` ${TRACKS[rec.track].favours}`),
       h('p', { class: 'reason' }, P.eventReason(s, rec)),
@@ -503,9 +503,9 @@ class RaceScreen {
     if (approaching) {
       const q = (Math.round(Math.max(0, Math.min(1, 1 - eta / 2.2)) * 20) / 20).toFixed(2); // 20 steps: no repaint every frame
       if (this.nitroBtn.style.getPropertyValue('--eta') !== q) this.nitroBtn.style.setProperty('--eta', q);
-      const lbl = `WINDOW IN ${eta.toFixed(1)} s`;
+      const lbl = `BOOST ZONE IN ${eta.toFixed(1)} s`;
       if (this.nitroBtn.dataset.label !== lbl) this.nitroBtn.dataset.label = lbl;
-    } else if (inWindow && this.nitroBtn.dataset.label !== "▲ PERFECT WINDOW") this.nitroBtn.dataset.label = "▲ PERFECT WINDOW";
+    } else if (inWindow && this.nitroBtn.dataset.label !== "▲ BOOST ZONE — TAP") this.nitroBtn.dataset.label = "▲ BOOST ZONE — TAP";
     // overtakes, called out once they settle (after the launch)
     if (this.sim.t > 2) {
       const order = this.sim.standings().map((r) => r.id).join('|');
@@ -523,7 +523,7 @@ class RaceScreen {
       if (this.app.game.state.settings.nitroCue) sfx.windowCue();
       this.showCallout('TAP NITRO NOW', 'window', 700);
     } else if (!active && next && canUse && eta < 2.0 && eta > 1.9) {
-      this.showCallout('Nitro window ahead', 'window', 900);
+      this.showCallout('Boost zone ahead', 'window', 900);
     }
     this.hum.set(Math.min(1, p.v / (p.stats.top * 1.1)), p.nitroLeft > 0);
   }
@@ -560,7 +560,7 @@ class RaceScreen {
     const g = P.goalStatus(s);
     const finish = r.signatureFinish ? SIGNATURE_FINISHES[r.signatureFinish] : undefined;
     if (r.personalBest) pills.push(h('span', { class: 'chip best' }, 'Personal best'));
-    if (r.freshRep) pills.push(h('span', { class: 'chip rep' }, `Fresh route +${r.freshRep} Rep`));
+    if (r.freshRep) pills.push(h('span', { class: 'chip rep' }, `New track bonus +${r.freshRep} Rep`));
     const nextLabel = s.pendingReveal ? 'Car unlocked' : 'Next step';
     const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).model} is ready to reveal.` : r.advice;
     const tierCls = r.boss || r.heat?.champion ? ' big' : s.pendingReveal ? ' big car' : r.newMedals?.length || r.trophy || r.newStars?.length || r.signatureFinish ? ' reward' : '';
@@ -624,7 +624,7 @@ class RaceScreen {
     }
     this.nitroBtn.classList.toggle('empty', c === 0);
     this.nitroBtn.setAttribute('aria-label', `Nitro, ${c} left`);
-    this.hintEl.textContent = this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : this.app.game.state.stats.races < 6 || this.sim.perfects === 0 && this.sim.t < 4 && this.app.game.state.stats.races < 20 ? 'Tap nitro in the amber windows for a Perfect boost.' : '';
+    this.hintEl.textContent = this.finished ? '' : c === 0 ? (this.setup.nitroCharges === 0 ? 'No nitro banked — merge combos of 3 to bank some.' : 'All nitro used.') : this.app.game.state.stats.races < 6 || this.sim.perfects === 0 && this.sim.t < 4 && this.app.game.state.stats.races < 20 ? 'Tap NITRO in a boost zone for a Perfect boost.' : '';
   }
 
   // ---------------- Drawing ----------------

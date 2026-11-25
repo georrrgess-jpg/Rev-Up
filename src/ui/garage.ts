@@ -55,7 +55,7 @@ export class GarageView implements View {
     this.capEl = h('div', { class: 'capnote' });
     this.benchStatus = h('span', { class: 'num' });
     this.boardEl = h('div', { class: 'board', role: 'grid', 'aria-label': 'Parts board' });
-    this.trayEl = h('div', { class: 'tray', role: 'grid', 'aria-label': 'Overflow tray' });
+    this.trayEl = h('div', { class: 'tray', role: 'grid', 'aria-label': 'Spare rack' });
     this.pressEl = h('button', { class: 'press', 'data-press': '1', 'aria-label': 'Scrap press: drop or select a part, then tap here to scrap it' },
       h('span', { class: 'pi', 'aria-hidden': 'true' }, '♻'), 'SCRAP');
     this.pressEl.addEventListener('click', () => this.onPressTap());
@@ -64,7 +64,7 @@ export class GarageView implements View {
     this.cratesBtn = h('button', { class: 'btn crates', onclick: () => this.onCrates() });
     this.mergeAllBtn = h('button', { class: 'btn', onclick: () => this.onMergeAll() });
     this.raceBtn = h('button', { class: 'btn primary race', onclick: () => this.onRace() });
-    const shopBtn = h('button', { class: 'btn', 'aria-label': 'Workshop: crates and upgrades', onclick: () => this.openWorkshop() }, 'Shop');
+    const shopBtn = h('button', { class: 'btn', 'aria-label': 'Shop: parts, crates and upgrades', onclick: () => this.openWorkshop() }, 'Shop');
     this.shopBtn = shopBtn;
 
     this.el = h('section', { class: 'view garage', 'aria-label': 'Garage' },
@@ -72,7 +72,7 @@ export class GarageView implements View {
         this.goalBtn, this.equipEl, this.capEl,
         h('div', { class: 'benchhead' }, h('strong', {}, 'Workbench'), this.benchStatus),
         h('div', { class: 'boardwrap' }, this.boardEl),
-        h('div', { class: 'trayrow' }, h('span', { class: 'traycaption' }, 'Overflow'), this.trayEl, this.pressEl),
+        h('div', { class: 'trayrow' }, h('span', { class: 'traycaption' }, 'Spare rack'), this.trayEl, this.pressEl),
         this.hintEl),
       h('div', { class: 'actions' }, this.cratesBtn, shopBtn, this.mergeAllBtn, this.raceBtn),
     );
@@ -268,7 +268,7 @@ export class GarageView implements View {
         return chip ? { id: step, targets: [chip], ack: true, text: 'You banked nitro: three quick merges in a row add a charge (up to 3). Banked charges add to your free crew nitro in live races.' } : null;
       }
       case 'overflow':
-        return { id: step, targets: [this.trayEl], ack: true, text: 'Overflow holds parts when the bench is full. Drag them back onto the bench or onto a match any time.' };
+        return { id: step, targets: [this.trayEl], ack: true, text: 'The spare rack holds parts when the bench is full. Drag them back onto the bench or onto a match any time.' };
       case 'scrap':
         return { id: step, targets: [this.pressEl], ack: true, text: 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap buys crates of the family you need.' };
       case 'mergeAll':
@@ -418,7 +418,7 @@ export class GarageView implements View {
     else if (this.sel) {
       const part = B.getPart(s, this.sel);
       if (part) t = `T${part.t} ${FAMILIES[part.f].name} selected. Tap a matching part.`;
-    } else if (s.nitro > 0 && !s.tips.nitro) t = `Nitro ready. Use it when the race button turns amber.`;
+    } else if (s.nitro > 0 && !s.tips.nitro) t = `Nitro ready. In the race, tap NITRO when its button lights up in a boost zone.`;
     if (this.hintEl.textContent !== t) this.hintEl.textContent = t;
     this.raceBtn.classList.toggle('pulse', !!s.stats.milestones.firstMerge && s.stats.races === 0);
   }
@@ -821,7 +821,7 @@ export class GarageView implements View {
         const away = P.offlineRate(s);
         body.replaceChildren(
           h('button', { class: 'btn sm close', onclick: close }, 'Close'),
-          h('h2', {}, 'Workshop'),
+          h('h2', {}, 'Shop'),
           h('p', { class: 'wallet' }, h('span', { class: 'chip cash' }, `$${fmt(s.cash)}`), h('span', { class: 'chip scrap' }, `${fmt(s.scrap)} scrap`), h('span', { class: 'd' }, 'Cash buys parts and upgrades; scrap buys crates.')),
           h('h3', {}, 'Order a part'),
           h('p', { class: 'd' }, goalFam && g
