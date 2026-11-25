@@ -51,6 +51,8 @@ export interface LastResult {
   nitroUsed: number;
   advice: string;
   standings: { name: string; time: number | null; isPlayer: boolean }[];
+  /** Where the cash came from: the place purse, skill (Perfect boosts), one-time rewards. */
+  breakdown?: { label: string; cash: number; kind: 'base' | 'skill' | 'once' }[];
 }
 
 export interface LeanOutcome {
@@ -82,7 +84,7 @@ export interface GameState {
   nitro: number;
   combo: { count: number; lastAt: number };
   crafted: string[]; // keystone ledger entries "family:tier"
-  upgrades: { grid: number; printer: number; crateTier: number };
+  upgrades: { grid: number; printer: number; crateTier: number; nitroTank: number; crew: number; lockup: number };
   printerS: number; // progress toward next crate in seconds
   owned: CarId[];
   activeCar: CarId;
@@ -93,6 +95,9 @@ export interface GameState {
   blueprints: string[];
   badges: string[];
   paints: Partial<Record<CarId, string>>;
+  /** Paint shop purchases (item ids; premium paint as `material:<kind>:<car>`) and each car's chosen style. */
+  owns: string[];
+  style: Partial<Record<CarId, { wheel?: string; material?: string; restore?: number }>>;
   livePodiums: CarId[];
   /** last two events raced (live or quick), for the Fresh route Rep bonus */
   recentEvents: string[];
@@ -102,7 +107,7 @@ export interface GameState {
   catchup: { goal: CarId | null; effort: number; bestTier: number; claimed: CarId[] };
   offline: { lastSeenAt: number; pendingCash: number; pendingS: number };
   settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean };
-  stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number> };
+  stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number>; earned?: number; spent?: number };
   tips: Record<string, boolean>;
   pendingRace: { id: number; eventId: string; car: CarId; seed: number; startedAt: number } | null;
   /** Quick Race runs in the background for the race's real duration, then pays once. */
@@ -136,7 +141,7 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     nitro: 0,
     combo: { count: 0, lastAt: -1e12 },
     crafted: [],
-    upgrades: { grid: 0, printer: 0, crateTier: 0 },
+    upgrades: { grid: 0, printer: 0, crateTier: 0, nitroTank: 0, crew: 0, lockup: 0 },
     printerS: 0,
     owned: ['junker'],
     activeCar: 'junker',
@@ -147,6 +152,8 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     blueprints: [],
     badges: [],
     paints: {},
+    owns: [],
+    style: {},
     livePodiums: [],
     recentEvents: [],
     medals: {},
@@ -198,7 +205,7 @@ export function validateState(s: unknown): string[] {
   }
   if (isNum(g.cash) && g.cash < 0) errs.push('negative cash');
   if (isNum(g.scrap) && g.scrap < 0) errs.push('negative scrap');
-  if (isNum(g.nitro) && (g.nitro < 0 || g.nitro > NITRO_CAP)) errs.push('nitro range');
+  if (isNum(g.nitro) && (g.nitro < 0 || g.nitro > NITRO_CAP + 2)) errs.push('nitro range');
   if (!Array.isArray(g.board) || g.board.length !== g.cols * g.rows) errs.push('board size');
   else if (!g.board.every(isPart)) errs.push('board parts');
   if (!Array.isArray(g.tray) || g.tray.length !== TRAY_SLOTS || !g.tray.every(isPart)) errs.push('tray');

@@ -22,6 +22,7 @@ export type GameEvent =
   | { type: 'printer' }
   | { type: 'quickDone' }
   | { type: 'invalid'; reason: string }
-  | { type: 'mergeAll'; fusions: number; longest: number };
+  | { type: 'mergeAll'; fusions: number; longest: number }
+  | { type: 'styleBought'; item: string; car: CarId };
 
 export const sameRef = (a: SlotRef, b: SlotRef) => a.zone === b.zone && a.i === b.i;

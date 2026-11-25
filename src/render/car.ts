@@ -266,7 +266,33 @@ export interface CarDrawOpts {
   blur?: number;
   /** Race mode: cache the body as bitmaps and draw only wheels, lights and nitro live. */
   cache?: boolean;
+  /** Cosmetic choices from the Paint shop: wheel set, paint material, restoration. */
+  style?: CarStyle;
 }
+
+export type WheelSetId = 'steel' | 'turbine' | 'fivespoke' | 'dish' | 'wire';
+export type PaintMaterial = 'metallic' | 'pearl' | 'candy';
+/** restore: Tapeback restoration stage — 1 rust and tape fixed, 2 straight panels and one colour, 3 brightwork. */
+export interface CarStyle { wheel?: WheelSetId; material?: PaintMaterial; restore?: number }
+
+/** Wheel sets any car can wear: shape and colours only; the tyre and size stay the car's own. */
+const WHEEL_SETS: Record<WheelSetId, Partial<WheelStyle>> = {
+  steel: { kind: 'steel', rim: 0.6 },
+  turbine: { kind: 'cover', rim: 0.68 },
+  fivespoke: { kind: 'sport', rim: 0.74, caliper: '#d8312a' },
+  dish: { kind: 'dish', rim: 0.68, caliper: '#3a3f44' },
+  wire: { kind: 'center', rim: 0.74, caliper: '#c9a14a' },
+};
+const styledDefs = new Map<string, CarDef>();
+function styledDef(id: string, st?: CarStyle): CarDef {
+  const d = defFor(id);
+  if (!st?.wheel) return d;
+  const key = `${id}|${st.wheel}`;
+  let v = styledDefs.get(key);
+  if (!v) { v = { ...d, wheel: { ...d.wheel, ...WHEEL_SETS[st.wheel] } }; styledDefs.set(key, v); }
+  return v;
+}
+const styleKey = (st?: CarStyle) => (st ? `${st.wheel ?? ''}.${st.material ?? ''}.${st.restore ?? 0}` : '');
 
 // ---------------------------------------------------------------- wheels
 
@@ -455,7 +481,7 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
 
 // ---------------------------------------------------------------- body layers
 
-interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; paint: string; trim: string; stripe: string | null; detail: boolean }
+interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; paint: string; trim: string; stripe: string | null; detail: boolean; mat?: PaintMaterial; restore: number }
 
 /** Ground shadow, far wheels, extruded planes, wheel wells, near panel and its details (everything behind the near wheels). */
 function backLayer(c: Ctx, shadow: boolean) {
@@ -577,8 +603,9 @@ function nearPanel(c: Ctx) {
   const hz = (d.belt + d.sill) / 2 + 0.04;
   ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.fillRect(0, hz - 0.05, d.L, 0.05);
   ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, hz - 0.065, d.L, 0.012);
+  if (c.mat) paintMaterial(c);
   // a long specular streak from the stage light
-  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillStyle = c.mat ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.14)';
   ctx.beginPath(); ctx.moveTo(d.L * 0.18, d.belt - 0.09); ctx.lineTo(d.L * 0.86, d.belt - 0.13); ctx.lineTo(d.L * 0.84, d.belt - 0.165); ctx.lineTo(d.L * 0.16, d.belt - 0.12); ctx.closePath(); ctx.fill();
   if (id === 'tourer') {
     // two-tone: cream lower body under a chrome divide
@@ -587,7 +614,7 @@ function nearPanel(c: Ctx) {
     cg.addColorStop(0, 'rgba(255,255,255,0.15)'); cg.addColorStop(1, 'rgba(0,0,0,0.28)');
     ctx.fillStyle = cg; ctx.fillRect(0, 0, d.L, 0.5);
   }
-  if (id === 'junker') {
+  if (id === 'junker' && c.restore < 2) {
     // mismatched front fender in primer, and a couple of dents catching the light
     ctx.fillStyle = '#7d817b';
     ctx.beginPath(); ctx.moveTo(2.46, 0.98); ctx.lineTo(3.4, 0.9); ctx.lineTo(3.7, 0.6); ctx.lineTo(3.7, 0.3); ctx.lineTo(2.46, 0.3); ctx.closePath(); ctx.fill();
@@ -635,6 +662,35 @@ function nearPanel(c: Ctx) {
   void trim;
 }
 
+/** Premium paint: metallic flake, a pearl colour shift, or deep candy over a bright base. Cosmetic only. */
+function paintMaterial(c: Ctx) {
+  const { ctx, d, paint } = c;
+  if (c.mat === 'metallic') {
+    // fine flake: a deterministic scatter of bright points, denser where the light hits
+    for (let k = 0; k < 140; k++) {
+      const fx = ((k * 0.6180339) % 1) * d.L, fy = d.sill + (((k * 0.7548776) % 1) * (d.belt + 0.25 - d.sill));
+      ctx.fillStyle = k % 3 ? 'rgba(255,255,255,0.35)' : lit(paint, 0.55);
+      ctx.fillRect(fx, fy, 0.012, 0.012);
+    }
+    const sh = ctx.createLinearGradient(0, 0, d.L, 0);
+    sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.45, 'rgba(255,255,255,0.12)'); sh.addColorStop(0.6, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sh; ctx.fillRect(0, 0, d.L, 1.6);
+  } else if (c.mat === 'pearl') {
+    // a soft hue flip toward the ends of the car, as pearl does when the angle changes
+    const pg = ctx.createLinearGradient(0, 0, d.L, 0.6);
+    pg.addColorStop(0, 'rgba(255,170,220,0.22)'); pg.addColorStop(0.45, 'rgba(255,255,255,0.05)'); pg.addColorStop(1, 'rgba(120,230,255,0.24)');
+    ctx.fillStyle = pg; ctx.fillRect(0, 0, d.L, 1.6);
+  } else if (c.mat === 'candy') {
+    // deep candy: darker, richer flanks with a bright core where the light lands
+    const cg = ctx.createLinearGradient(0, d.belt + 0.1, 0, d.sill);
+    cg.addColorStop(0, 'rgba(255,255,255,0.1)'); cg.addColorStop(0.35, 'rgba(0,0,0,0)'); cg.addColorStop(1, 'rgba(0,0,0,0.38)');
+    ctx.fillStyle = cg; ctx.fillRect(0, 0, d.L, 1.6);
+    const core = ctx.createRadialGradient(d.L * 0.55, d.belt - 0.15, 0.05, d.L * 0.55, d.belt - 0.15, d.L * 0.45);
+    core.addColorStop(0, lit(paint, 0.45) + '88'); core.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = core; ctx.fillRect(0, 0, d.L, 1.6);
+  }
+}
+
 function seam(ctx: CanvasRenderingContext2D, pts: [number, number][], w = 0.012) {
   ctx.strokeStyle = 'rgba(5,7,9,0.7)'; ctx.lineWidth = w; ctx.lineCap = 'round';
   ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
@@ -657,7 +713,14 @@ function mirror(ctx: CanvasRenderingContext2D, x: number, y: number, col: string
 function panelDetails(c: Ctx) {
   const { ctx, id, d, paint, trim, detail } = c;
   const lo = d.sill + 0.05;
-  if (id === 'junker') {
+  if (id === 'junker' && c.restore >= 2) {
+    // restored body: straight panels in one colour, true door seams; brightwork adds a chrome waist strip
+    seam(ctx, [[1.24, 0.98], [1.24, 0.5], [1.3, lo]], 0.014);
+    seam(ctx, [[2.42, 0.99], [2.44, 0.5], [2.3, lo]], 0.014);
+    if (c.restore >= 3) { ctx.fillStyle = 'rgba(232,236,240,0.85)'; ctx.fillRect(0.1, 0.62, 3.45, 0.022); }
+    if (detail) handle(ctx, 1.4, 0.86, c.restore >= 3);
+    mirror(ctx, 2.34, 1.0, c.restore >= 3 ? '#d9dee2' : paint);
+  } else if (id === 'junker') {
     // replacement door in a different colour, with seams that don't quite line up
     ctx.fillStyle = '#6f8584';
     ctx.beginPath();
@@ -678,7 +741,7 @@ function panelDetails(c: Ctx) {
       ctx.strokeStyle = 'rgba(196,104,44,0.75)'; ctx.lineWidth = w * 0.45;
       ctx.stroke();
     };
-    for (const wx of [d.rx, d.fx]) {
+    for (const wx of c.restore >= 1 ? [] : [d.rx, d.fx]) {
       const R = d.r + d.archGap + 0.02;
       const pts: [number, number][] = [];
       for (let k = 0; k <= 12; k++) {
@@ -688,13 +751,14 @@ function panelDetails(c: Ctx) {
       }
       rust(pts, 0.05);
     }
-    rust([[0.25, lo - 0.01], [0.42, lo + 0.01], [0.6, lo - 0.005]], 0.04);
-    rust([[1.45, lo], [1.7, lo + 0.015], [2.0, lo]], 0.03);
-    rust([[2.95, 0.95], [3.1, 0.93]], 0.03);
+    if (c.restore < 1) {
+      rust([[0.25, lo - 0.01], [0.42, lo + 0.01], [0.6, lo - 0.005]], 0.04);
+      rust([[1.45, lo], [1.7, lo + 0.015], [2.0, lo]], 0.03);
+      rust([[2.95, 0.95], [3.1, 0.93]], 0.03);
+    }
     ctx.restore();
     // duct tape over a crack on the rear quarter — big enough to read on a phone
-    tape(ctx, 0.5, 0.72, 0.36, -0.3);
-    tape(ctx, 0.52, 0.66, 0.3, 0.35);
+    if (c.restore < 1) { tape(ctx, 0.5, 0.72, 0.36, -0.3); tape(ctx, 0.52, 0.66, 0.3, 0.35); }
     if (detail) { ctx.fillStyle = '#20262a'; ctx.beginPath(); ctx.arc(0.42, 0.88, 0.05, 0, Math.PI * 2); ctx.fill(); } // fuel cap
     mirror(ctx, 2.34, 1.0, '#2b2f31');
   } else if (id === 'beater') {
@@ -882,12 +946,16 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     fillPts(ctx, side, face);
     ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.01; path(ctx, side); ctx.stroke();
   };
-  if (id === 'junker') {
+  if (id === 'junker' && c.restore >= 3) {
+    const gr = ctx.createLinearGradient(0, 0.49, 0, 0.34);
+    gr.addColorStop(0, '#f4f6f8'); gr.addColorStop(0.5, '#8f969c'); gr.addColorStop(1, '#dde1e4');
+    bumper('rear', 0.34, 0.48, 0.45, gr, '#f1f3f5', '#a3aab0');
+    bumper('front', 0.34, 0.48, 0.42, gr, '#f1f3f5', '#b9c0c6');
+  } else if (id === 'junker') {
     // uneven, mismatched black bumpers — the rear one sags on one side, the front is taped on
     bumper('rear', 0.33, 0.49, 0.45, '#27292b', '#3c3f42', '#1d1f21', -0.04);
     bumper('front', 0.34, 0.5, 0.42, '#2e2c29', '#4a4743', '#24221f');
-    tape(ctx, 3.5, 0.43, 0.26, 0.45);
-    tape(ctx, 3.53, 0.42, 0.22, -0.35);
+    if (c.restore < 1) { tape(ctx, 3.5, 0.43, 0.26, 0.45); tape(ctx, 3.53, 0.42, 0.22, -0.35); }
   } else if (id === 'beater') {
     bumper('rear', 0.36, 0.47, 0.5, '#2a2c2e', '#45484b', '#202224');
     bumper('front', 0.36, 0.47, 0.55, '#2a2c2e', '#45484b', '#202224');
@@ -913,10 +981,13 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     for (let k = 0; k < 3; k++) fillPts(ctx, quadFP(g, 0.32, 0.68, 0.53 + k * 0.035, 0.545 + k * 0.035), '#3d4144');
     // mismatched headlights: one clear, one yellowed and cracked
     fillPts(ctx, quadFP(g, 0.08, 0.27, 0.52, 0.66), lens(true));
-    fillPts(ctx, quadFP(g, 0.73, 0.92, 0.52, 0.66), lampOn ? '#ffd27a' : '#c9a54a');
-    ctx.strokeStyle = 'rgba(40,30,10,0.7)'; ctx.lineWidth = 0.008;
-    const a = fp(g, 0.76, 0.64), b = fp(g, 0.85, 0.55), e = fp(g, 0.9, 0.6);
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    if (c.restore >= 3) fillPts(ctx, quadFP(g, 0.73, 0.92, 0.52, 0.66), lens(true));
+    else {
+      fillPts(ctx, quadFP(g, 0.73, 0.92, 0.52, 0.66), lampOn ? '#ffd27a' : '#c9a54a');
+      ctx.strokeStyle = 'rgba(40,30,10,0.7)'; ctx.lineWidth = 0.008;
+      const a = fp(g, 0.76, 0.64), b = fp(g, 0.85, 0.55), e = fp(g, 0.9, 0.6);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    }
   } else if (id === 'beater') {
     fillPts(ctx, quadFP(g, 0.27, 0.73, 0.55, 0.73), '#16181a');
     for (let k = 0; k < 4; k++) fillPts(ctx, quadFP(g, 0.29, 0.71, 0.575 + k * 0.04, 0.59 + k * 0.04), '#9aa0a5');
@@ -1055,7 +1126,7 @@ function setupCtx(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 /** Paint a consistent car at garage, showroom, reveal, and live race scales. (x, y) is the rear of the car at ground level; w is the car length in px. */
 export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: number, y: number, w: number, o: CarDrawOpts) {
   if (w < 2) return;
-  const d = defFor(id);
+  const d = styledDef(id, o.style);
   const g = geometry(id);
   const paint = hexOf(o.paint);
   const trim = hexOf(o.trim ?? lit(paint, -0.4));
@@ -1063,7 +1134,7 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
   if (o.cache && !o.silhouette && !o.cover) return drawCached(ctx, id, x, y, w, o, paint, trim);
   ctx.save();
   setupCtx(ctx, x, y, w, id);
-  const c: Ctx = { ctx, id, d, g, paint, trim, stripe: o.livery ?? null, detail };
+  const c: Ctx = { ctx, id, d, g, paint, trim, stripe: o.livery ?? null, detail, mat: o.style?.material, restore: o.style?.restore ?? 0 };
   if (o.silhouette) {
     if (o.shadow !== false) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(d.L / 2, 0.02, d.L * 0.55, 0.12, 0, 0, Math.PI * 2); ctx.fill(); }
     hull(c, '#0f141b');
@@ -1081,13 +1152,13 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
 }
 
 function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, o: CarDrawOpts, paint: string, trim: string) {
-  const d = defFor(id);
+  const d = styledDef(id, o.style);
   const g = geometry(id);
   // Sprites are rendered at coarse size steps (~12%, rounded up) and drawn scaled down to the exact size,
   // so a zooming race camera reuses a handful of bitmaps instead of rebuilding every car each frame or two.
   const W = Math.max(8, Math.round(2 ** (Math.ceil(Math.log2(Math.max(8, w)) * 6) / 6)));
   const f = w / W;
-  const key = [id, paint, trim, o.livery ?? '', W].join('|');
+  const key = [id, paint, trim, o.livery ?? '', W, styleKey(o.style)].join('|');
   let s = spriteCache.get(key);
   if (!s) {
     if (spriteCache.size > 48) spriteCache.clear();
@@ -1104,7 +1175,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
     const draw = (cv: HTMLCanvasElement, fn: (c: Ctx) => void) => {
       const cx = cv.getContext('2d')!;
       cx.save(); setupCtx(cx, pad, oy, W, id);
-      fn({ ctx: cx, id, d, g, paint, trim, stripe: o.livery ?? null, detail: false });
+      fn({ ctx: cx, id, d, g, paint, trim, stripe: o.livery ?? null, detail: false, mat: o.style?.material, restore: o.style?.restore ?? 0 });
       cx.restore();
     };
     draw(back, (c) => backLayer(c, o.shadow !== false));
@@ -1116,7 +1187,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
   const blit = (cv: HTMLCanvasElement) => ctx.drawImage(cv, x - s!.pad * f, y - oy * f, cv.width * f, cv.height * f);
   if (o.headlights || o.nitro) {
     ctx.save(); setupCtx(ctx, x, y, w, id);
-    const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false };
+    const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false, restore: 0 };
     if (o.headlights) beam(c, o.headlights);
     if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0);
     ctx.restore();
@@ -1128,7 +1199,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
   blit(s.front);
   if (o.headlights || o.brake) {
     ctx.save(); setupCtx(ctx, x, y, w, id);
-    const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false };
+    const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false, restore: 0 };
     frontLayerLightsOnly(c, o.headlights ?? 0, !!o.brake);
     ctx.restore();
   }
@@ -1157,7 +1228,7 @@ export function drawCarCover(ctx: CanvasRenderingContext2D, id: CarId | string, 
 export function drawHeadlightBeam(ctx: CanvasRenderingContext2D, id: CarId | string, x: number, y: number, w: number, k: number) {
   if (k <= 0) return;
   ctx.save(); setupCtx(ctx, x, y, w, id);
-  beam({ ctx, id, d: defFor(id), g: geometry(id), paint: '#888888', trim: '#888888', stripe: null, detail: false }, k);
+  beam({ ctx, id, d: defFor(id), g: geometry(id), paint: '#888888', trim: '#888888', stripe: null, detail: false, restore: 0 }, k);
   ctx.restore();
 }
 

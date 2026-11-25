@@ -35,6 +35,8 @@ export interface BotOpts {
   policy?: NitroPolicy | 'mixed';
   quickRace?: boolean;
   forceStd?: boolean;
+  /** Called before every bot decision (audits: cash timelines, save snapshots). */
+  onStep?: (g: Game, t: number) => void;
 }
 
 const COST = { merge: 1.3, scrap: 1.5, buy: 2.5, raceOverhead: 7, quick: 5, think: 1 };
@@ -130,6 +132,7 @@ export function runBot(o: BotOpts): BotLog {
   };
 
   while (t < maxS && !g.state.owned.includes(goalCar as never)) {
+    o.onStep?.(g, t);
     if (g.state.pendingReveal) { spend(4); g.finishReveal(g.state.pendingReveal, now); }
     if (g.state.crates.length && B.freeSlots(g.state) > 0) { g.openCrates(now); spend(COST.think); }
     // Merge All when available and useful

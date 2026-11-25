@@ -1,7 +1,7 @@
 import { setMuted, sfx, unlockAudio } from '../audio';
 import type { GameEvent } from '../core/events';
 import type { Game } from '../core/game';
-import { MAX_TIER, NITRO_CAP } from '../data/tables';
+import { MAX_TIER, nitroCapFor } from '../data/tables';
 import { fmt, h } from './dom';
 import { GarageView } from './garage';
 import { RaceView } from './race';
@@ -140,7 +140,7 @@ export class App {
     set('cash', fmt(s.cash), any);
     set('rep', fmt(s.rep), any);
     set('scrap', fmt(s.scrap), any);
-    set('nitro', `${s.nitro}/${NITRO_CAP}`, any);
+    set('nitro', `${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`, any);
     this.fitTop();
     this.navBtns.showroom.querySelector('.badge')?.remove();
     if (s.pendingReveal) this.navBtns.showroom.append(h('span', { class: 'badge' }, '1'));

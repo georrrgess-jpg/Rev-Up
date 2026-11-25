@@ -1,10 +1,11 @@
+import type { GameState } from '../core/state';
 import { EngineHum, resumeAudio, sfx, suspendAudio } from '../audio';
 import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
 import { RaceSetup, RaceSim } from '../core/race';
 import type { LastResult } from '../core/state';
-import { DISTRICTS, EVENTS, MEDAL_REWARDS, NITRO_CAP, RACE, RIVALS, RaceEvent, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
+import { DISTRICTS, EVENTS, MEDAL_REWARDS, RACE, RIVALS, RaceEvent, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength, CREW_NITRO, nitroCapFor } from '../data/tables';
 import { carLengthM, drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h, ordinal } from './dom';
@@ -42,7 +43,7 @@ export class RaceView implements View {
     const s = this.app.game.state;
     const cls = carById(s.activeCar);
     const lo = computeLoadout(s);
-    this.head.replaceChildren(h('strong', {}, cls.model), h('div', {}, `${kmh(lo.stats.top)} km/h · Nitro ${s.nitro}/${NITRO_CAP}`));
+    this.head.replaceChildren(h('strong', {}, cls.model), h('div', {}, `${kmh(lo.stats.top)} km/h · Nitro ${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`));
     const { w, h: hh } = fitCanvas(this.headCanvas);
     const ctx = this.headCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, hh);
@@ -54,7 +55,7 @@ export class RaceView implements View {
     const rec = P.recommendedEvent(s);
     const q = s.pendingQuick;
     const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details[open]')).map((d) => d.dataset.event));
-    const nitroNote = s.nitro ? `${s.nitro} nitro` : s.stats.races === 0 ? 'starter nitro' : 'no nitro';
+    const nitroNote = `${s.nitro + CREW_NITRO} nitro${s.nitro ? '' : ' (crew)'}`; // banked charges plus the free crew charge
     const details = (e: RaceEvent) => {
       const pay = e.payout;
       return h('details', { class: 'event-detail', 'data-event': e.id, ...(expanded.has(e.id) ? { open: '' } : {}) },
@@ -67,8 +68,9 @@ export class RaceView implements View {
     const quickBtn = (e: RaceEvent, small: boolean) => {
       if (!P.canQuickRace(s, e)) return null;
       const here = q?.eventId === e.id;
-      return h('button', { class: `btn${small ? ' sm' : ''}${q && !here ? ' off' : ''}`, onclick: () => this.startQuick(e.id) },
-        here ? `Crew ${Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000))} s` : small ? 'Quick' : h('span', { class: 'stack' }, 'Quick Race', h('small', {}, 'base pay · keep merging')));
+      const crew = P.purse(s, e).quick;
+      return h('button', { class: `btn${small ? ' sm' : ''}${q && !here ? ' off' : ''}`, 'aria-label': `Quick Race: your crew races for up to $${crew[0]}`, onclick: () => this.startQuick(e.id) },
+        here ? `Crew ${Math.max(0, Math.ceil((q!.endsAt - Date.now()) / 1000))} s` : small ? h('span', { class: 'stack' }, 'Quick', h('small', {}, `$${crew[0]}`)) : h('span', { class: 'stack' }, 'Quick Race', h('small', {}, `crew earns up to $${crew[0]}`)));
     };
     const course = (e: RaceEvent) => h('span', { class: 'course' }, TRACKS[e.track].course);
 
@@ -79,7 +81,8 @@ export class RaceView implements View {
       h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
       h('div', { class: 'meta' }, course(rec), ` ${TRACKS[rec.track].favours}`),
       h('p', { class: 'reason' }, P.eventReason(s, rec)),
-      h('div', { class: 'event-rewards' }, h('span', {}, `Win $${rec.payout.cash[0]}`), h('span', {}, `${rec.payout.rep[0]} Rep`),
+      purseStrip(s, rec),
+      h('div', { class: 'event-rewards' }, h('span', {}, `${rec.payout.rep[0]} Rep for a win`),
         rec.payout.crates[0] ? h('span', {}, `${rec.payout.crates[0]} crate${rec.payout.crates[0] > 1 ? 's' : ''}`) : null,
         fr?.bestTime ? h('span', {}, `Record ${fr.bestTime.toFixed(2)} s`) : null),
       h('div', { class: 'btns' },
@@ -186,6 +189,16 @@ interface Particle { x: number; y: number; vx: number; vy: number; life: number;
 const sim0Launch = (sim: RaceSim) => sim.player.x < (sim.track.segments[0]?.length ?? 0) && sim.player.x > 0.5;
 
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
+
+/** What a live race pays before you commit: each place, the skill bonus, and any one-time reward. */
+function purseStrip(s: GameState, e: RaceEvent): HTMLElement {
+  const p = P.purse(s, e);
+  if (e.timeAttack) return h('div', { class: 'purse' }, h('span', { class: 'p1' }, `$${p.live[0]} a run`), h('span', {}, 'medals pay once'));
+  return h('div', { class: 'purse', 'aria-label': `Pays ${p.live.map((c, i) => `${ordinal(i + 1)} $${c}`).join(', ')}` },
+    ...p.live.map((c, i) => h('span', { class: i === 0 ? 'p1' : '' }, h('small', {}, ordinal(i + 1)), `$${c}`)),
+    h('span', { class: 'skill' }, h('small', {}, 'Perfect'), `+$${p.perfect}`),
+    p.firstClear ? h('span', { class: 'once' }, h('small', {}, 'First win'), `+$${p.firstClear}`) : null);
+}
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
 
 function hash(n: number) {
@@ -513,6 +526,8 @@ class RaceScreen {
       r.nextMedal ? h('p', { class: 'explain' }, `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
       r.trophy ? h('div', { class: 'finish-earned' }, h('span', { class: 'trophy-ico', 'aria-hidden': 'true' }, '🏆'), h('div', {}, h('strong', {}, r.trophy), h('div', {}, 'Class trophy added to the Showroom'))) : null,
       h('div', { class: 'pays' }, ...pills),
+      r.breakdown && r.breakdown.length > 1 ? h('div', { class: 'breakdown', 'aria-label': 'Cash breakdown' },
+        ...r.breakdown.map((b) => h('div', { class: `bd ${b.kind}` }, h('span', {}, b.label), h('span', { class: 'num' }, `+$${b.cash}`)))) : null,
       s.stats.races <= 1 ? h('p', { class: 'explain' }, 'Cash buys upgrades and crates · Rep unlocks new cars · Crates drop parts onto your bench.') : null,
       finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
       ev.id === 'foundry-final' && r.firstClear ? h('div', { class: 'finish-earned' }, 'Campaign finale won') : null,

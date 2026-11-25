@@ -1,3 +1,4 @@
+import type { UpgradeId } from '../data/tables';
 import { CREW_NITRO, CarId, Family, carById } from '../data/tables';
 import * as B from './board';
 import type { GameEvent, SlotRef } from './events';
@@ -114,7 +115,11 @@ export class Game {
       return ev;
     }, now);
   }
-  buyUpgrade(id: 'grid' | 'printer' | 'crateTier', now = Date.now()) {
+  orderPart(family: Family, tier: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => B.orderPart(d, family, tier), now);
+  }
+  buyUpgrade(id: UpgradeId, now = Date.now()) {
     this.input(now);
     return this.transact((d) => P.buyUpgrade(d, id), now);
   }

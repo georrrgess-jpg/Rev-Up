@@ -1,6 +1,6 @@
 import {
   ACTIVE_FAMILIES, BOARD_EXPANDED, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
-  Family, MAX_TIER, MERGE_ALL_NITRO_MIN_CHAIN, MERGE_CASH, NITRO_CAP, QUALITY_ODDS, Quality, SCRAP_VALUE,
+  Family, MAX_TIER, MERGE_ALL_NITRO_MIN_CHAIN, MERGE_CASH, QUALITY_ODDS, Quality, SCRAP_VALUE, PART_ORDER_PRICE, nitroCapFor, carById, ENABLED_CARS,
   TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST,
 } from '../data/tables';
 import { nextRandom, pickWeighted } from './rng';
@@ -121,7 +121,7 @@ function bumpCombo(s: GameState, now: number, fusions: number, events: GameEvent
     s.combo.count++;
     s.combo.lastAt = now;
     if (s.combo.count % COMBO_NITRO_EVERY === 0) {
-      if (s.nitro < NITRO_CAP) {
+      if (s.nitro < nitroCapFor(s.upgrades.nitroTank)) {
         s.nitro++;
         events.push({ type: 'nitro', total: s.nitro, source: 'combo' });
       } else events.push({ type: 'nitroFull' });
@@ -183,7 +183,7 @@ export function mergeAll(s: GameState): GameEvent[] {
   if (fusions > 0) {
     s.mergeAllUses++;
     if (longest >= MERGE_ALL_NITRO_MIN_CHAIN) {
-      if (s.nitro < NITRO_CAP) {
+      if (s.nitro < nitroCapFor(s.upgrades.nitroTank)) {
         s.nitro++;
         events.push({ type: 'nitro', total: s.nitro, source: 'mergeAll' });
       } else events.push({ type: 'nitroFull' });
@@ -278,6 +278,26 @@ export function buyCrate(s: GameState, kind: 'std' | 'targeted' | 'cash', family
     s.cash -= TARGETED_CRATE_CASH_COST;
     s.crates.push({ kind: 'targeted', family, source: 'shop' });
   }
+  return openCrates(s, 1);
+}
+
+/** The highest tier the parts counter sells: one below your best car's cap (the cap tier is a craft). */
+export function orderMaxTier(s: GameState): number {
+  const cap = Math.max(...s.owned.map((id) => carById(id).cap));
+  // the next car's keystone craft is always reachable: two bought parts of the tier below make it
+  const next = ENABLED_CARS.find((c) => !s.owned.includes(c.id));
+  const goalTier = next?.unlock ? next.unlock.tier : 0;
+  return Math.max(1, Math.min(Math.max(cap, goalTier) - 1, MAX_TIER - 1));
+}
+
+/** Order a Part: a known family and tier for cash. It goes straight onto the bench, or first in the crate queue. */
+export function orderPart(s: GameState, family: Family, tier: number): GameEvent[] {
+  if (tier < 1 || tier > orderMaxTier(s)) return [{ type: 'invalid', reason: `T${tier} parts aren't sold yet` }];
+  const price = PART_ORDER_PRICE[tier];
+  if (s.cash < price) return [{ type: 'invalid', reason: `Need $${price - s.cash} more` }];
+  s.cash -= price;
+  s.stats.spent = (s.stats.spent ?? 0) + price;
+  s.crates.unshift({ kind: 'targeted', family, tier, source: 'shop' });
   return openCrates(s, 1);
 }
 

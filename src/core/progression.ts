@@ -1,8 +1,7 @@
 import {
   ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
-  MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MAX_S, OFFLINE_MIN_S, PRECISION_BONUS_CAP, PRECISION_BONUS_PER_PERFECT,
-  PRINTER_INTERVAL_S, RACE_EFFORT, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById,
-} from '../data/tables';
+  MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
+  PRINTER_INTERVAL_S, RACE_EFFORT, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
 import type { GameEvent } from './events';
 import { computeLoadout } from './loadout';
@@ -124,27 +123,52 @@ export const mergeAllUnlocked = (s: GameState) => s.stats.races >= MERGE_ALL_UNL
 
 // ---------------- Upgrades ----------------
 
-export function upgradeCost(s: GameState, id: 'grid' | 'printer' | 'crateTier'): number | null {
+export function upgradeCost(s: GameState, id: UpgradeId): number | null {
   const def = UPGRADES.find((u) => u.id === id)!;
   const lvl = s.upgrades[id];
   return lvl < def.levels.length ? def.levels[lvl].cost : null;
 }
 
-export function buyUpgrade(s: GameState, id: 'grid' | 'printer' | 'crateTier'): GameEvent[] {
+export function buyUpgrade(s: GameState, id: UpgradeId): GameEvent[] {
   const cost = upgradeCost(s, id);
   if (cost === null) return [{ type: 'invalid', reason: 'Maxed' }];
   if (s.cash < cost) return [{ type: 'invalid', reason: `Need $${cost - s.cash} more` }];
   s.cash -= cost;
+  s.stats.spent = (s.stats.spent ?? 0) + cost;
   s.upgrades[id]++;
   if (id === 'grid') expandBoard(s);
   return openCrates(s);
+}
+
+/** The Workshop shows each upgrade once it is relevant, so the early catalogue stays short. */
+export function upgradeShown(s: GameState, u: UpgradeDef): boolean {
+  switch (u.shows ?? 'always') {
+    case 'quick': return Object.values(s.events).some((r) => r.wins > 0);
+    case 'cars3': return s.owned.length >= 3;
+    case 'cars4': return s.owned.length >= 4;
+    default: return true;
+  }
+}
+
+/** What an upgrade does now and what its next level does, in exact numbers. */
+export function upgradeEffect(s: GameState, id: UpgradeId): { now: string; next: string } {
+  const lvl = s.upgrades[id] ?? 0;
+  const odds = (l: number) => CRATE_TIER_ODDS[Math.min(l, CRATE_TIER_ODDS.length - 1)].map((w, i) => (w > 0 ? `${Math.round(w * 100)}% T${i + 1}` : '')).filter(Boolean).join(' · ');
+  switch (id) {
+    case 'grid': return { now: lvl ? 'Board 6×7' : 'Board 5×6', next: 'Board 6×7 (+12 slots)' };
+    case 'printer': return { now: `Crate every ${PRINTER_INTERVAL_S[lvl]} s`, next: `every ${PRINTER_INTERVAL_S[lvl + 1] ?? PRINTER_INTERVAL_S[lvl]} s` };
+    case 'crateTier': return { now: odds(lvl), next: odds(lvl + 1) };
+    case 'crew': return { now: `Quick Races pay ${Math.round(QUICK_PAY_SHARE[Math.min(lvl, QUICK_PAY_SHARE.length - 1)] * 100)}%`, next: `${Math.round(QUICK_PAY_SHARE[Math.min(lvl + 1, QUICK_PAY_SHARE.length - 1)] * 100)}% of the live purse` };
+    case 'nitroTank': return { now: `Bank ${nitroCapFor(lvl)} nitro`, next: `${nitroCapFor(lvl + 1)} nitro` };
+    case 'lockup': return { now: `Away earnings for ${OFFLINE_HOURS[Math.min(lvl, OFFLINE_HOURS.length - 1)]} h`, next: `${OFFLINE_HOURS[Math.min(lvl + 1, OFFLINE_HOURS.length - 1)]} h` };
+  }
 }
 
 // ---------------- Events & payouts ----------------
 
 export function eventUnlocked(s: GameState, e: RaceEvent): { ok: boolean; why: string; switchCar?: CarId } {
   if (e.requires.car && !s.owned.includes(e.requires.car)) return { ok: false, why: `Unlock the ${carById(e.requires.car).model}` };
-  if (e.requires.beatBoss && !s.bosses.includes(e.requires.beatBoss)) return { ok: false, why: 'Beat Rusty Ray to open the Suburbs' };
+  if (e.requires.beatBoss && !s.bosses.includes(e.requires.beatBoss)) return { ok: false, why: `Beat ${RIVALS[e.requires.beatBoss].name}` };
   if (e.requires.afterWin && !(s.events[e.requires.afterWin]?.wins)) return { ok: false, why: `Win ${eventById(e.requires.afterWin).name} first` };
   if (e.requires.rep && s.rep < e.requires.rep) return { ok: false, why: `${e.requires.rep - s.rep} more Rep` };
   if (e.carOnly && s.activeCar !== e.carOnly) return { ok: false, why: `${carById(e.carOnly).model} only`, switchCar: e.carOnly };
@@ -156,7 +180,7 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   const u = eventUnlocked(s, e);
   if (!u.ok) return u.why;
   const g = goalStatus(s);
-  if (e.boss && !s.bosses.includes(e.boss.rival)) return `Beat Rusty Ray for his ${e.boss.reward.blueprint} paint and to open the Suburbs`;
+  if (e.boss && !s.bosses.includes(e.boss.rival)) return `Beat ${RIVALS[e.boss.rival].name} for the ${e.boss.reward.blueprint} paint${e.boss.rival === 'ray' ? ' and to open the Suburbs' : ''}`;
   if (!s.events[e.id]?.wins) {
     const fam = g && !g.keystoneDone ? ` ${FAMILIES[g.family].name}` : '';
     return `First win: +$${e.firstClear.cash} and ${e.firstClear.crates}${fam} crates${fam ? ` toward the ${g!.car.model}` : ''}`;
@@ -189,13 +213,29 @@ export function isFreshRoute(s: GameState, e: RaceEvent): boolean {
   return s.stats.races >= FRESH_ROUTE_AFTER_RACES && !(s.recentEvents ?? []).includes(e.id);
 }
 
+/** Cash for one Perfect boost in this event (live only, at most two per race). */
+export const perfectBonus = (e: RaceEvent) => Math.max(PRECISION_BONUS_PER_PERFECT, Math.round(e.payout.cash[0] * PERFECT_BONUS_SHARE));
+
+/** The purse a player can see before racing: live by place, the crew's Quick Race cut, and skill bonus. */
+export function purse(s: GameState, e: RaceEvent) {
+  const share = QUICK_PAY_SHARE[Math.min(s.upgrades.crew ?? 0, QUICK_PAY_SHARE.length - 1)];
+  return {
+    live: e.payout.cash,
+    quick: e.payout.cash.map((c) => Math.round(c * share)),
+    quickShare: share,
+    perfect: perfectBonus(e),
+    firstClear: !(s.events[e.id]?.wins) && !e.boss ? e.firstClear.cash : 0,
+  };
+}
+
 export function computePayout(s: GameState, e: RaceEvent, place: number, mode: 'live' | 'quick', perfects: number): Payout {
   const i = place - 1;
-  const base = { cash: e.payout.cash[i], rep: e.payout.rep[i], crates: e.payout.crates[i] };
+  const share = mode === 'quick' ? QUICK_PAY_SHARE[Math.min(s.upgrades.crew ?? 0, QUICK_PAY_SHARE.length - 1)] : 1;
+  const base = { cash: Math.round(e.payout.cash[i] * share), rep: e.payout.rep[i], crates: e.payout.crates[i] };
   const p: Payout = { ...base, precision: 0, firstClear: false, boss: false, freshRep: 0 };
   if (isFreshRoute(s, e)) { p.freshRep = Math.ceil(base.rep * FRESH_ROUTE_BONUS); p.rep += p.freshRep; }
   if (mode === 'live') {
-    p.precision = Math.min(PRECISION_BONUS_CAP, perfects * PRECISION_BONUS_PER_PERFECT);
+    p.precision = perfectBonus(e) * Math.min(2, perfects);
     p.cash += p.precision;
     const won = place === 1;
     const rec = s.events[e.id];
@@ -253,6 +293,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   if (input.mode === 'quick') s.pendingQuick = null;
   else s.pendingRace = null;
   s.cash += pay.cash;
+  s.stats.earned = (s.stats.earned ?? 0) + pay.cash;
   s.rep += pay.rep;
   if (input.mode === 'live') s.nitro = Math.max(0, s.nitro - Math.max(0, o.nitroUsed - CREW_NITRO)); // the crew charge is used first
   const goal = goalStatus(s);
@@ -329,6 +370,13 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     cash: pay.cash + bossCash + medalCash, rep: pay.rep, crates: pay.crates + (pay.bossReward?.crates ?? 0) + medalCrates, precision: pay.precision,
     firstClear: pay.firstClear, boss: pay.boss, perfects: o.perfects, nitroUsed: input.mode === 'live' ? o.nitroUsed : 0,
     personalBest, signatureFinish, freshRep: pay.freshRep, medal, newMedals, nextMedal, trophy,
+    breakdown: [
+      { label: input.mode === 'quick' ? `Crew purse · ${ordinalShort(o.place)}` : `Purse · ${ordinalShort(o.place)}`, cash: pay.cash - pay.precision - (pay.firstClear ? e.firstClear.cash : 0), kind: 'base' as const },
+      ...(pay.precision ? [{ label: `Perfect boost${o.perfects > 1 ? 's' : ''} ×${Math.min(2, o.perfects)}`, cash: pay.precision, kind: 'skill' as const }] : []),
+      ...(pay.firstClear && e.firstClear.cash ? [{ label: 'First win', cash: e.firstClear.cash, kind: 'once' as const }] : []),
+      ...(bossCash ? [{ label: `Beat ${RIVALS[e.boss!.rival].name}`, cash: bossCash, kind: 'once' as const }] : []),
+      ...(medalCash ? [{ label: 'Medal', cash: medalCash, kind: 'once' as const }] : []),
+    ],
     advice: adviceText(s, o),
     standings: o.standings,
   };
@@ -391,6 +439,11 @@ export function recommendedEvent(s: GameState): RaceEvent {
 
 // ---------------- Offline ----------------
 
+const ordinalShort = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
+
+/** How long away earnings can build up (seconds), by Lock-up level. */
+export const offlineMaxS = (s: GameState) => OFFLINE_HOURS[Math.min(s.upgrades.lockup ?? 0, OFFLINE_HOURS.length - 1)] * 3600;
+
 export const offlineRate = (s: GameState) => s.owned.reduce((a, id) => a + carById(id).offlineRate, 0);
 
 /**
@@ -399,7 +452,7 @@ export const offlineRate = (s: GameState) => s.owned.reduce((a, id) => a + carBy
  */
 export function accrueOffline(s: GameState, now: number) {
   const elapsed = Math.max(0, (now - s.offline.lastSeenAt) / 1000);
-  const room = Math.max(0, OFFLINE_MAX_S - s.offline.pendingS);
+  const room = Math.max(0, offlineMaxS(s) - s.offline.pendingS);
   const counted = Math.min(elapsed, room);
   if (elapsed >= OFFLINE_MIN_S || s.offline.pendingS > 0) {
     s.offline.pendingS += counted;

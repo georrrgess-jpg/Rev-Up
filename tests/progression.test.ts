@@ -223,7 +223,7 @@ describe('race payouts', () => {
     const e = eventById('rusty-ray');
     const first = P.computePayout(s, e, 1, 'live', 2);
     expect(first.boss).toBe(true);
-    expect(first.precision).toBe(16);
+    expect(first.precision).toBe(2 * P.perfectBonus(e)); // 10% of the win purse per Perfect, two at most
     expect(P.computePayout(s, e, 1, 'quick', 2).boss).toBe(false);
     s.bosses.push('ray');
     expect(P.computePayout(s, e, 1, 'live', 0).boss).toBe(false);

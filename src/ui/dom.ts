@@ -22,7 +22,7 @@ export function fmt(n: number): string {
   const down = (v: number, d: number) => (Math.floor(v * 10 ** d) / 10 ** d).toFixed(d);
   if (n >= 1e6) return `${down(n / 1e6, n >= 1e7 ? 0 : 1)}M`;
   if (n >= 1e4) return `${down(n / 1e3, n >= 1e5 ? 0 : 1)}k`;
-  return String(Math.floor(n));
+  return Math.floor(n).toLocaleString('en-US');
 }
 
 export function durationText(s: number): string {

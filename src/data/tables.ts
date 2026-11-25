@@ -59,10 +59,15 @@ export const BOARD_BASE = { cols: 5, rows: 6 };
 export const BOARD_EXPANDED = { cols: 6, rows: 7 };
 export const TRAY_SLOTS = 4;
 
+export type UpgradeId = 'grid' | 'printer' | 'crateTier' | 'nitroTank' | 'crew' | 'lockup';
 export interface UpgradeDef {
-  id: 'grid' | 'printer' | 'crateTier';
+  id: UpgradeId;
   name: string;
+  /** One line on what it is for, shown above the next level's exact effect. */
+  about: string;
   levels: { cost: number; label: string }[];
+  /** Shown in the Workshop once this is true, so the early catalogue stays short. */
+  shows?: 'always' | 'quick' | 'cars3' | 'cars4';
 }
 
 export const PRINTER_INTERVAL_S = [20, 16, 13, 10]; // by printer level
@@ -75,22 +80,76 @@ export const CRATE_TIER_ODDS: number[][] = [
 ];
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'grid', name: 'Bigger bench', levels: [{ cost: 600, label: 'Expand the board to 6×7' }] },
+  { id: 'grid', name: 'Bigger bench', about: 'More room to line up merges.', levels: [{ cost: 600, label: 'Board grows from 5×6 to 6×7 (+12 slots)' }] },
   {
-    id: 'printer', name: 'Faster printer', levels: [
+    id: 'printer', name: 'Faster printer', about: 'The free crate printer in your garage.', levels: [
       { cost: 250, label: 'Crate every 16 s' },
       { cost: 750, label: 'Crate every 13 s' },
       { cost: 1600, label: 'Crate every 10 s' },
     ],
   },
   {
-    id: 'crateTier', name: 'Better crates', levels: [
+    id: 'crateTier', name: 'Better crates', about: 'Higher tiers in every crate you get.', levels: [
       { cost: 450, label: '25% chance of T2 parts' },
       { cost: 1200, label: 'Half T2, a few T3 parts' },
       { cost: 2400, label: 'Mostly T2, 15% T3 parts' },
     ],
   },
+  {
+    id: 'crew', name: 'Pit crew', about: 'Your crew runs Quick Races while you merge.', shows: 'quick', levels: [
+      { cost: 900, label: 'Quick Races pay 85% of the live purse (was 70%)' },
+    ],
+  },
+  {
+    id: 'nitroTank', name: 'Nitro tank', about: 'Bank more charges from merge combos.', shows: 'cars3', levels: [
+      { cost: 1500, label: 'Bank up to 4 nitro (was 3)' },
+      { cost: 4800, label: 'Bank up to 5 nitro' },
+    ],
+  },
+  {
+    id: 'lockup', name: 'Lock-up', about: 'Your cars earn while you are away.', shows: 'cars4', levels: [
+      { cost: 2500, label: 'Away earnings build for 12 h (was 8 h)' },
+    ],
+  },
 ];
+
+// ---------------- Economy (one table: prices, payouts, rates) ----------------
+// Prices are set in runs of play: see README "Economy". Cash buys things; Rep marks progress; scrap buys crates.
+/** Order a Part: a known family and tier, by tier. Each tier costs a bit more than two of the tier below,
+ *  so merging stays the cheaper route and buying is the reliable one. Keystones (a car's top tier) must be crafted. */
+export const PART_ORDER_PRICE = [0, 45, 110, 260, 600, 1400, 3200, 7400];
+/** Quick Race cash, as a share of the live purse for that place, by Pit crew level. */
+export const QUICK_PAY_SHARE = [0.7, 0.85]; // live stays worth playing: the crew never earns the full purse
+/** Each Perfect boost pays this share of the event's win purse (live, at most two). */
+export const PERFECT_BONUS_SHARE = 0.1;
+/** Hours of away earnings that can build up, by Lock-up level. */
+export const OFFLINE_HOURS = [8, 12];
+export const nitroCapFor = (tankLevel: number) => NITRO_CAP + tankLevel;
+
+/** Paint shop: cosmetic only, never performance. Colours and wheel sets are bought once and fit any car;
+ *  premium paint is bought per car; the Tapeback restoration is three staged jobs. `opens`: cars owned. */
+export type StyleKind = 'paint' | 'wheel' | 'material' | 'restore';
+export interface StyleItem { id: string; kind: StyleKind; name: string; price: number; value: string; opens: number; blurb: string }
+export const STYLE_ITEMS: StyleItem[] = [
+  { id: 'paint:safety', kind: 'paint', name: 'Safety Yellow', price: 250, value: '#f0b92a', opens: 1, blurb: 'Scrapyard crane yellow.' },
+  { id: 'paint:cream', kind: 'paint', name: 'Fresh Cream', price: 250, value: '#ece2c6', opens: 1, blurb: 'A clean old-school cream.' },
+  { id: 'paint:green', kind: 'paint', name: 'Racing Green', price: 250, value: '#1f5e3b', opens: 2, blurb: 'Deep green, gold-friendly.' },
+  { id: 'paint:signal', kind: 'paint', name: 'Signal Red', price: 250, value: '#c8231f', opens: 2, blurb: 'Brake-light red.' },
+  { id: 'paint:midnight', kind: 'paint', name: 'Midnight Blue', price: 250, value: '#1b2b57', opens: 3, blurb: 'Nearly black until the light hits it.' },
+  { id: 'paint:gunmetal', kind: 'paint', name: 'Gunmetal', price: 250, value: '#4b535b', opens: 3, blurb: 'Dark grey with a blue cast.' },
+  { id: 'wheel:steel', kind: 'wheel', name: 'Steelies', price: 300, value: 'steel', opens: 2, blurb: 'Plain steel wheels with lug holes.' },
+  { id: 'wheel:turbine', kind: 'wheel', name: 'Turbine covers', price: 450, value: 'turbine', opens: 2, blurb: 'Period aero wheel covers.' },
+  { id: 'wheel:fivespoke', kind: 'wheel', name: 'Five-spoke', price: 900, value: 'fivespoke', opens: 3, blurb: 'Sport alloys with red calipers.' },
+  { id: 'wheel:dish', kind: 'wheel', name: 'Deep dish', price: 1400, value: 'dish', opens: 4, blurb: 'Polished lips, muscle-car stance.' },
+  { id: 'wheel:wire', kind: 'wheel', name: 'Wire wheels', price: 2400, value: 'wire', opens: 5, blurb: 'Centre-lock wire wheels with gold calipers.' },
+  { id: 'material:metallic', kind: 'material', name: 'Metallic', price: 1200, value: 'metallic', opens: 3, blurb: 'Fine flake that sparkles in the light. For this car.' },
+  { id: 'material:pearl', kind: 'material', name: 'Pearl', price: 3000, value: 'pearl', opens: 4, blurb: 'Colour shifts toward pink and teal at the ends. For this car.' },
+  { id: 'material:candy', kind: 'material', name: 'Candy', price: 6000, value: 'candy', opens: 5, blurb: 'Deep, glowing colour over a bright base. For this car.' },
+  { id: 'restore:1', kind: 'restore', name: 'Rust repair', price: 1500, value: '1', opens: 2, blurb: 'Cut out the rust, lose the duct tape.' },
+  { id: 'restore:2', kind: 'restore', name: 'Body and paint', price: 3000, value: '2', opens: 3, blurb: 'Straighten the dents; one colour door to door.' },
+  { id: 'restore:3', kind: 'restore', name: 'Brightwork', price: 4500, value: '3', opens: 4, blurb: 'Chrome bumpers, a waist strip, matching headlamps.' },
+];
+export const styleItem = (id: string) => STYLE_ITEMS.find((i) => i.id === id);
 
 export interface CarClass {
   id: CarId;
