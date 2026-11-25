@@ -3,7 +3,7 @@
 import { expandBoard } from './core/board';
 import type { Game } from './core/game';
 import type { GameState, Part } from './core/state';
-import type { Family } from './data/tables';
+import { EVENTS, type Family } from './data/tables';
 
 function fill(s: GameState, list: [Family, number][]) {
   s.board = s.board.map(() => null);
@@ -57,8 +57,9 @@ export function applyPreset(game: Game, preset: string) {
         s.badges = ['Scrapyard King', 'Coastal Crown', 'Main Event Champion', ...(preset !== 'desert' ? ['Canyon Rally Champion'] : [])];
         s.crafted = ['tires:3', 'turbo:4', 'engine:5', 'engine:6', 'tires:6', 'turbo:7', ...(preset !== 'desert' ? ['tires:8', 'engine:8'] : []), ...(preset === 'finale' ? ['turbo:9'] : [])];
         s.cash = 20000; s.activeS = 3600; s.nitro = 3; s.stats.races = 150;
-        for (const id of ['yard-sprint', 'crusher-run', 'rusty-ray', 'cul-de-sac', 'maple-mile', 'foundry-final', 'harbor-launch', 'cliff-esses', 'coast-crown', 'neon-mile', 'skyline-run', 'stock-cup', 'main-event', 'midnight-run',
-          ...(preset !== 'desert' ? ['canyon-qualifier', 'dust-stage', 'canyon-stage', 'rally-final'] : []), ...(preset === 'finale' ? ['glacier-pass', 'summit-1000'] : [])]) s.events[id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
+        const later = ['canyon-qualifier', 'mesa-trap', 'dust-stage', 'canyon-stage', 'rally-final', 'ironhorse-revival', 'ta-canyon', 'glacier-pass', 'summit-1000', 'altamar-tour', 'ta-summit', 'summit-gala'];
+        const done = { desert: 0, summit: 7, finale: 11 }[preset as 'desert'];
+        for (const e of EVENTS) if (!e.heatOf && (!later.includes(e.id) || later.indexOf(e.id) < done)) s.events[e.id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
         s.stars = { 'neon-mile': 7, 'skyline-run': 7, 'stock-cup': 7 };
         const fam: Family[] = ['engine', 'tires', 'turbo'];
         s.installed = { [upTo]: Object.fromEntries(fam.map((f) => [f, { id: s.nextPartId++, f, t: cap, q: 'std' }])) };
