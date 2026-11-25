@@ -1,0 +1,35 @@
+{
+  "name": "Rev Up",
+  "short_name": "Rev Up",
+  "id": "/Rev-Up/",
+  "start_url": "/Rev-Up/#garage",
+  "scope": "/Rev-Up/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1d1712",
+  "theme_color": "#1d1712",
+  "description": "Merge parts, race for cash and reputation, and fill a showroom one earned car at a time.",
+  "categories": [
+    "games"
+  ],
+  "icons": [
+    {
+      "src": "/Rev-Up/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Rev-Up/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Rev-Up/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
