@@ -89,36 +89,57 @@ export const sfx = {
   lose() { tone(392, 0.2, 'triangle', 0.1); tone(330, 0.3, 'triangle', 0.1, 0.15); },
   cloth() { noise(0.5, 0.25, 0, 900, 'lowpass'); },
   /** Distinct rev for each car on reveal. */
-  rev(base: number, peak: number) {
+  /** Focused light cue for the reveal: a relay clunk and a short warm hum. */
+  spot() { noise(0.06, 0.35, 0, 1800, 'bandpass'); tone(110, 0.5, 'sine', 0.08, 0.02); tone(220, 0.35, 'sine', 0.04, 0.03); },
+  /** A distinct engine voice per car on reveal. */
+  rev(base: number, peak: number, id = 'muscle') {
     if (!ctx || !master || muted) return;
+    const v = VOICES[id] ?? VOICES.muscle;
     const t = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const o2 = ctx.createOscillator();
     const f = ctx.createBiquadFilter();
+    f.type = v.filter;
+    f.Q.value = v.q;
+    f.frequency.setValueAtTime(v.cut * 0.4, t);
+    f.frequency.linearRampToValueAtTime(v.cut, t + 0.45);
+    f.frequency.linearRampToValueAtTime(v.cut * 0.45, t + 1.7);
     const g = ctx.createGain();
-    o.type = 'sawtooth';
-    o2.type = 'square';
-    f.type = 'lowpass';
-    f.frequency.setValueAtTime(400, t);
-    f.frequency.linearRampToValueAtTime(2200, t + 0.5);
-    f.frequency.linearRampToValueAtTime(500, t + 1.6);
-    for (const [osc, mul] of [[o, 1], [o2, 0.5]] as const) {
-      osc.frequency.setValueAtTime(base * mul, t);
-      osc.frequency.exponentialRampToValueAtTime(peak * mul, t + 0.45);
-      osc.frequency.exponentialRampToValueAtTime(base * 1.4 * mul, t + 1.0);
-      osc.frequency.exponentialRampToValueAtTime(peak * 0.9 * mul, t + 1.3);
-      osc.frequency.exponentialRampToValueAtTime(base * mul, t + 1.9);
-    }
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.25, t + 0.08);
-    g.gain.setValueAtTime(0.25, t + 1.5);
+    g.gain.exponentialRampToValueAtTime(0.24, t + 0.08);
+    g.gain.setValueAtTime(0.24, t + 1.5);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 2.1);
-    o.connect(f);
-    o2.connect(f);
-    f.connect(g).connect(master);
-    o.start(t); o2.start(t);
-    o.stop(t + 2.2); o2.stop(t + 2.2);
+    // lope / misfire: amplitude modulation at the car's idle rhythm
+    const am = ctx.createGain();
+    am.gain.value = 1 - v.lope;
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = v.lopeHz;
+    lfoGain.gain.value = v.lope;
+    lfo.connect(lfoGain).connect(am.gain);
+    const oscs = v.layers.map(([type, mul, detune]) => {
+      const o = ctx!.createOscillator();
+      o.type = type;
+      o.detune.value = detune;
+      const curve = v.blips
+        ? [[0, base], [0.18, peak], [0.32, base * 1.3], [0.5, peak * 1.05], [0.7, base * 1.2], [1.2, peak * 0.85], [1.9, base]]
+        : [[0, base], [0.45, peak], [1.0, base * 1.4], [1.3, peak * 0.9], [1.9, base]];
+      curve.forEach(([dt, fr], i) => (i ? o.frequency.exponentialRampToValueAtTime(fr * mul, t + dt) : o.frequency.setValueAtTime(fr * mul, t)));
+      o.connect(f);
+      return o;
+    });
+    f.connect(am).connect(g).connect(master);
+    lfo.start(t); lfo.stop(t + 2.2);
+    for (const o of oscs) { o.start(t); o.stop(t + 2.2); }
   },
+};
+
+type Layer = [OscillatorType, number, number];
+interface Voice { layers: Layer[]; filter: BiquadFilterType; cut: number; q: number; lope: number; lopeHz: number; blips?: boolean; hum: number }
+/** Engine voices: Tapeback misfires, Corsa hums, Vexa rasps with quick blips, Ironhorse lopes deep. */
+const VOICES: Record<string, Voice> = {
+  junker: { layers: [['square', 1, 0], ['sawtooth', 0.5, 14]], filter: 'lowpass', cut: 1100, q: 2, lope: 0.45, lopeHz: 11, hum: 0.9 },
+  beater: { layers: [['sawtooth', 1, 0], ['triangle', 2, 5]], filter: 'lowpass', cut: 1600, q: 1, lope: 0.15, lopeHz: 9, hum: 1 },
+  hothatch: { layers: [['sawtooth', 1, 0], ['sawtooth', 2, 9], ['square', 3, -6]], filter: 'bandpass', cut: 2400, q: 1.6, lope: 0.08, lopeHz: 14, blips: true, hum: 1.25 },
+  muscle: { layers: [['sawtooth', 1, 0], ['sawtooth', 1, 22], ['square', 0.5, 0]], filter: 'lowpass', cut: 900, q: 3, lope: 0.4, lopeHz: 7.5, hum: 0.7 },
 };
 
 /** Continuous engine hum for the race. */
@@ -127,15 +148,17 @@ export class EngineHum {
   private g: GainNode | null = null;
   private f: BiquadFilterNode | null = null;
 
-  constructor(private idle = 50, private redline = 190) {}
+  constructor(private idle = 50, private redline = 190, private voice = 'muscle') {}
 
   start() {
     if (!ctx || !master || muted || this.o) return;
+    const v = VOICES[this.voice] ?? VOICES.muscle;
     this.o = ctx.createOscillator();
-    this.o.type = 'sawtooth';
+    this.o.type = v.layers[0][0];
     this.o.frequency.value = this.idle;
     this.f = ctx.createBiquadFilter();
-    this.f.type = 'lowpass';
+    this.f.type = v.filter;
+    this.f.Q.value = v.q * 0.6;
     this.f.frequency.value = 600;
     this.g = ctx.createGain();
     this.g.gain.value = 0.05;

@@ -1,14 +1,18 @@
 import { sfx, unlockAudio } from '../audio';
-import { CarId, carById } from '../data/tables';
+import { computeLoadout } from '../core/loadout';
+import { CarId, ENABLED_CARS, carById, finishStripe } from '../data/tables';
 import { drawCar, drawCarCover, drawHeadlightBeam, fitCanvas } from '../render/car';
 import type { App } from './app';
 import { h } from './dom';
 
-type Phase = 'cover' | 'pull' | 'lights' | 'camera' | 'done';
+type Phase = 'cover' | 'pull' | 'spot' | 'lights' | 'camera' | 'done';
 
 /**
- * Car unveil. Ownership was already committed before this opens, so closing the page at any
- * point keeps the car; the presentation resumes from the start on the next launch.
+ * Car unveil: pull the cover (or tap) → dark silhouette → focused spotlight cue → headlights and the car's
+ * own engine note → camera settles → hero hold with the model name and what it unlocks.
+ * Ownership is committed before this opens, so closing the page at any point keeps the car; the
+ * presentation resumes on the next launch. `replay` runs the same sequence from the Showroom without
+ * touching the save.
  */
 export class RevealOverlay {
   el: HTMLElement;
@@ -22,18 +26,19 @@ export class RevealOverlay {
   private dragX: number | null = null;
   private dragCover = 1;
   private reduced: boolean;
-  private litQ = -1;
+  private bgKey = '';
   private carCache = document.createElement('canvas');
-  private cacheW = 0;
+  private silCache = document.createElement('canvas');
+  private cacheKey = '';
 
-  constructor(private app: App, private car: CarId, private onDone: () => void) {
+  constructor(private app: App, private car: CarId, private onDone: () => void, private replay = false) {
     this.reduced = app.game.state.settings.reducedMotion;
     const c = carById(car);
     this.canvas = h('canvas', { 'aria-hidden': 'true' });
     this.textEl = h('div', { class: 'rtext' },
-      h('div', { class: 'm' }, 'New car unlocked'),
+      h('div', { class: 'm' }, replay ? c.model : 'New car unlocked'),
       h('div', { class: 'instr' }, 'Pull the cover or tap to unveil'));
-    this.el = h('div', { class: 'reveal', role: 'dialog', 'aria-label': `Reveal the ${c.name}` },
+    this.el = h('div', { class: 'reveal', role: 'dialog', 'aria-label': `Reveal the ${c.model}` },
       this.canvas, this.textEl,
       h('div', { class: 'rbtns' }, h('button', { class: 'btn sm', onclick: () => this.skip() }, 'Skip')));
     this.el.addEventListener('pointerdown', (e) => this.down(e));
@@ -50,6 +55,11 @@ export class RevealOverlay {
     requestAnimationFrame(() => this.el.focus());
   }
 
+  private get paint() {
+    const p = this.app.game.state.paints[this.car];
+    return this.replay && p ? p : carById(this.car).paint;
+  }
+
   private down(e: PointerEvent) {
     if ((e.target as HTMLElement).closest('button')) return;
     unlockAudio();
@@ -60,8 +70,7 @@ export class RevealOverlay {
   }
   private move(e: PointerEvent) {
     if (this.dragX === null || this.phase !== 'cover') return;
-    const dx = this.dragX - e.clientX; // pull toward the rear (left)
-    const dist = Math.abs(dx) > 0 ? Math.abs(dx) : 0;
+    const dist = Math.abs(this.dragX - e.clientX);
     this.cover = Math.max(0, Math.min(1, this.dragCover - dist / (this.el.clientWidth * 0.6)));
     this.requestDraw();
   }
@@ -86,28 +95,42 @@ export class RevealOverlay {
     this.last = performance.now();
     const c = carById(this.car);
     if (p === 'pull') { sfx.cloth(); this.textEl.querySelector('.instr')!.textContent = ''; }
-    if (p === 'lights') sfx.rev(c.rev.base, c.rev.peak);
+    if (p === 'spot') sfx.spot();
+    if (p === 'lights') sfx.rev(c.rev.base, c.rev.peak, c.id);
     if (p === 'done') {
       this.cover = 0;
       this.textEl.replaceChildren(
         h('h2', {}, c.model),
-        h('div', { class: 'm' }, `${c.name} · Parts up to T${c.cap}`),
+        h('div', { class: 'reveal-cap' }, this.advantage()),
         h('div', { class: 'm', style: 'margin-top:6px' }, c.blurb),
-        h('button', { class: 'btn primary done', onclick: () => this.finish() }, 'Back to the garage'));
+        h('button', { class: 'btn primary done', onclick: () => this.finish() }, this.replay ? 'Back to the Showroom' : 'Back to the garage'));
       (this.textEl.querySelector('button') as HTMLButtonElement).focus();
     }
     this.requestDraw();
   }
 
+  /** One line on what the new car changes for the player. */
+  private advantage(): string {
+    const c = carById(this.car);
+    const i = ENABLED_CARS.findIndex((x) => x.id === this.car);
+    const prev = i > 0 ? ENABLED_CARS[i - 1] : null;
+    if (this.replay || !prev) return `${c.name} · equips parts up to T${c.cap}`;
+    const s = this.app.game.state;
+    const now = computeLoadout(s, this.car).stats.top;
+    const before = computeLoadout(s, prev.id).stats.top;
+    const gain = Math.round((now - before) * 3.6);
+    return `T${c.cap} parts now fit (was T${prev.cap})${gain > 0 ? ` · +${gain} km/h` : ''}`;
+  }
+
   private skip() {
     this.finish();
-    this.app.toast(`The ${carById(this.car).name} is in your Showroom`);
+    if (!this.replay) this.app.toast(`The ${carById(this.car).model} is in your Showroom`);
   }
 
   private finish() {
     cancelAnimationFrame(this.raf);
     window.removeEventListener('resize', this.requestDraw);
-    this.app.game.finishReveal(this.car);
+    if (!this.replay) this.app.game.finishReveal(this.car);
     this.el.remove();
     this.onDone();
   }
@@ -124,58 +147,78 @@ export class RevealOverlay {
     const speed = this.reduced ? 3 : 1;
     if (this.phase === 'pull') {
       this.cover = Math.max(0, this.cover - dt * 1.6 * speed);
-      if (this.cover <= 0) this.go('lights');
-    } else if (this.phase === 'lights' && this.t > 1.0 / speed) this.go('camera');
-    else if (this.phase === 'camera' && this.t > 1.3 / speed) this.go('done');
+      if (this.cover <= 0) this.go('spot');
+    } else if (this.phase === 'spot' && this.t > 0.7 / speed) this.go('lights');
+    else if (this.phase === 'lights' && this.t > 1.0 / speed) this.go(this.reduced ? 'done' : 'camera');
+    else if (this.phase === 'camera' && this.t > 1.2) this.go('done');
     this.draw();
     if (this.phase !== 'cover' && this.phase !== 'done') this.requestDraw();
+  }
+
+  /** 0 = only the work lamp, 1 = full stage lighting. */
+  private light(): number {
+    switch (this.phase) {
+      case 'cover': case 'pull': return 0;
+      case 'spot': return Math.min(1, this.t / 0.25) * 0.55;
+      case 'lights': return 0.55 + 0.45 * Math.min(1, this.t);
+      default: return 1;
+    }
   }
 
   private draw() {
     const { w, h: hh, dpr } = fitCanvas(this.canvas, 1.5);
     const ctx = this.canvas.getContext('2d')!;
     const c = carById(this.car);
-    const lit = this.phase === 'cover' || this.phase === 'pull' ? 0.25 : Math.min(1, this.phase === 'lights' ? this.t : 1);
-    // camera: layered zoom/pan
+    const lit = this.light();
     let zoom = 1;
     let pan = 0;
-    if (this.phase === 'camera' && !this.reduced) {
-      const k = Math.min(1, this.t / 1.3);
-      const e = 1 - (1 - k) ** 3;
-      zoom = 1.22 - 0.22 * e;
-      pan = (1 - e) * w * 0.08;
-    } else if (this.phase === 'lights') { zoom = 1.22; pan = w * 0.08; }
-    const cw = Math.min(w * .83, hh * 1.5, 790 * dpr) * zoom;
-    const x = (w - cw) / 2 - pan;
+    if (this.phase === 'camera') {
+      const e = 1 - (1 - Math.min(1, this.t / 1.2)) ** 3;
+      zoom = 1.18 - 0.18 * e;
+      pan = (1 - e) * w * 0.07;
+    } else if ((this.phase === 'lights' || this.phase === 'spot') && !this.reduced) { zoom = 1.18; pan = w * 0.07; }
+    const base = Math.min(w * 0.8, hh * 1.4, 760 * dpr);
+    const cw = base * zoom;
+    const x = (w - cw * 1.09) / 2 - pan;
     const y = hh * 0.64;
     // Room lighting is a CSS gradient (composited by the browser), updated only when it changes.
     const q = Math.round(lit * 20) / 20;
-    if (q !== this.litQ) {
-      this.litQ = q;
-      this.el.style.background = `radial-gradient(60% 40% at 50% 62%, rgba(255,225,180,${(0.12 + 0.25 * q).toFixed(2)}), transparent 70%), linear-gradient(to bottom, transparent 64%, #0c0907 64%), radial-gradient(90% 70% at 50% 30%, rgb(${90 + 80 * q},${60 + 50 * q},${40 + 20 * q}), #050403 75%)`;
+    const key = `${q}`;
+    if (key !== this.bgKey) {
+      this.bgKey = key;
+      const spot = (0.08 + 0.4 * q).toFixed(2);
+      this.el.style.background = `radial-gradient(42% 30% at 50% 60%, rgba(255,228,186,${spot}), transparent 72%), linear-gradient(to bottom, transparent 64%, #0c0907 64%), radial-gradient(90% 70% at 50% 30%, rgb(${40 + 120 * q},${30 + 85 * q},${24 + 40 * q}), #050403 75%)`;
     }
     ctx.clearRect(0, 0, w, hh);
-    const headlights = this.phase === 'lights' ? Math.min(1, this.t * 2) * (0.6 + 0.4 * Math.sin(this.t * 14)) : this.phase === 'camera' || this.phase === 'done' ? 0.8 : 0;
-    // The car body is cached once per size; cover and beams are drawn live on top.
-    const baseW = Math.round(Math.min(w * .83, hh * 1.5, 790 * dpr) * 1.22);
-    if (this.cacheW !== baseW) {
-      this.cacheW = baseW;
-      this.carCache.width = Math.round(baseW * 1.19);
-      this.carCache.height = Math.round(baseW * 0.56);
-      const cc = this.carCache.getContext('2d')!;
-      drawCar(cc, this.car, baseW * 0.05, baseW * 0.52, baseW, { paint: c.paint, trim: c.trim });
+    // The car is cached once per size and finish; a silhouette copy lets the light cue fade it up.
+    const bw = Math.round(base * 1.18);
+    const ck = `${bw}|${this.paint}`;
+    if (this.cacheKey !== ck) {
+      this.cacheKey = ck;
+      for (const [cv, sil] of [[this.carCache, false], [this.silCache, true]] as const) {
+        cv.width = Math.round(bw * 1.25);
+        cv.height = Math.round(bw * 0.6);
+        const cc = cv.getContext('2d')!;
+        drawCar(cc, this.car, bw * 0.05, bw * 0.55, bw, { paint: this.paint, trim: c.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true });
+      }
     }
-    const sc = cw / baseW;
-    ctx.drawImage(this.carCache, x - baseW * 0.05 * sc, y - baseW * 0.52 * sc, this.carCache.width * sc, this.carCache.height * sc);
+    const sc = cw / bw;
+    const dx = x - bw * 0.05 * sc, dy = y - bw * 0.55 * sc;
+    if (this.cover > 0 || lit < 1) ctx.drawImage(this.silCache, dx, dy, this.silCache.width * sc, this.silCache.height * sc);
+    if (lit > 0) {
+      ctx.globalAlpha = Math.min(1, 0.15 + lit);
+      ctx.drawImage(this.carCache, dx, dy, this.carCache.width * sc, this.carCache.height * sc);
+      ctx.globalAlpha = 1;
+    }
+    const headlights = this.phase === 'lights' ? Math.min(1, this.t * 2) * (0.6 + 0.4 * Math.sin(this.t * 14)) : this.phase === 'camera' || this.phase === 'done' ? 0.85 : 0;
     drawHeadlightBeam(ctx, this.car, x, y, cw, headlights);
     drawCarCover(ctx, this.car, x, y, cw, this.cover);
-    // headlight sweep across the room
-    if (this.phase === 'lights' || this.phase === 'camera') {
-      const k = this.phase === 'lights' ? this.t : 1 + this.t;
-      const sx = w * (((k * 0.6) % 1.4) - 0.2);
+    // one headlight sweep across the room while the engine speaks
+    if (this.phase === 'lights' && !this.reduced) {
+      const sx = w * (this.t * 1.2 - 0.2);
       const g = ctx.createLinearGradient(sx - 120 * dpr, 0, sx + 120 * dpr, 0);
       g.addColorStop(0, 'rgba(255,240,200,0)');
-      g.addColorStop(0.5, 'rgba(255,240,200,0.12)');
+      g.addColorStop(0.5, 'rgba(255,240,200,0.14)');
       g.addColorStop(1, 'rgba(255,240,200,0)');
       ctx.fillStyle = g;
       ctx.fillRect(sx - 120 * dpr, 0, 240 * dpr, hh);

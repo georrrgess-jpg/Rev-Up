@@ -312,6 +312,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .reveal .rtext h2 { margin: 0; font-size: 30px; font-weight: 900; }
 .reveal .rtext .m { color: var(--muted); font-size: 15px; margin-top: 2px; }
 .reveal .rtext .instr { color: var(--amber2); font-weight: 800; font-size: 16px; margin-top: 10px; }
+.reveal .rtext .reveal-cap { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(242,163,58,.16); border: 1px solid rgba(242,163,58,.55); color: var(--amber2); font-weight: 800; font-size: 14px; }
 .reveal .rbtns { position: absolute; top: calc(var(--safe-t) + 12px); right: calc(var(--safe-r) + 12px); display: flex; gap: 8px; }
 .reveal .done { pointer-events: auto; margin-top: 14px; }
 

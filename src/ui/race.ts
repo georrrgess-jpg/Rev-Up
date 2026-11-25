@@ -5,7 +5,7 @@ import * as P from '../core/progression';
 import { RaceSetup, RaceSim } from '../core/race';
 import type { LastResult } from '../core/state';
 import { DISTRICTS, EVENTS, NITRO_CAP, RACE, RIVALS, SIGNATURE_FINISHES, TRACKS, carById, eventById, finishStripe, trackLength } from '../data/tables';
-import { drawCar, fitCanvas } from '../render/car';
+import { carLengthM, drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
 import { h, ordinal } from './dom';
 
@@ -166,12 +166,13 @@ class RaceScreen {
   private frameTimes: number[] = [];
   private dpr = 1;
   private reduced: boolean;
+  private zoom = 0;
   private eventName: string;
 
   constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
     this.sim = new RaceSim(setup);
     const rev = carById(setup.player.car).rev;
-    this.hum = new EngineHum(rev.base, rev.peak);
+    this.hum = new EngineHum(rev.base, rev.peak, setup.player.car);
     this.reduced = app.game.state.settings.reducedMotion;
     this.countdown = this.reduced ? 1.2 : 2.4;
     this.eventName = eventById(setup.eventId).name;
@@ -442,9 +443,17 @@ class RaceScreen {
     const sim = this.sim;
     const theme = sim.track.theme;
     const player = sim.player;
-    const carLenM = 4.3;
-    const ppm = Math.min(W * 0.3, H * 0.22) / carLenM;
-    const camX = player.x - (W * 0.32) / ppm;
+    // Camera frames the pack: zoom out when rivals spread, keep the player between 22% and 70% of the width.
+    const ppm0 = Math.min(W * 0.34, H * 0.24) / 4.3;
+    const xs = sim.racers.map((r) => r.x);
+    const span = Math.max(...xs) - Math.min(...xs);
+    const target = Math.max(ppm0 * 0.6, Math.min(ppm0, (W * 0.8) / (span + 9)));
+    this.zoom = this.zoom ? this.zoom + (target - this.zoom) * 0.06 : target;
+    const ppm = this.zoom;
+    const mid = (Math.max(...xs) + Math.min(...xs)) / 2;
+    let camX = mid - (W * 0.48) / ppm;
+    camX = Math.min(camX, player.x - (W * 0.22) / ppm);
+    camX = Math.max(camX, player.x - (W * 0.7) / ppm);
     const horizon = H * 0.46;
     const roadTop = H * 0.55;
     const roadBot = H * 0.83;
@@ -581,7 +590,7 @@ class RaceScreen {
     const draws = sim.racers.map((r, i) => ({ r, lane: order[i] })).sort((a, b) => a.lane - b.lane);
     for (const { r, lane } of draws) {
       const depth = 0.86 + lane * 0.06;
-      const len = carLenM * ppm * depth;
+      const len = carLengthM(r.car) * ppm * depth;
       const gy = roadTop + (lane + 0.85) * laneH;
       const sx = (r.x - camX) * ppm - len;
       const cls = carById(r.car);
@@ -604,7 +613,7 @@ class RaceScreen {
       const livery = r.isPlayer ? this.app.game.state.paints[r.car] : null;
       drawCar(ctx, r.car, sx, gy, len, {
         paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, wheelAngle: r.x / 0.33,
-        livery: finishStripe(r.car, livery ?? undefined), detail: false,
+        livery: finishStripe(r.car, livery ?? undefined), detail: false, cache: true,
         nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: theme === 'scrap' ? 0.25 : 0.55,
       });
       if (r.isPlayer) {

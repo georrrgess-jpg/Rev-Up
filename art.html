@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rev Up · art sheet (dev only)</title>
+<style>
+  body { margin: 0; background: #1b2128; color: #dfe6ec; font: 13px system-ui, sans-serif; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+  import { drawCar } from '/src/render/car.ts';
+  import { CARS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
+  const q = new URLSearchParams(location.search);
+  const only = q.get('car');
+  const cars = CARS.filter((c) => c.enabled && (!only || c.id === only));
+  const W = innerWidth, H = cars.length * 420;
+  const c = document.getElementById('c');
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  cars.forEach((car, i) => {
+    const y0 = i * 420;
+    const g = ctx.createLinearGradient(0, y0, 0, y0 + 420);
+    g.addColorStop(0, '#3a4652'); g.addColorStop(0.7, '#1c232a'); g.addColorStop(1, '#12171c');
+    ctx.fillStyle = g; ctx.fillRect(0, y0, W, 420);
+    ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.model} (${car.id})`, 10, y0 + 16);
+    const hero = Math.min(W * 0.55, 620);
+    drawCar(ctx, car.id, 20, y0 + 330, hero * 0.92, { paint: car.paint, trim: car.trim, headlights: q.has('lit') ? 1 : 0, wheelAngle: 0.3 });
+    const sig = SIGNATURE_FINISHES[car.id];
+    let x = hero + 80;
+    drawCar(ctx, car.id, x, y0 + 120, 220, { paint: sig.paint, trim: car.trim, livery: sig.stripe });
+    drawCar(ctx, car.id, x, y0 + 230, 150, { paint: car.paint, trim: car.trim, cache: true, wheelAngle: 1, nitro: 1.5, headlights: 0.5 });
+    drawCar(ctx, car.id, x + 180, y0 + 230, 96, { paint: car.paint, trim: car.trim });
+    drawCar(ctx, car.id, x + 300, y0 + 230, 60, { paint: car.paint, trim: car.trim });
+    drawCar(ctx, car.id, x, y0 + 320, 150, { paint: car.paint, trim: car.trim, cover: 1 });
+    drawCar(ctx, car.id, x + 180, y0 + 320, 150, { paint: car.paint, trim: car.trim, silhouette: true });
+  });
+</script>
+</body>
+</html>
