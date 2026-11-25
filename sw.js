@@ -1,11 +1,11 @@
 /* Rev Up service worker — generated at build time from src/sw/sw-template.js.
  * Precaches one immutable revision of the app. Updates wait until the page asks
  * (after saving, on a safe screen), so HTML and hashed assets never mix versions. */
-const VERSION = '14f9747a0fb5';
+const VERSION = 'f6edb53bbe8c';
 const SCOPE = '/Rev-Up/';
 const PREFIX = 'revup:' + SCOPE + ':';
 const CACHE = PREFIX + VERSION;
-const ASSETS = ["./","assets/index-Bbshvndd.css","assets/index-NT9ZFQ9V.js","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","manifest.webmanifest","index.html"];
+const ASSETS = ["./","assets/index-CXLXVbMN.css","assets/index-DU9B5cA2.js","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","manifest.webmanifest","index.html"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
