@@ -292,7 +292,7 @@ export class RaceScreen {
       this.frameTimes = [];
       // two slow seconds in a row drop effects for the rest of the race; a single hitch (a GC, the launch) does not,
       // and quality never climbs back mid-race, which would re-render every sprite and stutter again
-      this.slowWindows = avg > 0.024 ? this.slowWindows + 1 : 0;
+      this.slowWindows = avg > 0.021 ? this.slowWindows + 1 : 0;
       if (this.slowWindows >= 2 && this.quality === 1) { this.quality = 0; this.resize(); }
     }
     if (!this.paused) {
