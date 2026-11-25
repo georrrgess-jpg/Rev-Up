@@ -94,7 +94,7 @@ export class ShowroomView implements View {
       }, canvas,
       h('div', { class: 'carcard-info' },
         h('div', { class: 'cn' }, car.model),
-        h('div', { class: 'cm' }, `${car.name} · Parts up to T${car.cap}`),
+        h('div', { class: 'cm' }, `${car.name} class · parts up to T${car.cap}`),
         h('div', { class: 'car-status' }, label)));
       this.redrawCards.push(() => studio(canvas, car.id, state.paints[car.id], 0, pending || isNext, !owned && !isNext));
       return card;
@@ -161,7 +161,7 @@ export class ShowroomView implements View {
     h('div', { class: 'inspect-stage' }, canvas, lights),
     h('div', { class: 'info scroll' },
       h('h2', {}, car.model),
-      h('div', { class: 'm' }, `${car.name} · ${DISTRICTS[car.district].name} · Parts up to T${car.cap}`),
+      h('div', { class: 'm' }, `${car.name} class · ${DISTRICTS[car.district].name} · Parts up to T${car.cap}`),
       h('p', {}, car.blurb),
       h('div', { class: 'statrow' },
         h('span', { class: 'chip' }, `${Math.round(loadout.top * 3.6)} km/h`),
@@ -188,7 +188,7 @@ export class ShowroomView implements View {
       this.redrawInspect = null;
       if (this.visible) {
         this.render();
-        this.grid.querySelector<HTMLButtonElement>(`[data-car="${id}"]`)?.focus();
+        this.grid.querySelector<HTMLButtonElement>(`[data-car="${id}"]`)?.focus({ preventScroll: true });
       }
     };
 
@@ -197,6 +197,6 @@ export class ShowroomView implements View {
     this.app.root.append(dialog);
     updateFinish();
     draw();
-    closeBtn.focus();
+    closeBtn.focus({ preventScroll: true });
   }
 }

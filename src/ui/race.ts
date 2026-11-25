@@ -90,30 +90,59 @@ export class RaceView implements View {
 
     const out: HTMLElement[] = [featured];
     if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));
-    let district = '';
-    for (const e of EVENTS) {
-      if (e.id === rec.id) continue;
-      if (e.district !== district) {
-        district = e.district;
-        out.push(h('div', { class: 'district' }, DISTRICTS[e.district].name));
+    // Catalogue: one collapsible section per district, with a progress summary; the recommended one opens.
+    const openSections = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.district-sec[open]')).map((d) => d.dataset.district));
+    const firstRender = !this.list.querySelector('details.district-sec');
+    const order: string[] = ['scrapyard', 'suburbs', 'coastal', 'meets', 'trials'];
+    const medalName = ['', 'Bronze', 'Silver', 'Gold'];
+    for (const dist of order) {
+      const evs = EVENTS.filter((e) => e.district === dist);
+      if (!evs.length) continue;
+      const open = evs.filter((e) => P.eventUnlocked(s, e).ok || P.eventUnlocked(s, e).switchCar);
+      let summary: string;
+      if (dist === 'trials') {
+        const medals = evs.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0);
+        summary = `${medals}/${evs.length * 3} medals`;
+      } else if (dist === 'meets') {
+        summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} trophies`;
+      } else {
+        summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
       }
-      const u = P.eventUnlocked(s, e);
-      const r = s.events[e.id];
-      const status = !u.ok ? `🔒 ${u.why}`
-        : e.boss && s.bosses.includes(e.boss.rival) ? `Rival beaten${r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
-        : r?.wins ? `✓ Won${r.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
-        : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : `First win +$${e.firstClear.cash} · ${e.firstClear.crates} crates`;
-      const action = u.ok
-        ? h('div', { class: 'row-btns' }, quickBtn(e, true), h('button', { class: `btn sm${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
-        : u.switchCar && s.owned.includes(u.switchCar)
-          ? h('button', { class: 'btn sm', onclick: () => { this.app.game.setActiveCar(u.switchCar!); this.app.toast(`Racing the ${carById(u.switchCar!).model}`); this.render(); } }, `Use ${carById(u.switchCar).model}`)
-          : null;
-      out.push(h('div', { class: `evt-row${u.ok ? '' : ' locked'}` },
-        h('div', { class: 'row-main' },
-          h('div', { class: 'name' }, e.name, e.carOnly ? h('span', { class: 'tag' }, 'Class event') : null),
-          h('div', { class: 'meta' }, course(e), ` ${status}`)),
-        action,
-        u.ok || u.switchCar ? details(e) : null));
+      if (!open.length) summary = `🔒 ${P.eventUnlocked(s, evs[0]).why}`;
+      const rows: HTMLElement[] = [];
+      for (const e of evs) {
+        if (e.id === rec.id) continue;
+        const u = P.eventUnlocked(s, e);
+        const r = s.events[e.id];
+        const medal = s.medals?.[e.id] ?? 0;
+        const status = !u.ok && !u.switchCar ? `🔒 ${u.why}`
+          : e.timeAttack ? (medal ? `${medalName[medal]}${medal < 3 ? ` · ${medalName[medal + 1]} at ${[e.timeAttack.bronze, e.timeAttack.silver, e.timeAttack.gold][medal].toFixed(2)} s` : ' · all medals'}` : `Bronze at ${e.timeAttack.bronze.toFixed(2)} s`) + (r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : '')
+          : e.boss && s.bosses.includes(e.boss.rival) ? `Rival beaten${r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
+          : r?.wins ? `✓ Won${r.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
+          : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : e.boss ? `Rival race · ${e.boss.reward.blueprint} paint` : `First win +$${e.firstClear.cash} · ${e.firstClear.crates} crates`;
+        const action = u.ok
+          ? h('div', { class: 'row-btns' }, quickBtn(e, true), h('button', { class: `btn sm${q ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
+          : u.switchCar && s.owned.includes(u.switchCar)
+            ? h('button', { class: 'btn sm', onclick: () => this.startLive(e.id) }, `Race · ${carById(u.switchCar).model.split(' ')[0]}`)
+            : null;
+        const tags = [
+          e.series ? h('span', { class: 'tag' }, `Round ${e.series.round}/${e.series.of}`) : null,
+          e.carOnly ? h('span', { class: 'tag' }, 'Class meet') : null,
+          e.timeAttack ? h('span', { class: 'tag' }, 'Solo') : null,
+          e.trophy && s.badges.includes(e.trophy) ? h('span', { class: 'tag done' }, `🏆 ${e.trophy}`) : null,
+        ];
+        rows.push(h('div', { class: `evt-row${u.ok ? '' : ' locked'}` },
+          h('div', { class: 'row-main' },
+            h('div', { class: 'name' }, e.name, ...tags),
+            h('div', { class: 'meta' }, course(e), ` ${status}`)),
+          action,
+          u.ok || u.switchCar ? details(e) : null));
+      }
+      if (!rows.length) continue;
+      const shouldOpen = firstRender ? (open.length > 0 && evs.some((e) => !s.events[e.id]?.wins || (e.timeAttack && (s.medals?.[e.id] ?? 0) < 3))) : openSections.has(dist);
+      out.push(h('details', { class: 'district-sec', 'data-district': dist, ...(shouldOpen ? { open: '' } : {}) },
+        h('summary', { class: 'district' }, h('span', {}, DISTRICTS[dist as keyof typeof DISTRICTS].name), h('span', { class: 'dist-sum' }, summary)),
+        ...rows));
     }
     const scroll = this.list.scrollTop;
     this.list.replaceChildren(...out);
@@ -271,7 +300,7 @@ class RaceScreen {
         h('button', { class: 'btn primary', onclick: () => this.setPaused(false) }, 'Resume'), ' ',
         h('button', { class: 'btn', onclick: () => this.quit() }, 'Leave race')));
       this.el.append(this.pauseEl);
-      (this.pauseEl.querySelector('.btn') as HTMLButtonElement).focus();
+      (this.pauseEl.querySelector('.btn') as HTMLButtonElement).focus({ preventScroll: true });
     } else {
       resumeAudio();
       this.pauseEl?.remove();
@@ -392,10 +421,10 @@ class RaceScreen {
     if (r.personalBest) pills.push(h('span', { class: 'chip best' }, 'Personal best'));
     if (r.freshRep) pills.push(h('span', { class: 'chip rep' }, `Fresh route +${r.freshRep} Rep`));
     const nextLabel = s.pendingReveal ? 'Car unlocked' : 'Next step';
-    const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).name} is ready to reveal.` : r.advice;
+    const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).model} is ready to reveal.` : r.advice;
     const card = h('div', { class: 'card', role: 'dialog', 'aria-label': 'Race result' },
       h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
-      h('div', { class: 'gap' }, `${ev.name} · ${r.gapText}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`),
+      h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
       r.boss ? h('div', { class: 'boss' }, h('b', {}, 'Rusty Ray is beaten.'), ` The Suburbs are open. Ray hands over his signature blueprint: ${ev.boss!.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss!.reward.badge}” badge.`) : null,
       h('div', { class: 'pays' }, ...pills),
       finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
@@ -412,7 +441,7 @@ class RaceScreen {
     );
     const wrap = h('div', { class: 'result' }, card);
     this.el.append(wrap);
-    (card.querySelector('.btn.primary') as HTMLButtonElement).focus();
+    (card.querySelector('.btn.primary') as HTMLButtonElement).focus({ preventScroll: true });
   }
 
   private retry(eventId: string) {

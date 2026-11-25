@@ -63,7 +63,8 @@ export function applyPreset(game: Game, preset: string) {
         s.stats.milestones.firstMerge = 1;
         break;
       case 'offline':
-        s.offline.lastSeenAt = Date.now() - 3 * 3600_000;
+        s.offline.pendingS = 3 * 3600;
+        s.offline.pendingCash = Math.floor(180 * s.owned.length);
         break;
       case 'reveal':
         s.owned = ['junker', 'beater']; s.activeCar = 'beater'; s.pendingReveal = 'beater'; s.crafted = ['tires:3']; s.rep = 50;

@@ -277,7 +277,8 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   rec.bestPlace = Math.min(rec.bestPlace, o.place);
   if (o.place === 1) rec.wins++;
   const liveTime = input.mode === 'live' ? o.playerTime : null;
-  const personalBest = liveTime !== null && (rec.bestTime === null || liveTime < rec.bestTime);
+  const personalBest = liveTime !== null && rec.bestTime !== null && liveTime < rec.bestTime;
+  if (liveTime !== null && rec.bestTime === null) rec.bestTime = liveTime;
   if (personalBest) rec.bestTime = liveTime;
   const signatureFinish = input.mode === 'live' && o.place <= 3 && SIGNATURE_FINISHES[pr.car]
     && s.owned.includes(pr.car) && !s.livePodiums.includes(pr.car) ? pr.car : undefined;

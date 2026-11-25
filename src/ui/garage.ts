@@ -403,12 +403,12 @@ export class GarageView implements View {
         const g = P.goalStatus(this.s);
         const car = P.nextCar(this.s);
         if (car?.unlock && car.unlock.family === e.family && car.unlock.tier === e.tier) {
-          this.app.toast(g?.keystoneDone && this.s.rep < g.repNeed ? `Keystone crafted! ${g.repNeed - this.s.rep} more Rep to unlock the ${car.name}` : 'Keystone crafted!');
+          this.app.toast(g?.keystoneDone && this.s.rep < g.repNeed ? `T${e.tier} ${FAMILIES[e.family].name} crafted — the ${car.model}'s part is done. ${g.repNeed - this.s.rep} more Rep to unlock it` : `T${e.tier} ${FAMILIES[e.family].name} crafted for the ${car.model}`);
         }
       }
       if (e.type === 'crateBlocked') this.app.toast('Board full. Merge a pair or scrap a part.');
       if (e.type === 'catchup') this.app.toast(`A ${FAMILIES[e.family].name} crate arrived to help with your goal`);
-      if (e.type === 'mergeAll') this.app.toast(e.fusions ? `Merge All: ${e.fusions} fusions${e.longest >= 3 ? ` · longest chain ${e.longest}` : ''}` : 'Nothing to merge');
+      if (e.type === 'mergeAll') this.app.toast(e.fusions ? `Merge All: ${e.fusions} merge${e.fusions === 1 ? '' : 's'}${e.longest >= 3 ? ` · best chain ×${e.longest}` : ''}` : 'Nothing to merge');
       if (e.type === 'invalid') {
         const c = this.sel ? this.cellFor(this.sel) : null;
         c?.classList.add('shake');
@@ -571,7 +571,7 @@ export class GarageView implements View {
       return h('div', {},
         h('h2', {}, `Scrap T${p.t} ${fam.name}?`),
         imp
-          ? h('p', {}, `It's equipped on your ${carById(this.s.activeCar).name}. ${fam.statLabel} drops — `,
+          ? h('p', {}, `It's equipped on your ${carById(this.s.activeCar).model}. ${fam.statLabel} drops — `,
             imp.next ? h('b', {}, `T${imp.next.t} ${fam.name} equips next.`) : h('b', {}, `no ${fam.name} left to equip.`))
           : h('p', {}, `You'll get ${value} scrap. Every 10 scrap buys a crate.`),
         imp ? h('p', {}, `You'll get ${value} scrap.`) : null,
@@ -609,7 +609,7 @@ export class GarageView implements View {
         const el = this.cellFor(next)!;
         for (const c of [...this.cells, ...this.trayCells]) c.tabIndex = -1;
         el.tabIndex = 0;
-        el.focus();
+        el.focus({ preventScroll: true });
         return;
       }
       if (e.key === 'Escape') { this.setSel(null); return; }

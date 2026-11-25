@@ -18,7 +18,12 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = 
   return el;
 }
 
-export const fmt = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 10000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : String(Math.floor(n)));
+export function fmt(n: number): string {
+  const down = (v: number, d: number) => (Math.floor(v * 10 ** d) / 10 ** d).toFixed(d);
+  if (n >= 1e6) return `${down(n / 1e6, n >= 1e7 ? 0 : 1)}M`;
+  if (n >= 1e4) return `${down(n / 1e3, n >= 1e5 ? 0 : 1)}k`;
+  return String(Math.floor(n));
+}
 
 export function durationText(s: number): string {
   const m = Math.floor(s / 60);

@@ -39,16 +39,17 @@ export class App {
     setMuted(s.settings.muted);
     document.documentElement.classList.toggle('reduced', s.settings.reducedMotion);
 
-    const chip = (key: string, cls: string, ico: string, label: string) => {
-      const el = h('span', { class: `chip ${cls}`, title: label, 'aria-label': label }, h('span', { class: 'ico', 'aria-hidden': 'true' }, ico), h('span', { class: 'num v' }, '0'));
+    const chip = (key: string, cls: string, glyph: string, word: string, label: string) => {
+      const el = h('span', { class: `chip ${cls}`, title: label, 'aria-label': label },
+        h('span', { class: 'ico g', 'aria-hidden': 'true' }, glyph), h('span', { class: 'ico w', 'aria-hidden': 'true' }, word), h('span', { class: 'num v' }, '0'));
       this.chips[key] = el;
       return el;
     };
     const top = h('header', { class: 'topbar' },
-      chip('cash', 'cash', '$', 'Cash'),
-      chip('rep', 'rep', 'Rep', 'Reputation'),
-      chip('scrap', 'scrap', 'Scrap', 'Scrap'),
-      chip('nitro', 'nitro', 'Nitro', 'Nitro charges'),
+      chip('cash', 'cash', '$', '$', 'Cash'),
+      chip('rep', 'rep', '★', 'Rep', 'Reputation'),
+      chip('scrap', 'scrap', '⚙', 'Scrap', 'Scrap'),
+      chip('nitro', 'nitro', '⚡', 'Nitro', 'Banked nitro charges'),
       h('span', { class: 'spacer' }),
       h('button', { class: 'iconbtn', 'aria-label': 'Settings', onclick: () => openSettings(this) }, '⚙'),
     );
@@ -172,23 +173,34 @@ export class App {
     this.root.append(this.reveal.el);
   }
 
+  private toastMsg = '';
+  private toastCount = 0;
   toast(msg: string, action?: { label: string; run: () => void }, ms = 3200) {
+    // Repeated notices group into one ("×3") instead of stacking over the bench or the Race button.
+    const same = this.toastEl?.isConnected && this.toastMsg === msg && !action;
+    this.toastCount = same ? this.toastCount + 1 : 1;
+    this.toastMsg = msg;
     this.toastEl?.remove();
     clearTimeout(this.toastTimer);
-    const el = h('div', { class: 'toast', role: 'status' }, h('span', {}, msg),
+    const el = h('div', { class: `toast${action ? ' has-action' : ''}${same ? ' again' : ''}`, role: 'status' }, h('span', {}, msg),
+      this.toastCount > 1 ? h('span', { class: 'toast-count' }, `×${this.toastCount}`) : null,
       action ? h('button', { class: 'btn sm primary', onclick: () => { el.remove(); action.run(); } }, action.label) : null);
     this.toastEl = el;
     this.root.append(el);
     this.toastTimer = window.setTimeout(() => el.remove(), ms);
   }
 
-  sheet(build: (close: () => void) => HTMLElement): () => void {
+  sheet(build: (close: () => void) => HTMLElement, onClose?: () => void): () => void {
     const back = h('div', { class: 'sheet-back' });
     const opener = document.activeElement;
+    let closed = false;
     const close = () => {
+      if (closed) return;
+      closed = true;
       back.remove();
       document.removeEventListener('keydown', onKey);
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+      onClose?.();
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
@@ -197,7 +209,7 @@ export class App {
     sh.append(build(close));
     back.append(sh);
     this.root.append(back);
-    (sh.querySelector('button') as HTMLButtonElement | null)?.focus();
+    (sh.querySelector('button') as HTMLButtonElement | null)?.focus({ preventScroll: true });
     return close;
   }
 

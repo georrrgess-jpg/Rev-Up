@@ -52,7 +52,7 @@ export class RevealOverlay {
     this.el.tabIndex = 0;
     window.addEventListener('resize', this.requestDraw);
     this.requestDraw();
-    requestAnimationFrame(() => this.el.focus());
+    requestAnimationFrame(() => this.el.focus({ preventScroll: true }));
   }
 
   private get paint() {
@@ -103,8 +103,11 @@ export class RevealOverlay {
         h('h2', {}, c.model),
         h('div', { class: 'reveal-cap' }, this.advantage()),
         h('div', { class: 'm', style: 'margin-top:6px' }, c.blurb),
-        h('button', { class: 'btn primary done', onclick: () => this.finish() }, this.replay ? 'Back to the Showroom' : 'Back to the garage'));
-      (this.textEl.querySelector('button') as HTMLButtonElement).focus();
+        h('div', { class: 'reveal-actions' },
+          h('button', { class: 'btn done', onclick: () => this.finish() }, this.replay ? 'Back to the Showroom' : 'Garage'),
+          this.replay ? null : h('button', { class: 'btn primary done', onclick: () => { this.finish(); this.app.go('race'); } }, 'Pick a race')));
+      this.el.querySelector('.rbtns')?.remove();
+      (this.textEl.querySelector('.btn.primary, button') as HTMLButtonElement).focus({ preventScroll: true });
     }
     this.requestDraw();
   }
