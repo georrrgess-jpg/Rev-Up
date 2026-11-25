@@ -1,10 +1,24 @@
 # Rev Up
 
-An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Junker**) to a restored muscle coupe (the **Muscle**).
+An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Junker**) to a restored muscle coupe (the **Muscle**) and, past the finale, a coastal grand tourer (the **Altamar GT**).
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~50 KB JS + 7 KB CSS gzipped; all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~60 KB JS + 9 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.3 · Open Road
+
+Built from a fresh-save and returning-save replay of 1.2 and three independent reviews (first-time usability, race feel, mobile visual QA); 35 findings, all addressed below or listed under Known limitations.
+
+- **Open Road chapter (after the Ironhorse).** The **Coastal Highway** opens with three new tracks that race differently — **Harbor Launch** (a long launch and two straights: Turbo), **Cliffside Esses** (three tight bends: Tires), **Coastal Crown** (two long highway runs and a fast sweeper: Engine). The three rounds are a staged rival series that ends with **Vale Moreau** in the Coastal Crown (Crown Teal blueprint, “Coastal Crown” badge, $600, 5 crates). The marquee reward is a new class and silhouette: the **Altamar GT** grand tourer (cap **T6**; 5,600 Rep + a crafted T6 Engine + the Coastal Crown).
+- **Earlier cars come back.** **Class meets** race one earlier car only: the **Corsa Club Run** (Corsa Rojo) and **Hatch Attack** (Vexa GTi), each awarding a Showroom trophy. Parts above a car’s cap now **run at the cap tier** instead of being unusable, so an older car still benefits from your current bench.
+- **Time attacks.** Three solo runs (Strip, Highway and Esses Time Attacks) with Bronze/Silver/Gold targets; each medal pays once ($120 / $240 / $450 plus crates aimed at your current craft) and the result names the next target and the gap.
+- **Collection.** The Showroom leads with a collection card (cars, finishes, medals, trophies, badges), the next unlock stays on the Garage goal card with its requirement chips, and the Race tab groups events by district with round, class-meet, solo and trophy tags. No prices were inflated and there are no daily check-ins.
+- **Teach through play.** A short coach-mark sequence, derived purely from save state (so it resumes after a reload and never repeats finished steps): first merge → first race (wider practice nitro windows) → craft toward the next car → spend → goal card, then one-time tips for nitro banking, the overflow tray, the scrap press, Merge All and equip caps. **Skip tips** turns them off; **How to play** (the “?” button) holds the legend, glossary and **Show tips again**. Existing saves open at their progress with no beginner prompts.
+- **Races that feel different.** The finish is shown: the result is committed the moment you cross (an off-screen copy finishes the race), while the visible race runs on for 1.6 s and the clock freezes at your time. The camera frames you with the nearest rival and looks ahead before a window; overtakes are called out (“Passed Dex · 2nd”). The nitro button counts down to each window with a ring and “WINDOW IN 1.2 s”. A **Perfect** boost gets a gold flash, gold speed lines and a camera surge, and every boost reports what it actually gained against a no-nitro ghost (“Perfect boost: +0.42 s on the field”). Launch shake and wheelspin smoke, a wheelspin note for launch taps, brake lights, motion-blurred wheels at speed, a lane layout that clears the nitro button and fills tall phones, a coast scene, and a “you” marker that sits on your own roof.
+- **Every screen easier.** One primary action per screen; car model names everywhere; grouped toasts that never block taps; focus returns to whatever opened a sheet; the results card explains rewards on the first race; small offline claims are silent and closing the sheet still claims; merging no longer makes the active car worse.
+- **Typography and layout.** One bundled typeface (Barlow 400/600/800, ~68 KB woff2 with a metric-matched fallback), a rem type scale with tokens, tabular numerals, 16 px body and 13–14 px secondary text, 44 px targets, and pinch-zoom allowed again. The top bar falls back to glyphs and then a second row instead of clipping balances; landscape phones get a rotate prompt.
+- **Car art.** Clearcoat reflections and a specular streak, wheel barrels with brake discs and calipers, deeper grilles, lamp lenses with glints, interiors through the glass, a primer fender and dents on the Tapeback, a planted, blunter Ironhorse front, and the Altamar GT’s long tail, covered lamps, chrome and centre-lock wire wheels, with its own reveal stage (a dusk-teal room and a light sweep along the body).
 
 ## Update 1.2 · cars, phone UI, loop
 
@@ -57,7 +71,7 @@ Invalid drops return the part to where it was. The page never scrolls while drag
 - **Equip.** The active car auto-equips the strongest part per family up to its equip cap. Stronger parts above the cap stay on the bench and are flagged. Scrapping an equipped part asks first and names what equips next.
 - **Racing.** Three rivals, a fixed-timestep (60 Hz) simulation on segmented tracks (launch, straights or highway, a bend). Amber **nitro windows** on the two straights are telegraphed on the road, on the progress bar and with an optional beep; a tap inside a window is a **Perfect** (1.5× effect), outside it still boosts. Every finish pays cash, Rep and crates scaled by place, with the real time gap and one next step. Rewards are committed at the finish line, so closing the page cannot lose or double them.
 - **Quick Race.** After a live win, an ordinary event can be raced by your crew in the background: same simulation without nitro, the placement's base payout, finished after the race's real duration while you keep merging. First-win bonuses, precision bonuses and rival rewards need a live race.
-- **Cars.** Junker (start, cap T2) → Beater (45 Rep + crafted T3 Tires, cap T3) → Hot hatch (450 Rep + crafted T4 Turbo, cap T4) → Muscle (1450 Rep + crafted T5 Engine, cap T5). Keystones are recorded in a permanent ledger the moment you craft them (including tiers jumped by a Mint); crate drops never count. The next car sits under a cover above the board with the exact remaining goal.
+- **Cars.** Junker (start, cap T2) → Beater (70 Rep + crafted T3 Tires, cap T3) → Hot hatch (600 Rep + crafted T4 Turbo, cap T4) → Muscle (1,850 Rep + crafted T5 Engine, cap T5) → Grand tourer (5,600 Rep + crafted T6 Engine + a Coastal Crown win, cap T6). Keystones are recorded in a permanent ledger the moment you craft them (including tiers jumped by a Mint); crate drops never count. The next car sits under a cover above the board with the exact remaining goal.
 - **Rusty Ray.** The Scrapyard rival (needs the Beater). First win: the Ray's Rust-Red paint blueprint, the "Scrapyard King" badge, $200, 4 crates, and the Suburbs open.
 - **Reveal.** Ownership is saved before the unveil. Drag the cover off (or tap), then a headlight sweep, a camera move and a per-car rev. Skip is always available; an interrupted reveal resumes on next launch.
 - **Catch-up.** After ~150 s of active play (and race finishes) without progress on the current keystone, one free crate of that family arrives (once per car). Idle time and reloads earn nothing toward it.
@@ -134,6 +148,32 @@ Source lives on the development branch; the compiled site is published to a dedi
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
 
+### 1.3 · Open Road
+
+**Automated tests** (`npm test`): 70 passing. New in 1.3: the teach-through-play steps (fresh save walk-through, out-of-order play, resume after closing mid-step, Skip, a returning save opening at its progress with no beginner prompts, the equip-cap tip), the Open Road rules (event-gated unlock, class-meet car switch, medals paying once per medal, trophies awarded once, parts above the cap running at the cap tier, crew nitro), and a chapter playthrough.
+
+**Clean save → Muscle** (`npm run playthrough`, simulation, ordinary luck, 5 seeds): Corsa Rojo 2:21–2:36, Vexa GTi 9:39–10:35, Ironhorse 19:21–21:50; longest run of one race 3; 0 s stuck on ingredients; 0 s waiting.
+
+**Clean save → Altamar GT** (`tests/chapter.test.ts`, simulation, perfect-timing and mixed-timing players, 2 seeds each): **39.3–41.2 min**, 122–129 races, longest run of one race 3, T6 Engine crafted at 6.8–11.4 min. Honest note: Rep for the GT comes from rotating through the coastal rounds, so Harbor Launch and Cliffside Esses are each run 14–16 times and the Maple Mile 27 times across the full 40 minutes (never more than 3 in a row); the Coastal Crown itself takes 1–2 attempts.
+
+**Race checks** (same seed, same car): a T5 Ironhorse wins the coastal rounds 8–10 times in 10 with a Perfect boost and 0–3 times in 10 with an ordinary tap, so both the build and the timing matter. Played and checked in the browser: countdown (no position shown until GO), pause and resume, backgrounding (pauses, shows Resume on return), closing mid-race (no payout, nothing stuck), last place on the coast, a close finish (“WIN! 0.1 s ahead” with the crossing on screen), a rival win, and Race again.
+
+**Layout** (`layout.cjs` in this session: 320×568, 360×640, 390×844, 430×932, 844×390, 667×375, 1280×800; normal and 125 % text; fresh and late-game saves; Garage, Race, Showroom, How to play, Settings): no sideways scroll, no clipped text, no overlapping controls on the top layer, no target under 40 px. Fixed on the way: top-bar balances clipping at 360–390 px with large numbers and with enlarged text (now glyphs, then a two-row bar), the bench not refitting when the bar grows, a 36 px coach button, 30 px settings toggles and a 34 px scrap press. `npm run check:input`: 24/24.
+
+**Production smoke test**: 22/22 at `/Rev-Up/`, upgrading **from the build currently on `gh-pages`** (1.2) to this one: same save key and Home Screen identity, scoped service worker, offline relaunch with a merge and a full race, staged update offered on a safe screen, old cache removed, one navigation, save intact.
+
+**Performance** (`npm run perf`, emulated 390×844 @3×, 4× CPU slowdown, software rendering; runs vary by ±3 fps):
+
+| Measure | 1.2 | 1.3 |
+| --- | --- | --- |
+| Dragging on a full board | 59–60 fps, p95 16.7 ms | 59–60 fps, p95 16.7 ms |
+| Live race | 54–57 fps, p95 33 ms | 49–54 fps, p95 33 ms |
+| Reveal | 53 fps, p95 33 ms | 56 fps, p95 33 ms |
+
+The race costs about 7 % more than 1.2 for the new effects (pack camera, overtakes, motion-blurred wheels, Perfect presentation). Profiling found and fixed three real costs on the way (the nitro button rebuilding every frame, car sprites re-rendered as the camera zoomed, and the effects-quality setting bouncing between resolutions); if a phone stays slow for two seconds, effects drop for the rest of the race.
+
+### 1.2
+
 **Automated tests** (`npm test`): 62 passing — the 1.1 rules, race and save suites plus: a 1.0 save loaded from storage that now qualifies for two cars (each owned once, revealed in order, survives closing mid-reveal), an earned finish persisting across reload into the next race, the Tapeback Trophy gate and balance (T2 Tapeback with good nitro wins ≥7/10 seeds, T1 without nitro 0/10), the Fresh-route bonus paying once and not on an immediate repeat, and live racing while the crew runs a Quick Race.
 
 **Clean save → Muscle** (`npm run playthrough`, **simulation**: scripted player through the real game API, 1.3 s per drag, race time + 7 s menus per live race, baseline luck — every roll Standard, zero Mint/Polished — 5 seeds):
@@ -171,8 +211,11 @@ Keystones (T3 Tires, T4 Turbo, T5 Engine) are crafted well before their Rep in e
 
 ## Known limitations
 
+- At 320×568 with 125 % text and very large balances, the bench reaches its 36 px minimum and the Garage body scrolls a little to reach the overflow tray.
+- The coach callout sits over part of the bench while it points at the pair to merge.
+
 - Not yet tested on a physical iPhone or Android device (Home Screen standalone launch, safe areas, pause/resume and save persistence after relaunch should be confirmed on hardware).
 - Quick Race and the Race button always race the active car; switch cars in the Showroom.
 - On a full 6×7 bench at 320×568 part cells shrink to 36 px (below the 44 px target for primary controls); the Race and recovery buttons stay at 44 px+.
 - Emulated frame times come from software rendering; real phone GPUs should do better, but this is unmeasured.
-- One model per class and three tracks in this release; Downtown onward, Transmission/Aero and T6–T10 exist in data only.
+- One model per class and six tracks in this release; Downtown, Transmission/Aero and T7–T10 exist in data only.
