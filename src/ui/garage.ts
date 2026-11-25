@@ -341,7 +341,7 @@ export class GarageView implements View {
       if (!slot || slot.dataset.k !== key) {
         slot = h('button', { class: `eq ${state}${lo.blocked[f] ? ' capped' : ''}`, 'data-fit': f, 'data-k': key, 'aria-label': label },
           h('span', { class: 'eqart', html: p ? partTileHtml(p.f, p.t, p.q, 'mini') : `<span class="eqempty">${familyIcon(f)}</span>` }),
-          h('span', { class: 'eqt' }, h('b', {}, p ? `T${p.t}` : 'Empty'), h('span', { class: 'eqn' }, ` ${fam.name}`)),
+          h('span', { class: 'eqt' }, h('b', {}, p ? `T${p.t}` : 'Empty'), h('span', { class: 'eqn' }, fam.name)),
           state === 'better' ? h('span', { class: 'eqbadge up', 'aria-hidden': 'true' }, `↑T${r!.part.t}`)
             : state === 'empty' && r ? h('span', { class: 'eqbadge add', 'aria-hidden': 'true' }, `+T${r.part.t}`) : null);
         this.eqSlots[f] = slot;
@@ -543,9 +543,9 @@ export class GarageView implements View {
         const { chain, at, q, tier, skipped } = e;
         this.later(() => {
           gsfx.merge(tier, chain);
-          if (chain > 1) { gsfx.cascade(chain); if (!batch) this.floater(at, `Cascade ×${chain}`, `chain c${Math.min(chain, 5)}`); }
+          if (chain > 1) { gsfx.cascade(chain); if (!batch) this.floater(at, `Cascade ×${chain}`, `mchain c${Math.min(chain, 5)}`); }
           if (q === 'mint') { gsfx.mint(); this.burst(at, 'gold'); this.floater(at, skipped ? `MINT · jumped to T${tier}` : 'MINT ★', 'gold'); }
-          else if (q === 'polished') { gsfx.polished(); this.burst(at, 'silver'); this.floater(at, 'Polished +15%', 'silver'); }
+          else if (q === 'polished') { gsfx.polished(); this.burst(at, 'silver'); this.floater(at, 'Polished +15%', 'msilver'); }
         }, delay);
         delay += reduced ? 0 : 110;
       }
@@ -577,7 +577,7 @@ export class GarageView implements View {
         if (e.outgoingId) {
           anim.set(key(e.from), ['land']);
           const out = B.getPart(this.s, e.from);
-          if (out) this.later(() => this.floater(e.from, `T${out.t} off the car`, 'silver'), reduced ? 0 : 380);
+          if (out) this.later(() => this.floater(e.from, `T${out.t} off the car`, 'msilver'), reduced ? 0 : 380);
         }
       }
       if (e.type === 'uninstall') {
@@ -587,7 +587,7 @@ export class GarageView implements View {
         const p = B.getPart(this.s, e.to);
         if (p && slot && cell && e.car === this.s.activeCar && !sheetOpen) flights.push({ html: partTileHtml(p.f, p.t, p.q), from: slot.getBoundingClientRect(), to: cell.getBoundingClientRect() });
         gsfx.unfit();
-        this.later(() => this.floater(e.to, 'Off the car', 'silver'), reduced ? 0 : 380);
+        this.later(() => this.floater(e.to, 'Off the car', 'msilver'), reduced ? 0 : 380);
       }
       if (e.type === 'move-fit') gsfx.fit();
       if (e.type === 'crateBlocked') this.app.toast('Board full. Merge a pair or scrap a part.');
@@ -607,7 +607,7 @@ export class GarageView implements View {
     if (!batch) {
       for (const site of sites.values()) {
         const name = FAMILIES[site.f].name;
-        this.later(() => this.floater(site.at, `T${site.from} ${name} → T${site.to}`, `result${site.to >= 5 ? ' high' : ''}`, 1300, 22), reduced ? 0 : Math.min(delay, 500));
+        this.later(() => this.floater(site.at, `T${site.from} ${name} → T${site.to}`, `mres${site.to >= 5 ? ' high' : ''}`, 1300, 22), reduced ? 0 : Math.min(delay, 500));
         if (site.chain >= 3) {
           this.later(() => { gsfx.cascadeEnd(site.chain); if (!reduced) { this.boardEl.classList.remove('quake'); void this.boardEl.offsetWidth; this.boardEl.classList.add('quake'); } }, Math.min(delay, 500));
         }
@@ -649,7 +649,7 @@ export class GarageView implements View {
     if (!c) return;
     const r = c.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
-    const b = h('div', { class: `burst ${kind}` });
+    const b = h('div', { class: `mburst ${kind}` });
     b.style.left = `${r.left - host.left + r.width / 2}px`;
     b.style.top = `${r.top - host.top + r.height / 2}px`;
     b.style.setProperty('--sz', `${r.width}px`);

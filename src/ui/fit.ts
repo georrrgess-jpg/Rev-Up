@@ -181,7 +181,14 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
         cur ? h('button', {
           class: `btn sm${room ? '' : ' off'}`, 'aria-disabled': room ? 'false' : 'true',
           onclick: () => {
-            if (!firstFree(s)) { note = I.NO_ROOM; noteBad = true; build(); return; }
+            if (!firstFree(s)) {
+              // the box below already explains how to make room: draw the eye to it
+              gsfx.invalid();
+              const box = body.querySelector('.fit-room');
+              box?.classList.remove('refuse'); void (box as HTMLElement | null)?.offsetWidth; box?.classList.add('refuse');
+              box?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              return;
+            }
             act(() => app.game.removePart(curCar, fam), () => gsfx.unfit(), fam);
           },
         }, 'Remove') : null);
