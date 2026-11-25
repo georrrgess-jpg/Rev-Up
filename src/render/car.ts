@@ -308,6 +308,19 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
   ctx.save();
   ctx.translate(wx, cy);
   const k = d.wheel.kind;
+  if (!detail && blur >= 0.6) {
+    // fully blurred at race speed: spokes cannot be seen, so draw only the smeared disc (cheaper than the rim)
+    ctx.fillStyle = '#07080a';
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.02, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = k === 'steel' ? 'rgb(70,74,77)' : 'rgb(96,101,106)';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = k === 'steel' ? 'rgb(120,124,126)' : 'rgb(170,176,182)';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = R * 0.04;
+    for (const q of [0.45, 0.72]) { ctx.beginPath(); ctx.arc(0, 0, R * q, angle % 6, (angle % 6) + 2.2); ctx.stroke(); }
+    ctx.restore();
+    return;
+  }
   // wheel barrel: a dark inner well offset toward the car so the rim reads deep
   ctx.fillStyle = '#07080a';
   ctx.beginPath(); ctx.arc(0, 0, R * 1.02, 0, Math.PI * 2); ctx.fill();
@@ -1070,8 +1083,10 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
 function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, o: CarDrawOpts, paint: string, trim: string) {
   const d = defFor(id);
   const g = geometry(id);
-  // sizes are quantised (~4% steps) so a zooming race camera reuses cached sprites
-  const W = Math.max(8, Math.round(2 ** (Math.round(Math.log2(w) * 16) / 16)));
+  // Sprites are rendered at coarse size steps (~12%, rounded up) and drawn scaled down to the exact size,
+  // so a zooming race camera reuses a handful of bitmaps instead of rebuilding every car each frame or two.
+  const W = Math.max(8, Math.round(2 ** (Math.ceil(Math.log2(Math.max(8, w)) * 6) / 6)));
+  const f = w / W;
   const key = [id, paint, trim, o.livery ?? '', W].join('|');
   let s = spriteCache.get(key);
   if (!s) {
@@ -1098,20 +1113,21 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
     spriteCache.set(key, s);
   }
   const oy = s.back.height - s.pad;
+  const blit = (cv: HTMLCanvasElement) => ctx.drawImage(cv, x - s!.pad * f, y - oy * f, cv.width * f, cv.height * f);
   if (o.headlights || o.nitro) {
-    ctx.save(); setupCtx(ctx, x, y, W, id);
+    ctx.save(); setupCtx(ctx, x, y, w, id);
     const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false };
     if (o.headlights) beam(c, o.headlights);
     if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0);
     ctx.restore();
   }
-  ctx.drawImage(s.back, Math.round(x - s.pad), Math.round(y - oy));
-  ctx.save(); setupCtx(ctx, x, y, W, id);
+  blit(s.back);
+  ctx.save(); setupCtx(ctx, x, y, w, id);
   for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, false, g.D, o.blur ?? 0);
   ctx.restore();
-  ctx.drawImage(s.front, Math.round(x - s.pad), Math.round(y - oy));
+  blit(s.front);
   if (o.headlights || o.brake) {
-    ctx.save(); setupCtx(ctx, x, y, W, id);
+    ctx.save(); setupCtx(ctx, x, y, w, id);
     const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false };
     frontLayerLightsOnly(c, o.headlights ?? 0, !!o.brake);
     ctx.restore();

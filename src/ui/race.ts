@@ -411,7 +411,7 @@ class RaceScreen {
       }
       this.shake = Math.max(0, this.shake - dt);
       this.kick = Math.max(0, this.kick - dt);
-      if (!this.finished && this.countdown <= 0 && sim0Launch(this.sim) && !this.reduced && Math.random() < 0.5) this.burst(2, '#bdb6ab');
+      if (!this.finished && this.countdown <= 0 && sim0Launch(this.sim) && !this.reduced && this.quality && Math.random() < 0.2) this.burst(1, '#bdb6ab');
       this.stepParticles(dt);
     }
     this.draw();
@@ -446,8 +446,9 @@ class RaceScreen {
     if (approaching) {
       const q = (Math.round(Math.max(0, Math.min(1, 1 - eta / 2.2)) * 20) / 20).toFixed(2); // 20 steps: no repaint every frame
       if (this.nitroBtn.style.getPropertyValue('--eta') !== q) this.nitroBtn.style.setProperty('--eta', q);
-      this.nitroBtn.dataset.label = `WINDOW IN ${eta.toFixed(1)} s`;
-    } else if (inWindow) this.nitroBtn.dataset.label = '▲ PERFECT WINDOW';
+      const lbl = `WINDOW IN ${eta.toFixed(1)} s`;
+      if (this.nitroBtn.dataset.label !== lbl) this.nitroBtn.dataset.label = lbl;
+    } else if (inWindow && this.nitroBtn.dataset.label !== "▲ PERFECT WINDOW") this.nitroBtn.dataset.label = "▲ PERFECT WINDOW";
     // overtakes, called out once they settle (after the launch)
     if (this.sim.t > 2) {
       const order = this.sim.standings().map((r) => r.id).join('|');
@@ -552,8 +553,8 @@ class RaceScreen {
     const ready = !this.finished && c > 0 && sim.player.nitroLeft <= 0 && active && !sim.usedWindows.has(active.segIndex);
     const nitroLabel = ready ? 'Tap now' : sim.player.nitroLeft > 0 ? 'Boosting' : 'Nitro';
     const labelKey = `${c}:${nitroLabel}`;
-    if (this.nitroBtn.dataset.label !== labelKey) {
-      this.nitroBtn.dataset.label = labelKey;
+    if (this.nitroBtn.dataset.key !== labelKey) {
+      this.nitroBtn.dataset.key = labelKey;
       this.nitroBtn.replaceChildren(h('span', { class: 'n num' }, c), nitroLabel);
     }
     this.nitroBtn.classList.toggle('empty', c === 0);
