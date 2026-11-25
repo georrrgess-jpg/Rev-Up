@@ -231,7 +231,7 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
         const gain = summary(rec.before, rec.after);
         confirm = h('div', { class: 'fit-confirm' },
           h('button', {
-            class: `btn primary${recCount ? '' : ' off'}`, 'aria-disabled': recCount ? 'false' : 'true',
+            class: `btn primary${recCount ? '' : ' off'}`, 'aria-disabled': recCount ? 'false' : 'true', 'data-coach': 'fit-recommended',
             onclick: () => {
               if (!recCount) { note = 'Best parts already fitted. Merge higher tiers to improve this car.'; noteBad = false; build(); return; }
               act(() => app.game.fitRecommended(curCar), () => gsfx.recommended(), null);

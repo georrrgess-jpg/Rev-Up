@@ -34,7 +34,7 @@ describe('teach-through-play steps', () => {
     const buy = bestBuy(g.state);
     if (!buy.affordable) {
       expect(tutorialStep(g.state)).toBe('goalCard');
-      g.transact((s) => { s.cash += 60; return []; }, T0 + 35_000);
+      g.transact((s) => { s.cash = Math.max(s.cash, buy.pick?.price ?? 0); return []; }, T0 + 35_000); // a second purse
     }
     expect(tutorialStep(g.state)).toBe('spend');
     const pick = bestBuy(g.state).pick!;

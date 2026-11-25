@@ -5,8 +5,8 @@
 // Contract (docs/CONTRACTS.md): owned by the Garage systems workstream. The functions here are the only code
 // that moves parts between the bench and a car's slots. Every operation is all-or-nothing: on any refusal the
 // state is untouched and a single `invalid` event says why (and, where it can, how to fix it).
-import { ACTIVE_FAMILIES, CarId, FAMILIES, Family, carById } from '../data/tables';
-import { allParts, firstFree, getPart, setPart } from './board';
+import { ACTIVE_FAMILIES, CarId, ENABLED_CARS, FAMILIES, Family, carById } from '../data/tables';
+import { allParts, craftedTier, firstFree, getPart, setPart } from './board';
 import type { GameEvent, SlotRef } from './events';
 import { computeLoadout, contributionOn, loadoutWith } from './loadout';
 import type { GameState, Part } from './state';
@@ -143,9 +143,19 @@ export function recommendedFit(s: GameState, car: CarId): Partial<Record<Family,
   const cur = fitted(s, car);
   const best: Partial<Record<Family, PartSource>> = {};
   const score = (p: Part) => contributionOn(p, cap);
+  // Keep the next car's crafting ingredients on the bench: a bench part of the keystone family below the
+  // keystone tier that still has a merge partner is an ingredient, not an upgrade (first session: the starter
+  // T1 Tires pair is the Corsa Rojo's T3 Tires).
+  const next = ENABLED_CARS.find((c) => !s.owned.includes(c.id))?.unlock ?? null;
+  const benchKey = (q: Part) => `${q.f}:${q.t}`;
+  const pairs = new Map<string, number>();
+  for (const q of [...s.board, ...s.tray]) if (q) pairs.set(benchKey(q), (pairs.get(benchKey(q)) ?? 0) + 1);
+  const ingredient = (src: PartSource) => 'at' in src && !!next && src.part.f === next.family && src.part.t < next.tier
+    && craftedTier(s, next.family) < next.tier && (pairs.get(benchKey(src.part)) ?? 0) >= 2;
   const consider = (src: PartSource, strict: boolean) => {
     const p = src.part;
     if (!ACTIVE_FAMILIES.includes(p.f)) return;
+    if (ingredient(src)) return;
     const have = cur[p.f];
     if (have && score(p) <= score(have)) return; // must beat what is fitted
     const lead = best[p.f]?.part;
