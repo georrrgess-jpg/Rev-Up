@@ -74,6 +74,8 @@ export class App {
 
     game.subscribe((ev) => this.onEvents(ev));
     window.addEventListener('hashchange', () => this.fromHash());
+    window.addEventListener('resize', () => this.fitTop());
+    document.fonts?.ready.then(() => this.fitTop());
     // First gesture unlocks audio (lazy) and counts as input.
     const first = () => { unlockAudio(); };
     window.addEventListener('pointerdown', first, { capture: true });
@@ -139,8 +141,22 @@ export class App {
     set('rep', fmt(s.rep), any);
     set('scrap', fmt(s.scrap), any);
     set('nitro', `${s.nitro}/${NITRO_CAP}`, any);
+    this.fitTop();
     this.navBtns.showroom.querySelector('.badge')?.remove();
     if (s.pendingReveal) this.navBtns.showroom.append(h('span', { class: 'badge' }, '1'));
+  }
+
+  /** Words ("Rep", "Scrap") read best, but large balances need the room: fall back to glyphs when a value would clip. */
+  private topBar: HTMLElement | null = null;
+  fitTop() {
+    const bar = this.topBar ?? (this.topBar = this.root.querySelector('.topbar'));
+    if (!bar) return;
+    bar.classList.remove('compact', 'wrap');
+    const clipping = () => Object.values(this.chips).some((c) => c.scrollWidth > c.clientWidth + 1);
+    if (!clipping()) return;
+    bar.classList.add('compact');
+    // enlarged text or very large balances: let the bar take a second row rather than cut numbers off
+    if (clipping()) bar.classList.add('wrap');
   }
 
   promptReveal() {

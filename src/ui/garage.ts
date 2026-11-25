@@ -83,6 +83,9 @@ export class GarageView implements View {
     this.bindKeys();
     window.addEventListener('resize', () => this.visible && this.layout());
     window.visualViewport?.addEventListener('resize', () => this.visible && this.layout());
+    // the view also changes height without a window resize (the top bar can take a second row)
+    let lastH = 0;
+    new ResizeObserver(() => { const hh = this.el.clientHeight; if (this.visible && hh !== lastH) { lastH = hh; this.layout(); } }).observe(this.el);
   }
 
   get s() { return this.app.game.state; }
