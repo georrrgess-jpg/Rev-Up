@@ -222,7 +222,7 @@ export const CARS: CarClass[] = [
   {
     id: 'tuner', name: 'Lightweight', model: 'Kestrel 1600', district: 'downtown', cap: 6,
     base: { top: 40, accel: 7.0, grip: 1.25 }, unlock: { rep: 2700, family: 'tires', tier: 6, stars: 3 }, enabled: true,
-    paint: '#e9e4d8', trim: '#1b1d21', blurb: 'A stripped, high-revving coupe built for the city. Thin glass, no carpet, all corner.',
+    paint: '#efc12c', trim: '#1b1d21', blurb: 'A stripped, high-revving coupe built for the city. Thin glass, no carpet, all corner.',
     offlineRate: 7, rev: { base: 95, peak: 320 }, handling: 'Best off the line and through tight corners; runs out of top end on highways.',
   },
   {
@@ -283,7 +283,7 @@ export interface Track {
   name: string;
   district: DistrictId;
   segments: Segment[];
-  theme: 'scrap' | 'suburb' | 'coast' | 'night';
+  theme: 'scrap' | 'suburb' | 'foundry' | 'coast' | 'night';
   /** Short player-facing course type and the part family it rewards. */
   course: string;
   favours: string;
@@ -309,7 +309,7 @@ export const TRACKS: Record<Track['id'], Track> = {
     ],
   },
   foundry: {
-    id: 'foundry', name: 'Foundry Circuit', district: 'suburbs', theme: 'scrap', course: 'Tight bends', favours: 'Tires through the bends',
+    id: 'foundry', name: 'Foundry Circuit', district: 'suburbs', theme: 'foundry', course: 'Tight bends', favours: 'Tires through the bends',
     segments: [
       { type: 'launch', length: 85 },
       { type: 'bend', length: 100, radius: 49 },

@@ -585,3 +585,21 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .paintshop .buybar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 10px; border-radius: 12px; background: #1d2530; border: 1px solid #9fd8ff; box-shadow: 0 -6px 18px rgba(0,0,0,.5); }
 .paintshop .buybar[hidden] { display: none; }
 .paintshop .buybar .grow { flex: 1; min-width: 0; font-size: var(--fs-sm); }
+
+/* ---- Downtown Nights: goals, heats, trap ---- */
+.tag.stars { color: var(--gold); letter-spacing: .05em; background: rgba(242,193,78,.12); }
+.goals { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 8px 0 2px; font-size: var(--fs-sm); color: var(--muted); }
+.goals .met { color: var(--gold); font-weight: var(--w-strong); }
+.goals .pay { flex-basis: 100%; font-size: var(--fs-2xs); }
+.heats { margin: 8px 0 2px; padding-left: 20px; font-size: var(--fs-sm); color: var(--muted); }
+.heats li { margin: 2px 0; }
+.heats li.now { color: var(--text); }
+.heats li.now::marker { color: var(--amber2); }
+.heats li.done { color: #6fd08c; text-decoration: line-through; }
+.result .trap { display: flex; align-items: baseline; gap: 6px; margin: -4px 0 8px; }
+.result .trap .num { font-size: var(--fs-3xl); font-weight: var(--w-heavy); color: #9fd8ff; }
+.result .heat-result { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; font-weight: var(--w-strong); }
+.result .heat-result.through { background: rgba(111,208,140,.14); color: #8fe0a8; }
+.result .heat-result.out { background: rgba(230,80,60,.14); color: #ffb3a6; }
+.result .heat-result.champ { background: linear-gradient(90deg, rgba(226,51,122,.35), rgba(120,80,255,.35)); color: #fff; font-size: var(--fs-lg); }
+.star-ico { font-size: 22px; color: var(--gold); }

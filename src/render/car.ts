@@ -13,7 +13,7 @@ type P = { x: number; y: number };
 /** Profile vertex: x, y (metres, y up), corner radius, tag for the edge that starts here ('g' = glass). */
 type V = [number, number, number?, string?];
 
-interface WheelStyle { kind: 'steel' | 'cover' | 'sport' | 'dish' | 'center'; rim: number; tire: string; side?: string; caliper?: string }
+interface WheelStyle { kind: 'steel' | 'cover' | 'sport' | 'dish' | 'center' | 'aero'; rim: number; tire: string; side?: string; caliper?: string }
 
 interface CarDef {
   L: number; // length, metres
@@ -83,6 +83,28 @@ const DEFS: Record<string, CarDef> = {
     ],
     belt: 0.96, wheel: { kind: 'center', rim: 0.74, tire: '#141414', side: '#1f1f1f', caliper: '#c9a14a' },
   },
+  // Kestrel 1600 — boxy, stripped lightweight coupe: short overhangs, box flares, a ducktail, square lamps.
+  tuner: {
+    L: 3.98, width: 1.66, rx: 0.72, fx: 3.08, r: 0.3, tireW: 0.125, rearTireW: 0.13, sill: 0.22, archGap: 0.03, flare: 0.055,
+    profile: [[0.08, 0.22, 0.02], [0, 0.32, 0.03], [0, 0.72, 0.03], [0.03, 0.86, 0.02], [0.4, 0.88, 0.05], [1.0, 1.22, 0.08], [1.95, 1.25, 0.07, 'g'],
+      [2.55, 0.89, 0.03], [3.7, 0.76, 0.05], [3.96, 0.62, 0.04], [3.98, 0.3, 0.03], [3.9, 0.21, 0.02]],
+    glass: [
+      [[1.06, 0.91, 0.02], [1.13, 1.17, 0.03], [1.5, 1.2, 0.02], [1.5, 0.91, 0.02]],
+      [[1.6, 0.91, 0.02], [1.6, 1.2, 0.02], [1.93, 1.2, 0.04], [2.43, 0.91, 0.02]],
+    ],
+    belt: 0.9, wheel: { kind: 'sport', rim: 0.72, tire: '#151516', side: '#222224', caliper: '#f2b33d' },
+  },
+  // Lumen RS — cab-forward hybrid hypercar: low nose, long tail, light-bar face, aero wheels.
+  super: {
+    L: 4.6, width: 1.98, rx: 0.98, fx: 3.66, r: 0.35, tireW: 0.14, rearTireW: 0.17, sill: 0.16, archGap: 0.03, flare: 0.04,
+    profile: [[0.1, 0.18, 0.02], [0, 0.3, 0.03], [0, 0.7, 0.04], [0.14, 0.86, 0.06], [1.35, 0.98, 0.3], [2.05, 1.13, 0.22], [2.6, 1.1, 0.12, 'g'],
+      [3.3, 0.76, 0.08], [4.35, 0.55, 0.14], [4.6, 0.42, 0.06], [4.6, 0.28, 0.03], [4.5, 0.17, 0.02]],
+    glass: [
+      [[1.55, 0.93, 0.02], [1.78, 1.04, 0.05], [1.96, 1.06, 0.02], [1.96, 0.93, 0.02]],
+      [[2.04, 0.88, 0.02], [2.12, 1.07, 0.04], [2.55, 1.06, 0.06], [3.16, 0.8, 0.02]],
+    ],
+    belt: 0.88, wheel: { kind: 'aero', rim: 0.76, tire: '#121214', side: '#1c1c20', caliper: '#b9a6ff' },
+  },
 };
 const defFor = (id: string): CarDef => DEFS[id] ?? DEFS.muscle;
 
@@ -90,7 +112,7 @@ const defFor = (id: string): CarDef => DEFS[id] ?? DEFS.muscle;
 export const carLengthM = (id: CarId | string) => defFor(id).L;
 
 /** Height of the headlamp centres on the front plane. */
-const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63 } as Record<string, number>)[id] ?? 0.65;
+const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63, tuner: 0.62, super: 0.5 } as Record<string, number>)[id] ?? 0.65;
 
 // ---------------------------------------------------------------- colour helpers
 
@@ -270,7 +292,7 @@ export interface CarDrawOpts {
   style?: CarStyle;
 }
 
-export type WheelSetId = 'steel' | 'turbine' | 'fivespoke' | 'dish' | 'wire';
+export type WheelSetId = 'steel' | 'turbine' | 'fivespoke' | 'dish' | 'wire' | 'aero';
 export type PaintMaterial = 'metallic' | 'pearl' | 'candy';
 /** restore: Tapeback restoration stage — 1 rust and tape fixed, 2 straight panels and one colour, 3 brightwork. */
 export interface CarStyle { wheel?: WheelSetId; material?: PaintMaterial; restore?: number }
@@ -282,6 +304,7 @@ const WHEEL_SETS: Record<WheelSetId, Partial<WheelStyle>> = {
   fivespoke: { kind: 'sport', rim: 0.74, caliper: '#d8312a' },
   dish: { kind: 'dish', rim: 0.68, caliper: '#3a3f44' },
   wire: { kind: 'center', rim: 0.74, caliper: '#c9a14a' },
+  aero: { kind: 'aero', rim: 0.76, caliper: '#b9a6ff' },
 };
 const styledDefs = new Map<string, CarDef>();
 function styledDef(id: string, st?: CarStyle): CarDef {
@@ -354,7 +377,7 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
   well.addColorStop(0, '#2a2e33'); well.addColorStop(1, '#0b0c0e');
   ctx.fillStyle = well;
   ctx.beginPath(); ctx.arc(D.x * 0.05, D.y * 0.05, R * 0.94, 0, Math.PI * 2); ctx.fill();
-  if (k === 'sport' || k === 'dish' || k === 'center') {
+  if (k === 'sport' || k === 'dish' || k === 'center' || k === 'aero') {
     // brake disc (with a machined ring) and caliper sit behind the spokes and do not rotate
     const disc = ctx.createRadialGradient(-R * 0.2, R * 0.2, R * 0.1, 0, 0, R * 0.8);
     disc.addColorStop(0, '#9aa1a8'); disc.addColorStop(1, '#4d5258');
@@ -422,6 +445,22 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
     ctx.beginPath(); ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#d8312a';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.07, 0, Math.PI * 2); ctx.fill();
+  } else if (k === 'aero') {
+    // aero wheel: a dark smoked disc with seven curved turbine blades and a thin lit ring
+    ctx.fillStyle = '#16151c';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.95, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 7; i++) {
+      ctx.save(); ctx.rotate((i * Math.PI * 2) / 7);
+      ctx.beginPath();
+      ctx.moveTo(R * 0.22, -R * 0.06); ctx.quadraticCurveTo(R * 0.6, -R * 0.3, R * 0.9, -R * 0.1);
+      ctx.lineTo(R * 0.9, R * 0.04); ctx.quadraticCurveTo(R * 0.6, -R * 0.14, R * 0.22, R * 0.06); ctx.closePath();
+      ctx.fillStyle = i % 2 ? '#3a3846' : '#55526a'; ctx.fill();
+      ctx.restore();
+    }
+    ctx.strokeStyle = d.wheel.caliper ?? '#b9a6ff'; ctx.lineWidth = R * 0.035;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.9, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#0b0b10'; ctx.beginPath(); ctx.arc(0, 0, R * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = d.wheel.caliper ?? '#b9a6ff'; ctx.beginPath(); ctx.arc(0, 0, R * 0.06, 0, Math.PI * 2); ctx.fill();
   } else if (k === 'center') {
     // centre-lock wire wheel: polished lip, cross-laced spokes, two-ear knock-off
     const lip = ctx.createLinearGradient(-R, R, R, -R);
@@ -487,6 +526,11 @@ interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; pa
 function backLayer(c: Ctx, shadow: boolean) {
   const { ctx, d, g, paint } = c;
   const D = g.D;
+  if (shadow && c.id === 'super') {
+    const ug = ctx.createRadialGradient(d.L / 2, 0.02, 0.1, d.L / 2, 0.02, d.L * 0.62);
+    ug.addColorStop(0, 'rgba(170,120,255,0.55)'); ug.addColorStop(1, 'rgba(170,120,255,0)');
+    ctx.fillStyle = ug; ctx.beginPath(); ctx.ellipse(d.L / 2 + g.D.x / 2, g.D.y / 2, d.L * 0.62, 0.35, 0, 0, Math.PI * 2); ctx.fill();
+  }
   if (shadow) {
     // soft footprint plus darker contact patches under every tyre
     ctx.save();
@@ -802,6 +846,31 @@ function panelDetails(c: Ctx) {
     ctx.fillStyle = '#1b1e22'; ctx.beginPath(); ctx.roundRect(0.0, 0.66, 0.1, 0.14, 0.02); ctx.fill();
     ctx.fillStyle = '#c8241d'; ctx.beginPath(); ctx.roundRect(0.0, 0.68, 0.08, 0.1, 0.02); ctx.fill();
     mirror(ctx, 2.38, 0.95, paint);
+  } else if (id === 'tuner') {
+    seam(ctx, [[1.55, 0.9], [1.57, 0.5], [1.62, lo]]);
+    seam(ctx, [[2.5, 0.88], [2.52, 0.5], [2.46, lo]]);
+    if (detail) handle(ctx, 1.68, 0.8);
+    // a contrast lower band with the model number, a fuel filler and a red tow hook at the back
+    ctx.fillStyle = trim; ctx.fillRect(0.05, lo - 0.02, d.L - 0.12, 0.14);
+    ctx.fillStyle = c.stripe ?? '#e8641c'; ctx.fillRect(0.05, lo + 0.12, d.L - 0.12, 0.03);
+    if (detail) { ctx.save(); ctx.translate(2.62, lo + 0.03); ctx.scale(0.011, -0.011); ctx.fillStyle = '#f1efe9'; ctx.font = '900 11px sans-serif'; ctx.fillText('1600', 0, 0); ctx.restore(); }
+    ctx.fillStyle = '#1b1d21'; ctx.beginPath(); ctx.arc(0.55, 0.78, 0.045, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d23a2a'; ctx.fillRect(-0.06, 0.26, 0.08, 0.05);
+    ctx.fillStyle = '#a5201b'; ctx.beginPath(); ctx.roundRect(0.0, 0.6, 0.1, 0.16, 0.02); ctx.fill();
+    mirror(ctx, 2.42, 0.92, paint);
+  } else if (id === 'super') {
+    seam(ctx, [[2.0, 0.92], [2.02, 0.4], [2.1, lo]]);
+    seam(ctx, [[3.2, 0.82], [3.26, 0.45], [3.18, lo]]);
+    // the side intake: a deep scoop behind the door that feeds the rear engine
+    ctx.fillStyle = '#07070b';
+    ctx.beginPath(); ctx.moveTo(1.95, 0.78); ctx.quadraticCurveTo(1.45, 0.74, 1.3, 0.42); ctx.lineTo(1.75, 0.4); ctx.quadraticCurveTo(1.85, 0.62, 1.98, 0.66); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = lit(paint, 0.4); ctx.lineWidth = 0.015; ctx.stroke();
+    // carbon sill and a lit violet accent line along it
+    ctx.fillStyle = '#121218'; ctx.fillRect(d.rx + d.r + 0.05, lo - 0.03, d.fx - d.rx - 2 * d.r - 0.1, 0.08);
+    ctx.fillStyle = c.stripe ?? '#b9a6ff'; ctx.fillRect(d.rx + d.r + 0.05, lo + 0.05, d.fx - d.rx - 2 * d.r - 0.1, 0.014);
+    // rear light bar wraps the tail
+    ctx.fillStyle = '#ff3b5c'; ctx.fillRect(0.0, 0.66, 0.08, 0.03);
+    mirror(ctx, 3.05, 0.86, paint);
   } else if (id === 'tourer') {
     seam(ctx, [[1.95, 0.97], [1.97, 0.55], [2.02, lo]]);
     seam(ctx, [[2.96, 0.95], [3.0, 0.55], [2.94, lo]]);
@@ -881,7 +950,7 @@ function sideGlass(c: Ctx) {
 function signatureStripe(c: Ctx) {
   // earned signature finishes add a contrasting accent line under the beltline (hot hatch uses its own stripe)
   const { ctx, d, id } = c;
-  if (id === 'hothatch' || id === 'muscle' || id === 'tourer') return;
+  if (id === 'hothatch' || id === 'muscle' || id === 'tourer' || id === 'tuner' || id === 'super') return;
   ctx.fillStyle = c.stripe!;
   ctx.beginPath(); ctx.moveTo(0.06, d.belt - 0.13); ctx.lineTo(d.L - 0.15, d.belt - 0.18); ctx.lineTo(d.L - 0.15, d.belt - 0.22); ctx.lineTo(0.06, d.belt - 0.17); ctx.closePath(); ctx.fill();
 }
@@ -933,6 +1002,20 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     const sp: P[] = [pt(0.12, 1.2), pt(0.66, 1.315), pt(0.7, 1.35), pt(0.18, 1.29)];
     extrude(ctx, sp, null, D, (n) => (n.y > 0.4 ? '#2b3036' : '#1a1d21'));
     fillPts(ctx, sp, '#14171a');
+  }
+  if (id === 'tuner') {
+    // ducktail: a short upturned lip on the trunk, extruded across the width; a roll cage through the glass
+    const dt: P[] = [pt(0.02, 0.86), pt(0.32, 0.88), pt(0.3, 0.95), pt(0.04, 0.93)];
+    extrude(ctx, dt, null, D, (n) => (n.y > 0.4 ? lit(paint, 0.12) : lit(paint, -0.2)));
+    fillPts(ctx, dt, lit(paint, -0.05));
+  }
+  if (id === 'super') {
+    // active rear wing on two slim pylons, raised above the tail
+    for (const u of [0.25, 0.75]) fillPts(ctx, [pt(0.35 + D.x * u, 0.86 + D.y * u), pt(0.42 + D.x * u, 0.86 + D.y * u), pt(0.4 + D.x * u, 1.06 + D.y * u), pt(0.33 + D.x * u, 1.06 + D.y * u)], '#121218');
+    const wing: P[] = [pt(0.05, 1.04), pt(0.62, 1.08), pt(0.62, 1.12), pt(0.08, 1.11)];
+    extrude(ctx, wing, null, D, (n) => (n.y > 0.4 ? '#2a2836' : '#121218'));
+    fillPts(ctx, wing, '#1a1924');
+    ctx.fillStyle = c.stripe ?? '#b9a6ff'; ctx.fillRect(0.08, 1.105, 0.52, 0.01);
   }
   if (id === 'beater') {
     // faded roof: sun-chalked lacquer along the near roof edge
@@ -1016,6 +1099,22 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     fillPts(ctx, quadFP(g, 0.75, 0.97, 0.5, 0.58), lens(false));
     fillPts(ctx, quadFP(g, 0.03, 0.25, 0.585, 0.6), lampOn ? '#e8fbff' : '#a9e8ff');
     fillPts(ctx, quadFP(g, 0.75, 0.97, 0.585, 0.6), lampOn ? '#e8fbff' : '#a9e8ff');
+  } else if (id === 'tuner') {
+    // black mesh grille panel with square lamps and a lower splitter
+    fillPts(ctx, quadFP(g, 0.02, 0.98, 0.52, 0.72), '#121315');
+    for (let k = 0; k < 4; k++) fillPts(ctx, quadFP(g, 0.3, 0.7, 0.56 + k * 0.035, 0.57 + k * 0.035), '#2e3236');
+    fillPts(ctx, quadFP(g, 0.04, 0.26, 0.55, 0.69), lens(true));
+    fillPts(ctx, quadFP(g, 0.74, 0.96, 0.55, 0.69), lens(true));
+    fillPts(ctx, quadFP(g, 0.0, 1.0, 0.24, 0.3), '#0c0d0f');
+    fillPts(ctx, quadFP(g, 0.42, 0.58, 0.36, 0.44), '#d23a2a');
+  } else if (id === 'super') {
+    // the light bar: one thin white-violet line across the nose, a dark mouth below it
+    fillPts(ctx, quadFP(g, 0.08, 0.92, 0.26, 0.42), '#08080c');
+    for (let k = 0; k < 3; k++) fillPts(ctx, quadFP(g, 0.12, 0.88, 0.29 + k * 0.035, 0.3 + k * 0.035), '#1d1c26');
+    fillPts(ctx, quadFP(g, 0.02, 0.98, 0.49, 0.515), lampOn ? '#ffffff' : '#e8e2ff');
+    fillPts(ctx, quadFP(g, 0.02, 0.98, 0.475, 0.49), lampOn ? 'rgba(200,170,255,0.9)' : 'rgba(185,166,255,0.6)');
+    fillPts(ctx, quadFP(g, 0.04, 0.2, 0.52, 0.58), '#14141c');
+    fillPts(ctx, quadFP(g, 0.8, 0.96, 0.52, 0.58), '#14141c');
   } else if (id === 'tourer') {
     // oval mouth with a chrome surround and egg-crate grille; covered headlamps under glass domes
     fillPts(ctx, ellipseFP(g, 0.5, 0.5, 0.3, 0.085, 24), '#d9dee3');
@@ -1078,10 +1177,12 @@ function beam(c: Ctx, k: number) {
 
 function flame(c: Ctx, k: number, phase: number) {
   const { ctx } = c;
-  const len = 0.9 + 0.5 * k + 0.08 * Math.sin(phase * 5);
+  const surge = c.id === 'super'; // the Lumen RS's Surge: a long violet light trail instead of a flame
+  const len = (0.9 + 0.5 * k + 0.08 * Math.sin(phase * 5)) * (surge ? 2.2 : 1);
   const y = 0.3;
   const gr = ctx.createLinearGradient(0, 0, -len, 0);
-  gr.addColorStop(0, 'rgba(255,255,240,0.95)'); gr.addColorStop(0.25, k > 1 ? 'rgba(255,214,94,0.9)' : 'rgba(120,205,255,0.9)'); gr.addColorStop(1, 'rgba(255,120,40,0)');
+  if (surge) { gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.2, 'rgba(190,140,255,0.9)'); gr.addColorStop(0.6, 'rgba(255,80,190,0.45)'); gr.addColorStop(1, 'rgba(120,60,255,0)'); }
+  else { gr.addColorStop(0, 'rgba(255,255,240,0.95)'); gr.addColorStop(0.25, k > 1 ? 'rgba(255,214,94,0.9)' : 'rgba(120,205,255,0.9)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); }
   ctx.fillStyle = gr;
   ctx.beginPath(); ctx.moveTo(0.02, y + 0.07); ctx.quadraticCurveTo(-len * 0.5, y + 0.12, -len, y); ctx.quadraticCurveTo(-len * 0.5, y - 0.1, 0.02, y - 0.06); ctx.closePath(); ctx.fill();
 }

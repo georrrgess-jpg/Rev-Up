@@ -75,16 +75,19 @@ export class RaceView implements View {
     };
     const course = (e: RaceEvent) => h('span', { class: 'course' }, TRACKS[e.track].course);
 
-    // Featured: one recommended event with a reason to run it now.
+    // Featured: one recommended event with a reason to run it now (a knockout shows the heat you race next).
+    const shown = rec.knockout ? eventById(rec.knockout.heats[s.knockout?.heat ?? 0]) : rec;
     const fr = s.events[rec.id];
     const featured = h('section', { class: 'featured', 'aria-label': 'Recommended event' },
       h('div', { class: 'feat-label' }, 'Recommended'),
       h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
       h('div', { class: 'meta' }, course(rec), ` ${TRACKS[rec.track].favours}`),
       h('p', { class: 'reason' }, P.eventReason(s, rec)),
-      purseStrip(s, rec),
-      h('div', { class: 'event-rewards' }, h('span', {}, `${rec.payout.rep[0]} Rep for a win`),
-        rec.payout.crates[0] ? h('span', {}, `${rec.payout.crates[0]} crate${rec.payout.crates[0] > 1 ? 's' : ''}`) : null,
+      rec.goals ? goalList(s, rec) : null,
+      rec.knockout ? heatList(s, rec) : null,
+      purseStrip(s, shown),
+      h('div', { class: 'event-rewards' }, h('span', {}, `${shown.payout.rep[0]} Rep for a win`),
+        shown.payout.crates[0] ? h('span', {}, `${shown.payout.crates[0]} crate${shown.payout.crates[0] > 1 ? 's' : ''}`) : null,
         fr?.bestTime ? h('span', {}, `Record ${fr.bestTime.toFixed(2)} s`) : null),
       h('div', { class: 'btns' },
         h('button', { class: `btn primary${q ? ' off' : ''}`, onclick: () => this.startLive(rec.id) }, h('span', { class: 'stack' }, 'Race', h('small', {}, `live · ${nitroNote}`))),
@@ -97,10 +100,10 @@ export class RaceView implements View {
     // Catalogue: one collapsible section per district, with a progress summary; the recommended one opens.
     const openSections = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.district-sec[open]')).map((d) => d.dataset.district));
     const firstRender = !this.list.querySelector('details.district-sec');
-    const order: string[] = ['scrapyard', 'suburbs', 'coastal', 'meets', 'trials'];
+    const order: string[] = ['downtown', 'coastal', 'suburbs', 'scrapyard', 'meets', 'trials'];
     const medalName = ['', 'Bronze', 'Silver', 'Gold'];
     for (const dist of order) {
-      const evs = EVENTS.filter((e) => e.district === dist);
+      const evs = EVENTS.filter((e) => e.district === dist && !e.heatOf);
       if (!evs.length) continue;
       const open = evs.filter((e) => P.eventUnlocked(s, e).ok || P.eventUnlocked(s, e).switchCar);
       let summary: string;
@@ -109,6 +112,8 @@ export class RaceView implements View {
         summary = `${medals}/${evs.length * 3} medals`;
       } else if (dist === 'meets') {
         summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} trophies`;
+      } else if (dist === 'downtown') {
+        summary = `★ ${P.starsIn(s)}/${evs.filter((e) => e.goals).length * 3} · ${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
       } else {
         summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
       }
@@ -120,6 +125,8 @@ export class RaceView implements View {
         const r = s.events[e.id];
         const medal = s.medals?.[e.id] ?? 0;
         const status = !u.ok && !u.switchCar ? `🔒 ${u.why}`
+          : e.knockout ? (s.knockout ? `Through to heat ${s.knockout.heat + 1} of ${e.knockout.heats.length}` : r?.wins ? `✓ Champion ×${r.wins}` : 'Three heats · knockout')
+          : e.speedTrap ? `${medal ? `${medalName[medal]} · ` : ''}${medal < 3 ? `${medalName[medal + 1]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][medal]} km/h` : 'all medals'}${r?.bestSpeed ? ` · best ${r.bestSpeed} km/h` : ''}`
           : e.timeAttack ? (medal ? `${medalName[medal]}${medal < 3 ? ` · ${medalName[medal + 1]} at ${[e.timeAttack.bronze, e.timeAttack.silver, e.timeAttack.gold][medal].toFixed(2)} s` : ' · all medals'}` : `Bronze at ${e.timeAttack.bronze.toFixed(2)} s`) + (r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : '')
           : e.boss && s.bosses.includes(e.boss.rival) ? `Rival beaten${r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
           : r?.wins ? `✓ Won${r.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : ''}`
@@ -133,6 +140,10 @@ export class RaceView implements View {
           e.series ? h('span', { class: 'tag' }, `Round ${e.series.round}/${e.series.of}`) : null,
           e.carOnly ? h('span', { class: 'tag' }, 'Class meet') : null,
           e.timeAttack ? h('span', { class: 'tag' }, 'Solo') : null,
+          e.speedTrap ? h('span', { class: 'tag' }, 'Speed trap') : null,
+          e.partCap ? h('span', { class: 'tag' }, `Stock · T${e.partCap}`) : null,
+          e.knockout ? h('span', { class: 'tag boss' }, 'Knockout') : null,
+          e.goals ? starTag(s.stars?.[e.id] ?? 0) : null,
           e.trophy && s.badges.includes(e.trophy) ? h('span', { class: 'tag done' }, `🏆 ${e.trophy}`) : null,
         ];
         rows.push(h('div', { class: `evt-row${u.ok ? '' : ' locked'}` },
@@ -191,16 +202,48 @@ const sim0Launch = (sim: RaceSim) => sim.player.x < (sim.track.segments[0]?.leng
 
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
 
+/** ★★☆ for an event's goals. */
+function starTag(bits: number): HTMLElement {
+  const n = (bits & 1) + ((bits >> 1) & 1) + ((bits >> 2) & 1);
+  return h('span', { class: `tag stars${n === 3 ? ' done' : ''}`, 'aria-label': `${n} of 3 goals` }, '★'.repeat(n) + '☆'.repeat(3 - n));
+}
+
+/** The three goals for this event, ticked when met, each with its one-time pay. */
+function goalList(s: GameState, e: RaceEvent): HTMLElement {
+  const bits = s.stars?.[e.id] ?? 0;
+  const items = [`Win`, `Under ${e.goals!.par.toFixed(1)} s`, 'A Perfect boost'];
+  return h('div', { class: 'goals', 'aria-label': 'Event goals' }, ...items.map((t, k) => h('span', { class: bits & (1 << k) ? 'met' : '' }, bits & (1 << k) ? '★ ' : '☆ ', t)),
+    h('span', { class: 'pay' }, `$${P.starCash(e)} each, once`));
+}
+
+/** Knockout progress: each heat, how many go through, and where you are. */
+function heatList(s: GameState, e: RaceEvent): HTMLElement {
+  const at = s.knockout?.heat ?? 0;
+  return h('ol', { class: 'heats' }, ...e.knockout!.heats.map((id, k) => {
+    const hEv = eventById(id);
+    return h('li', { class: k < at && s.knockout ? 'done' : k === at ? 'now' : '' }, h('b', {}, hEv.name), ` · ${hEv.advance === 1 ? 'win to take it' : `top ${hEv.advance} go through`}`);
+  }));
+}
+
 /** What a live race pays before you commit: each place, the skill bonus, and any one-time reward. */
 function purseStrip(s: GameState, e: RaceEvent): HTMLElement {
   const p = P.purse(s, e);
   if (e.timeAttack) return h('div', { class: 'purse' }, h('span', { class: 'p1' }, `$${p.live[0]} a run`), h('span', {}, 'medals pay once'));
   return h('div', { class: 'purse', 'aria-label': `Pays ${p.live.map((c, i) => `${ordinal(i + 1)} $${c}`).join(', ')}` },
-    ...p.live.map((c, i) => h('span', { class: i === 0 ? 'p1' : '' }, h('small', {}, ordinal(i + 1)), `$${c}`)),
+    ...p.live.slice(0, e.rivals.length + 1).map((c, i) => h('span', { class: i === 0 ? 'p1' : '' }, h('small', {}, ordinal(i + 1)), `$${c}`)),
     h('span', { class: 'skill' }, h('small', {}, 'Perfect'), `+$${p.perfect}`),
     p.firstClear ? h('span', { class: 'once' }, h('small', {}, 'First win'), `+$${p.firstClear}`) : null);
 }
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
+
+/** Each area's palette: stage light, ground, road and foreground — carried through the race scene. */
+const PALETTES: Record<string, { sun: string; cloud: string; ground: string; road: string; highway: string; fore: string; post: string; lights: number }> = {
+  scrap: { sun: 'rgba(255,200,120,0.6)', cloud: 'rgba(255,214,170,0.045)', ground: '#3a2a1f', road: '#4b4038', highway: '#3a3d42', fore: '#1a120d', post: '#2a1d14', lights: 0.25 },
+  suburb: { sun: 'rgba(255,220,160,0.5)', cloud: 'rgba(230,236,245,0.05)', ground: '#263526', road: '#3d3c3a', highway: '#3a3d42', fore: '#142016', post: '#1d2d1f', lights: 0.55 },
+  foundry: { sun: 'rgba(220,230,255,0.55)', cloud: 'rgba(160,180,220,0.04)', ground: '#151b26', road: '#33363d', highway: '#2f3238', fore: '#0b0f15', post: '#1a222e', lights: 0.85 },
+  coast: { sun: 'rgba(255,226,170,0.6)', cloud: 'rgba(255,240,220,0.06)', ground: '#2a3a2e', road: '#3e3d3b', highway: '#3a3d42', fore: '#142016', post: '#1d2d1f', lights: 0.4 },
+  night: { sun: 'rgba(230,235,255,0.75)', cloud: 'rgba(150,120,220,0.035)', ground: '#0d0c18', road: '#1f1f27', highway: '#24242d', fore: '#07070c', post: '#14141d', lights: 1 },
+};
 
 function hash(n: number) {
   const x = Math.sin(n * 127.1) * 43758.5453;
@@ -520,11 +563,15 @@ class RaceScreen {
     const nextLabel = s.pendingReveal ? 'Car unlocked' : 'Next step';
     const nextText = s.pendingReveal ? `The ${carById(s.pendingReveal).model} is ready to reveal.` : r.advice;
     const card = h('div', { class: 'card', role: 'dialog', 'aria-label': 'Race result' },
-      h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
+      h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, ev.speedTrap ? (r.medal ? `${['', 'Bronze', 'Silver', 'Gold'][r.medal]} run` : 'Run complete') : ev.timeAttack ? (r.medal ? `${['', 'Bronze', 'Silver', 'Gold'][r.medal]} time` : 'Run complete') : r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
       h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
       r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ev.boss.rival === 'ray' ? ' The Suburbs are open.' : ' The coast road is yours.', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
       r.newMedals?.length ? h('div', { class: 'finish-earned medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), h('div', {}, h('strong', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal`), h('div', {}, r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ') + ' · paid once'))) : null,
-      r.nextMedal ? h('p', { class: 'explain' }, `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
+      r.nextMedal ? h('p', { class: 'explain' }, r.trapKmh ? `${r.nextMedal.name} at ${r.nextMedal.target} km/h — ${Math.max(0, r.nextMedal.gap)} km/h to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
+      r.newStars?.length ? h('div', { class: 'finish-earned stars-earned' }, h('span', { class: 'star-ico', 'aria-hidden': 'true' }, '★'), h('div', {}, h('strong', {}, `${r.newStars.length} new goal${r.newStars.length > 1 ? 's' : ''}: ${r.newStars.join(', ')}`), h('div', {}, `${P.starsIn(s)} Downtown stars`))) : null,
+      r.trapKmh ? h('div', { class: 'trap' }, h('span', { class: 'num' }, `${r.trapKmh}`), h('small', {}, 'km/h through the gate')) : null,
+      r.heat ? h('div', { class: `heat-result${r.heat.champion ? ' champ' : r.heat.advanced ? ' through' : ' out'}` },
+        r.heat.champion ? `Main Event champion!` : r.heat.advanced ? `Through! Next: ${r.heat.next}` : `Knocked out in ${r.heat.name}. Change cars, build, and start again from heat 1.`) : null,
       r.trophy ? h('div', { class: 'finish-earned' }, h('span', { class: 'trophy-ico', 'aria-hidden': 'true' }, '🏆'), h('div', {}, h('strong', {}, r.trophy), h('div', {}, 'Class trophy added to the Showroom'))) : null,
       h('div', { class: 'pays' }, ...pills),
       r.breakdown && r.breakdown.length > 1 ? h('div', { class: 'breakdown', 'aria-label': 'Cash breakdown' },
@@ -634,18 +681,21 @@ class RaceScreen {
 
     // sky
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    if (sim.track.id === 'foundry') { sky.addColorStop(0, '#10182c'); sky.addColorStop(.65, '#47324b'); sky.addColorStop(1, '#b3614c'); }
-    else if (theme === 'scrap') { sky.addColorStop(0, '#2b1d2e'); sky.addColorStop(0.6, '#7a3f2a'); sky.addColorStop(1, '#d9813f'); }
+    const pal = PALETTES[theme];
+    if (theme === 'foundry') { sky.addColorStop(0, '#070c18'); sky.addColorStop(.6, '#1a2742'); sky.addColorStop(1, '#3d4f6e'); }
+    else if (theme === 'night') { sky.addColorStop(0, '#04050c'); sky.addColorStop(.6, '#120d2b'); sky.addColorStop(1, '#2d1746'); }
+    else if (theme === 'scrap') { sky.addColorStop(0, '#2b1d2e'); sky.addColorStop(0.6, '#7a3f2a'); sky.addColorStop(1, '#f0a040'); }
     else if (theme === 'coast') { sky.addColorStop(0, '#0f2a44'); sky.addColorStop(0.6, '#3f7fa3'); sky.addColorStop(1, '#f0c189'); }
     else { sky.addColorStop(0, '#16233d'); sky.addColorStop(0.6, '#3d5a7a'); sky.addColorStop(1, '#e0a165'); }
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, horizon + 2);
     // sun
-    ctx.fillStyle = theme === 'scrap' ? 'rgba(255,200,120,0.55)' : 'rgba(255,220,160,0.5)';
-    ctx.beginPath(); ctx.arc(W * 0.78, horizon * 0.82, H * 0.06, 0, 7); ctx.fill();
+    ctx.fillStyle = pal.sun;
+    const night = theme === 'night' || theme === 'foundry';
+    ctx.beginPath(); ctx.arc(W * 0.78, horizon * (night ? 0.35 : 0.82), H * (night ? 0.03 : 0.06), 0, 7); ctx.fill();
     // restrained background motion: slow clouds drifting against the camera
     if (!this.reduced) {
-      ctx.fillStyle = sim.track.theme === 'suburb' ? 'rgba(230,236,245,0.05)' : 'rgba(255,214,170,0.045)';
+      ctx.fillStyle = pal.cloud;
       for (let k = 0; k < 4; k++) {
         const span = W * 1.6;
         const cx = ((k * span) / 4 - camX * ppm * 0.03 - sim.t * 6 * this.dpr) % span;
@@ -656,7 +706,7 @@ class RaceScreen {
       }
     }
     // route lighting: the Foundry glows and breathes along the horizon
-    if (sim.track.id === 'foundry') {
+    if (theme === 'foundry') {
       const pulse = this.reduced ? 0.5 : 0.5 + 0.5 * Math.sin(sim.t * 1.7);
       const glow = ctx.createRadialGradient(W * 0.3, horizon, 0, W * 0.3, horizon, W * 0.55);
       glow.addColorStop(0, `rgba(255,120,40,${0.28 + 0.12 * pulse})`);
@@ -666,7 +716,7 @@ class RaceScreen {
     }
 
     // far layer
-    const far = (par: number, color: string, base: number, hmax: number, spacing: number, kind: 'pile' | 'house' | 'crane' | 'tree') => {
+    const far = (par: number, color: string, base: number, hmax: number, spacing: number, kind: 'pile' | 'house' | 'crane' | 'tree' | 'stack' | 'tower' | 'sign') => {
       ctx.fillStyle = color;
       const off = camX * ppm * par;
       const sp = spacing * this.dpr;
@@ -686,6 +736,29 @@ class RaceScreen {
         } else if (kind === 'crane') {
           if (r > 0.55) { ctx.fillRect(x, y - hh * 2, 4 * this.dpr, hh * 2); ctx.fillRect(x - hh * 0.6, y - hh * 2, hh * 1.4, 3 * this.dpr); }
           else { ctx.fillRect(x, y - hh * 0.5, sp * 0.5, hh * 0.5); }
+        } else if (kind === 'stack') {
+          // foundry stacks and sheds with a furnace-lit window band
+          ctx.fillRect(x, y - hh * 1.8, sp * 0.12, hh * 1.8);
+          ctx.fillRect(x + sp * 0.18, y - hh * 0.7, sp * 0.5, hh * 0.7);
+          ctx.fillStyle = 'rgba(255,140,60,0.55)'; ctx.fillRect(x + sp * 0.22, y - hh * 0.45, sp * 0.42, 3 * this.dpr); ctx.fillStyle = color;
+        } else if (kind === 'tower') {
+          // night skyline: towers with a grid of lit windows in cool and neon tones
+          const bw = sp * 0.62;
+          ctx.fillRect(x, y - hh, bw, hh);
+          const cols = 3, rows = Math.floor(hh / (9 * this.dpr));
+          for (let a = 0; a < cols; a++) for (let b2 = 1; b2 < rows; b2++) {
+            const h2 = hash(k * 31 + a * 7 + b2);
+            if (h2 > 0.55) { ctx.fillStyle = h2 > 0.93 ? 'rgba(255,80,170,0.7)' : h2 > 0.85 ? 'rgba(80,230,255,0.6)' : 'rgba(255,226,170,0.35)'; ctx.fillRect(x + bw * (0.14 + a * 0.28), y - hh + b2 * 9 * this.dpr, bw * 0.14, 3 * this.dpr); }
+          }
+          ctx.fillStyle = color;
+        } else if (kind === 'sign') {
+          // storefronts and neon signs along the street
+          ctx.fillRect(x, y - hh, sp * 0.8, hh);
+          const neon = ['#ff3fa4', '#38e1ff', '#ffd23f', '#9b7bff'][Math.floor(r * 4)];
+          ctx.fillStyle = neon; ctx.globalAlpha = 0.85; ctx.fillRect(x + sp * 0.12, y - hh * 0.8, sp * 0.4, 4 * this.dpr);
+          ctx.globalAlpha = 0.25; ctx.fillRect(x + sp * 0.06, y - hh * 0.95, sp * 0.52, 14 * this.dpr); ctx.globalAlpha = 1;
+          ctx.fillStyle = 'rgba(120,200,255,0.18)'; ctx.fillRect(x + sp * 0.08, y - hh * 0.45, sp * 0.6, hh * 0.38);
+          ctx.fillStyle = color;
         } else {
           ctx.beginPath(); ctx.arc(x, y - hh, hh * 0.45, 0, 7); ctx.fill(); ctx.fillRect(x - 2 * this.dpr, y - hh, 4 * this.dpr, hh);
         }
@@ -701,6 +774,14 @@ class RaceScreen {
       for (let k = 0; k < 6; k++) ctx.fillRect(((k * 211 - camX * ppm * 0.05) % W + W) % W, horizon - 4 * this.dpr + k * 3 * this.dpr, 50 * this.dpr, 1.5 * this.dpr);
       far(0.1, '#2c3b33', horizon - 10 * this.dpr, 46, 220, 'pile');
       far(0.38, '#1b2a22', roadTop - 2, 46, 110, 'tree');
+    } else if (theme === 'foundry') {
+      far(0.06, '#141c2c', horizon, 70, 200, 'stack');
+      far(0.18, '#0f1522', horizon + 4, 50, 130, 'crane');
+      far(0.36, '#0b0f18', roadTop - 2, 36, 95, 'stack');
+    } else if (theme === 'night') {
+      far(0.05, '#0e0d22', horizon, 120, 120, 'tower');
+      far(0.16, '#0a0a1a', horizon + 6, 90, 90, 'tower');
+      far(0.34, '#07070f', roadTop - 2, 40, 140, 'sign');
     } else {
       far(0.08, '#2e3a4f', horizon, 34, 150, 'tree');
       far(0.2, '#2a2730', horizon + 8, 40, 130, 'house');
@@ -708,7 +789,7 @@ class RaceScreen {
     }
     // ground strip
     if (theme !== 'coast') {
-      ctx.fillStyle = theme === 'scrap' ? '#3a2a1f' : '#263526';
+      ctx.fillStyle = pal.ground;
       ctx.fillRect(0, horizon, W, roadTop - horizon);
     }
 
@@ -724,7 +805,7 @@ class RaceScreen {
       const { sg } = segInfo(Math.max(0, wx));
       const sx = (wx - camX) * ppm;
       const hw = sg.type === 'highway' || sg.type === 'hwbend';
-      ctx.fillStyle = hw ? '#3a3d42' : theme === 'scrap' ? '#4b4038' : '#3d3c3a';
+      ctx.fillStyle = hw ? pal.highway : pal.road;
       ctx.fillRect(sx, roadTop, stripM * ppm + 1, roadBot - roadTop);
       if (sg.radius) {
         // bend curbs
@@ -735,6 +816,14 @@ class RaceScreen {
       } else if (hw) {
         ctx.fillStyle = '#8b8f96';
         ctx.fillRect(sx, roadTop - 4 * this.dpr, stripM * ppm + 1, 3 * this.dpr);
+      }
+    }
+    if (theme === 'night' && !this.reduced) {
+      // wet street: long smeared reflections of the neon signs, moving with the far layer
+      for (let k = 0; k < 6; k++) {
+        const x = ((k * 233 - camX * ppm * 0.34) % (W + 200) + W + 200) % (W + 200) - 100;
+        ctx.fillStyle = ['rgba(255,63,164,0.10)', 'rgba(56,225,255,0.09)', 'rgba(255,210,63,0.08)'][k % 3];
+        ctx.fillRect(x, roadTop + 4 * this.dpr, 14 * this.dpr, roadBot - roadTop - 8 * this.dpr);
       }
     }
     // nitro windows (telegraphed on the road ahead)
@@ -823,7 +912,7 @@ class RaceScreen {
         paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, style: r.isPlayer ? carStyle(this.app.game.state, r.car) : undefined, wheelAngle: r.x / 0.31,
         blur: this.reduced ? 0 : Math.max(0, Math.min(1, (r.v - 7) / 10)), brake: braking,
         livery: finishStripe(r.car, livery ?? undefined), detail: false, cache: true,
-        nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: theme === 'scrap' ? 0.25 : 0.55,
+        nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: pal.lights,
       });
       if (r.isPlayer) {
         ctx.fillStyle = '#ffc457';
@@ -843,7 +932,8 @@ class RaceScreen {
     // speed lines
     if (!this.reduced && this.quality && player.v > 18) {
       const perfectBoost = player.nitroLeft > 0 && player.nitroMul > 1;
-      ctx.strokeStyle = perfectBoost ? 'rgba(255,214,94,0.35)' : `rgba(255,255,255,${Math.min(0.22, (player.v - 18) / 80 + (player.nitroLeft > 0 ? 0.1 : 0))})`;
+      const surge = player.car === 'super';
+      ctx.strokeStyle = perfectBoost ? (surge ? 'rgba(185,140,255,0.45)' : 'rgba(255,214,94,0.35)') : `rgba(255,255,255,${Math.min(0.22, (player.v - 18) / 80 + (player.nitroLeft > 0 ? 0.1 : 0))})`;
       ctx.lineWidth = (perfectBoost ? 3 : 2) * this.dpr;
       const n = perfectBoost ? 16 : 10;
       const cell = W / 3;
@@ -856,12 +946,22 @@ class RaceScreen {
       }
     }
     // foreground
-    ctx.fillStyle = theme === 'scrap' ? '#1a120d' : '#142016';
+    ctx.fillStyle = pal.fore;
     ctx.fillRect(0, roadBot, W, H - roadBot + 8 * this.dpr); // no unpainted strip under the road
-    ctx.fillStyle = theme === 'scrap' ? '#2a1d14' : '#1d2d1f';
     const fsp = 140 * this.dpr;
     const foff = (camX * ppm * 1.25) % fsp;
-    for (let x = -foff; x < W; x += fsp) ctx.fillRect(x, roadBot + 8 * this.dpr, 6 * this.dpr, 40 * this.dpr);
+    for (let x = -foff; x < W; x += fsp) {
+      ctx.fillStyle = pal.post;
+      ctx.fillRect(x, roadBot + 8 * this.dpr, 6 * this.dpr, 40 * this.dpr);
+      if (theme === 'scrap') { // safety-paint chevrons on the yard posts
+        ctx.fillStyle = '#f2c230';
+        for (let k = 0; k < 4; k++) ctx.fillRect(x, roadBot + (10 + k * 10) * this.dpr, 6 * this.dpr, 5 * this.dpr);
+      }
+      if (theme === 'night') { // street lamps throw pools of light on the kerb
+        ctx.fillStyle = 'rgba(255,214,140,0.12)';
+        ctx.beginPath(); ctx.ellipse(x + 3 * this.dpr, roadBot + 4 * this.dpr, 40 * this.dpr, 8 * this.dpr, 0, 0, 7); ctx.fill();
+      }
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 }

@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { encodeSave } from '../src/core/save';
 import { runBot } from './bot';
 
 // Downtown Nights: clean save → Lumen RS through the Neon Mile, event goals (stars), the Kestrel 1600,
 // and The Main Event knockout. Simulation through the real Game API with three kinds of player.
 describe('Downtown Nights playthrough (simulation)', () => {
-  const runs = (['perfect', 'mixed'] as const).flatMap((policy) => [1, 2].map((seed) => ({ policy, seed, log: (() => { let st: Record<string, number> = {}; let nitro = 0; const log = runBot({ seed, untilCar: 'super', maxS: 4 * 3600, policy, onStep: (g) => { st = g.state.stars; nitro = g.state.nitro; } }); return Object.assign(log, { stars: st, nitro }); })() })));
+  const runs = (['perfect', 'mixed'] as const).flatMap((policy) => [1, 2].map((seed) => ({ policy, seed, log: (() => { let st: Record<string, number> = {}; let nitro = 0; const log = runBot({ seed, untilCar: 'super', maxS: 4 * 3600, policy, onStep: (g) => {
+        st = g.state.stars; nitro = g.state.nitro;
+        const dir = process.env.AUDIT_SAVES;
+        if (dir && seed === 1 && policy === 'perfect') {
+          const o = g.state.owned;
+          if (o.includes('tourer') && !o.includes('tuner') && g.state.events['neon-mile']?.wins) writeFileSync(`${dir}/downtown-start.txt`, encodeSave(g.state));
+          if (o.includes('tuner') && !g.state.events['main-event']?.wins) writeFileSync(`${dir}/downtown-mid.txt`, encodeSave(g.state));
+          if (o.includes('super')) writeFileSync(`${dir}/downtown-end.txt`, encodeSave(g.state));
+        }
+      } }); return Object.assign(log, { stars: st, nitro }); })() })));
   it('prints the chapter milestones', () => {
     for (const r of runs) {
       const m = r.log.milestones;
