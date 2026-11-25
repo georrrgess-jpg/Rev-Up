@@ -587,7 +587,7 @@ class RaceScreen {
       ctx.fillRect(x0, roadTop, x1 - x0, roadBot - roadTop);
       if (!used) {
         ctx.fillStyle = 'rgba(255,196,87,0.75)';
-        ctx.font = `900 ${Math.round(16 * this.dpr)}px system-ui`;
+        ctx.font = `800 ${Math.round(16 * this.dpr)}px Barlow, system-ui`;
         for (let cx = x0 + 10; cx < x1 - 10; cx += 46 * this.dpr) ctx.fillText('›››', cx, (roadTop + roadBot) / 2 + 6 * this.dpr);
       }
     }
@@ -625,7 +625,7 @@ class RaceScreen {
       ctx.fillStyle = '#f2a33a';
       ctx.fillRect(x - 22 * this.dpr, roadTop - 64 * this.dpr, 48 * this.dpr, 20 * this.dpr);
       ctx.fillStyle = '#1d1208';
-      ctx.font = `900 ${Math.round(12 * this.dpr)}px system-ui`;
+      ctx.font = `800 ${Math.round(13 * this.dpr)}px Barlow, system-ui`;
       ctx.fillText('BEND ›', x - 18 * this.dpr, roadTop - 49 * this.dpr);
     }
 
@@ -642,7 +642,7 @@ class RaceScreen {
         // off-screen marker
         const ahead = sx > W;
         const gap = Math.round(Math.abs(r.x - player.x));
-        ctx.font = `800 ${Math.round(12 * this.dpr)}px system-ui`;
+        ctx.font = `800 ${Math.round(13 * this.dpr)}px Barlow, system-ui`;
         const label = `${ahead ? '' : '‹ '}${r.name.split(' ')[0]} ${ahead ? '+' : '-'}${gap} m${ahead ? ' ›' : ''}`;
         const tw = ctx.measureText(label).width;
         const tx = ahead ? W - tw - 12 * this.dpr : 18 * this.dpr;
