@@ -472,7 +472,7 @@ export class GarageView implements View {
     else if (this.sel) {
       const part = B.getPart(s, this.sel);
       if (part) t = part.t >= MAX_TIER ? `T${part.t} ${FAMILIES[part.f].name}: top tier. Tap its slot above to fit it.` : `T${part.t} ${FAMILIES[part.f].name} selected · tap a glowing T${part.t} to merge, or its slot above to fit it`;
-    } else if (s.nitro > 0 && !s.tips.nitro) t = `Nitro ready. In the race, tap NITRO when its button lights up in a boost zone.`;
+    } else if (s.nitro > 0 && !s.tips.nitro) t = 'Nitro ready · in a race, tap NITRO in a boost zone';
     if (this.hintEl.textContent !== t) this.hintEl.textContent = t;
     this.raceBtn.classList.toggle('pulse', !!s.stats.milestones.firstMerge && s.stats.races === 0);
   }
@@ -543,9 +543,10 @@ export class GarageView implements View {
         const { chain, at, q, tier, skipped } = e;
         this.later(() => {
           gsfx.merge(tier, chain);
-          if (chain > 1) { gsfx.cascade(chain); if (!batch) this.floater(at, `Cascade ×${chain}`, `mchain c${Math.min(chain, 5)}`); }
-          if (q === 'mint') { gsfx.mint(); this.burst(at, 'gold'); this.floater(at, skipped ? `MINT · jumped to T${tier}` : 'MINT ★', 'gold'); }
-          else if (q === 'polished') { gsfx.polished(); this.burst(at, 'silver'); this.floater(at, 'Polished +15%', 'msilver'); }
+          if (chain > 1) { gsfx.cascade(chain); if (!batch) { this.chainEl?.remove(); this.chainEl = this.floater(at, `Cascade ×${chain}`, `mchain c${Math.min(chain, 5)}`, 1000, 30); } }
+          // rare crafts get their own lane above the cascade counter; the latest one replaces the last
+          if (q === 'mint') { gsfx.mint(); this.burst(at, 'gold'); this.rareEl?.remove(); this.rareEl = this.floater(at, skipped ? `★ MINT · jumped to T${tier}` : '★ MINT', 'gold', 1100, 58); }
+          else if (q === 'polished') { gsfx.polished(); this.burst(at, 'silver'); this.rareEl?.remove(); this.rareEl = this.floater(at, '◆ Polished +15%', 'msilver', 1000, 58); }
         }, delay);
         delay += reduced ? 0 : 110;
       }
@@ -607,7 +608,10 @@ export class GarageView implements View {
     if (!batch) {
       for (const site of sites.values()) {
         const name = FAMILIES[site.f].name;
-        this.later(() => this.floater(site.at, `T${site.from} ${name} → T${site.to}`, `mres${site.to >= 5 ? ' high' : ''}`, 1300, 22), reduced ? 0 : Math.min(delay, 500));
+        this.later(() => {
+          this.chainEl?.remove(); // the result line takes over from the cascade counter
+          this.floater(site.at, `T${site.from} ${name} → T${site.to}${site.chain > 1 ? ` · ×${site.chain}` : ''}`, `mres${site.to >= 5 ? ' high' : ''}`, 1300, 22);
+        }, reduced ? 0 : Math.min(delay + 120, 620));
         if (site.chain >= 3) {
           this.later(() => { gsfx.cascadeEnd(site.chain); if (!reduced) { this.boardEl.classList.remove('quake'); void this.boardEl.offsetWidth; this.boardEl.classList.add('quake'); } }, Math.min(delay, 500));
         }
@@ -620,9 +624,12 @@ export class GarageView implements View {
     if (!reduced) for (const f of flights) this.fly(f.html, f.from, f.to);
   }
 
-  floater(at: SlotRef, text: string, cls: string, ms = 1000, dy = 4) {
+  /** The live "Cascade ×n" label: each link replaces the last, so a chain counts up in one place. */
+  private chainEl: HTMLElement | null = null;
+  private rareEl: HTMLElement | null = null;
+  floater(at: SlotRef, text: string, cls: string, ms = 1000, dy = 4): HTMLElement | null {
     const c = this.cellFor(at);
-    if (!c) return;
+    if (!c) return null;
     const r = c.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
     const f = h('div', { class: `floater ${cls}` }, text);
@@ -632,14 +639,19 @@ export class GarageView implements View {
     f.style.top = `${r.top - host.top - dy}px`;
     this.el.append(f);
     setTimeout(() => f.remove(), ms);
+    return f;
   }
+  /** Board-level messages (combo, nitro, keystone): live ones stack downward instead of overprinting. */
+  private topFloaters: HTMLElement[] = [];
   floaterTop(text: string, cls: string) {
     const r = this.boardEl.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
+    this.topFloaters = this.topFloaters.filter((x) => x.isConnected);
     const f = h('div', { class: `floater ${cls}` }, text);
     f.style.left = `${r.left - host.left + r.width / 2}px`;
-    f.style.top = `${r.top - host.top + 6}px`;
+    f.style.top = `${r.top - host.top + 6 + this.topFloaters.length * 26}px`;
     this.el.append(f);
+    this.topFloaters.push(f);
     setTimeout(() => f.remove(), 1000);
   }
   /** A ring of light from a cell: Polished (silver) and Mint (gold) crafts. */
