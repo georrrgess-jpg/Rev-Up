@@ -1,10 +1,63 @@
 # Rev Up
 
-An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Junker**) to a restored muscle coupe (the **Muscle**) and, past the finale, a coastal grand tourer (the **Altamar GT**).
+An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Junker**) to a restored muscle coupe (the **Muscle**), a coastal grand tourer (the **Altamar GT**), a city lightweight (the **Kestrel 1600**) and, as the headline prize of Downtown Nights, a hybrid hypercar (the **Lumen RS**).
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~60 KB JS + 9 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~74 KB JS + 10 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.4 · Main Event
+
+Built from an audit of a fresh, a mid-game and a last-event save on the production build, a seeded cash timeline, and three independent reviews (economy, progression, mobile art/UI). The audit's headline: every upgrade ($7,250 in all) was bought by 17–22 minutes, after which cash piled up to $20,000+ with nothing to buy; beating the Coastal Crown didn't award the Altamar (3,400 Rep of grinding followed); the post-finale game had nothing left.
+
+### New content and rewards
+
+- **Downtown Nights**, a chapter after the Altamar GT, at night: street circuit, harbor-bridge drag, expressway.
+  - **Neon Mile** opens it. Each Downtown event has three **goals** — win · beat the par time · land a Perfect boost — each paying once (half the win purse) and earning a ★.
+  - **Bridge Speed Trap** — scored on km/h through the gate, medals at 215/228/255 km/h.
+  - **Stock Cup** — every part runs as T4 on any car, so the light car wins the corners; a trophy.
+  - **Skyline Run** — sweepers, then a tight exit.
+  - **Intermediate unlock: Kestrel 1600** (lightweight, cap T6): best off the line and through corners, short of top speed on highways. 3 stars + a crafted T6 Tires.
+  - **Final: The Main Event** — a knockout: street heat (top 3 through), bridge heat (top 2), final one-on-one with **Nova Sato**. Change cars between heats; losing a heat starts again from heat 1. Needs the Kestrel and 4 stars. Winning pays $1,500 + the **Main Event Neon** paint + a badge.
+  - **Marquee: Lumen RS** (hypercar, cap T7, the Main Event win + a crafted T7 Turbo): cab-forward body, light-bar face, active wing, aero wheels, violet underglow, its own V12-and-whine voice, a violet **Surge** trail — and Perfect boosts at 1.7× instead of 1.5×. Fastest car on any highway, heavier than the Kestrel in tight corners. **Midnight Run** is where it belongs (a Lumen-against-Lumen rematch only it can win).
+- **The Altamar GT now follows the Coastal Crown** (its Rep sits just past the Crown): 25 min instead of 40, with no coastal grind.
+- **Reward ladder.** Early: parts you can order, garage upgrades, colours, steelies, Tapeback rust repair. Middle: sport wheel sets, Pit crew, metallic paint, Stock Cup. Late: pearl and candy paint, wire and aero wheels, Tapeback brightwork, signature finishes, Main Event Neon. Marquee: the Lumen RS.
+
+### Cash as a game system
+
+One tuning table in `src/data/tables.ts` (Economy block) holds prices, payout shares, rates. Cash buys things; Rep marks progress; scrap buys crates; the UI labels which.
+
+- **Earn:** every live place pays; before a race you see each place's purse, the Perfect bonus (now 10% of the win purse per Perfect, max two — $36 a Perfect at the Coastal Crown, was $8) and any first-win money; after it, a breakdown (purse · skill · one-time). Quick Races pay the crew **70%** of the live purse (85% with the Pit crew; never 100%, so live stays worth it), with the amount on the button. Away earnings show their rate and cap in the Shop.
+- **Spend at every price:** **Order a part** (a known family and tier, T1 $45 … T6 $3,200; each tier costs more than two of the tier below, and the next car's keystone is always reachable by buying two of the tier below — the deterministic route past bad crate luck). **Upgrades** with exact now → next effects (new: Pit crew $900, Nitro tank $1,500/$4,800, Lock-up $2,500). **Tune-up** per car (three stages, +2% speed/acceleration/grip each, from $120 for the Tapeback's first stage to $7,920 for the Lumen's third): the cash route for players who don't land Perfect boosts. **Paint shop** (Showroom → a car): six colours $250, five wheel sets $300–$2,400 (bought once, fit every car), premium paint per car — Metallic $1,200, Pearl $3,000, Candy $6,000 — and a three-stage **Tapeback restoration** ($1,500 / $3,000 / $4,500). Live preview before buying; looks never change performance.
+- **Short of cash** buttons read "$120 more"; an empty wallet never blocks racing or merging.
+
+### Name changes (display text only; ids and saves unchanged)
+
+| Before | After |
+| --- | --- |
+| Workshop (sheet) | Shop |
+| Engine $70 (random-tier crate) | Order a part · T1–T6 |
+| Random crate | Mystery crate |
+| Overflow | Spare rack |
+| amber window / amber zone / ▲ PERFECT WINDOW | boost zone / ▲ BOOST ZONE — TAP |
+| Nitro window ahead · WINDOW IN 1.2 s | Boost zone ahead · BOOST ZONE IN 1.2 s |
+| Fresh route +N Rep | New track bonus +N Rep |
+| Recommended | Up next (plus an "Or try" list) |
+| Inspect / Next unlock | View / Next car |
+| Junker class · parts up to T2 | Junker · T2 parts |
+| "Beat Rusty Ray for his Crown Teal paint and to open the Suburbs" (Coastal Crown) | "Beat Vale Moreau for the Crown Teal paint" |
+| Event requirements: "Beat Rusty Ray to open the Suburbs" (any boss) | "Beat <that rival>" |
+| ⚙ Scrap (same glyph as Settings) | ♻ Scrap |
+| Nitro window cue | Boost zone cue |
+| Collection complete (with goals left) | Collection · N% · next goal named |
+
+### Colour, identity and feel
+
+- Each area has its own palette through sky, dressing, road and foreground: Scrapyard (warm, safety-yellow chevrons), Suburbs (dusk), **Foundry** (now a steel-blue night with furnace glow and lit stacks — it used to copy the Scrapyard), Coast (sea and sunset), Downtown (neon towers, wet street with sign reflections, street lamps, moon).
+- Parts: a distinct metal per tier (iron, copper, blue steel, gold, chrome, teal titanium, violet) — T3, T5 and T6 no longer all read as silver.
+- Bigger rewards feel bigger: T5+ merges get a heavier sound and a flash; crafting the next car's keystone gets its own chord, a flash on the goal card and a floater; rival wins, Main Event titles and new cars get a gold (or violet) card and a fanfare; medals, trophies and goals get their own lines.
+- Showroom stages: plain bay for early cars, warm for the Ironhorse, dusk teal for the Altamar, sodium garage for the Kestrel, violet neon for the Lumen — and the next car's card shows its requirements and progress. Reveal rooms for the Kestrel and the Lumen.
+- Closer race camera; the offline-ready notice no longer covers a new player's first screen; the Lights button no longer covers a wheel; the race header no longer wraps.
 
 ## Update 1.3 · Open Road
 
@@ -148,6 +201,38 @@ Source lives on the development branch; the compiled site is published to a dedi
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
 
+### 1.4 · Main Event
+
+Environment: Linux cloud container, headless Chromium, production build served at `/Rev-Up/`. **Every device check below is emulated; no physical phone was available.**
+
+**Tests** (`npm test`): 93 passing + 1 calibration probe (skipped unless `PROBE=1`). New: `tests/economy.test.ts` (Order a part: price, refusals, keystone stays a craft, no buy-merge-scrap loop; upgrade effects; Quick Race 70/85%; breakdown sums to cash paid; no first-win chip when it pays nothing; Paint shop charges once, per-car premium paint, staged restoration, spending everything never blocks racing; goals pay once; Coastal Crown brings the Altamar; knockout advance/elimination/final; speed-trap medals once; Stock Cup cap; Tune-up; a 1.3 save with $36,564 and maxed upgrades loads unchanged with new fields filled and new things to buy), `tests/downtown.test.ts` (chapter playthrough with perfect, mixed and no-nitro players), `tests/economy-audit.test.ts` (prints the cash timeline). The new tests found and fixed one real bug: the Stock Cup's T4 cap wasn't applied to car stats.
+
+**Economy, before → after** (seeded simulation through the real rules, `npx vitest run tests/economy-audit.test.ts`):
+
+| Measure | 1.3 | 1.4 |
+| --- | --- | --- |
+| Cash spent by 30 min (bot buys upgrades, parts and tune-ups only — no cosmetics) | $7,250, all upgrades gone by 17–22 min | $16,950, still buying at 27–29 min |
+| Cash sitting idle at 30 min | $10,649–12,154 | $498–3,407 |
+| Optional spending available after the last upgrade | $70 random part | part orders to $3,200, tune-ups to $7,920, Paint shop ≈ $87,000 across the seven cars |
+| Perfect boost bonus at the Coastal Crown | $8 | $36 |
+| Quick Race share of the live purse | 100% | 70% (85% with Pit crew) |
+| Time between meaningful rewards (median / longest) | 0:42–1:31 / 4:09–6:24 | 0:37–1:02 / 3:28–3:35 |
+| Longest run of one race in a row | 3–5 | 3 |
+| Races to the Altamar GT | 122–129 | ~70 |
+| Coastal series runs (Harbor / Esses) | 14–16 each | 1–2 each |
+
+Expected runs to representative purchases (live runs at that stage): T1 part $45 ≈ 1 early run; Faster printer $250 ≈ 3–4; Bigger bench $600 ≈ 7 (about 3 min); Pit crew $900 ≈ 5 mid runs; Metallic paint $1,200 ≈ 6 mid runs; Nitro tank $1,500 ≈ 4 late runs; T6 part $3,200 ≈ 7 Downtown runs; Candy paint $6,000 ≈ 12 Downtown runs (about 6 min with goals).
+
+**Player paths** (simulation, 2–4 seeds each): perfect timing — Altamar 25–26 min, Kestrel 30–32 min, Lumen 31–34 min, every Downtown event run 2–5 times; mixed timing — same within a minute; **never uses nitro** — Altamar 29.7 min (1.3: never), Kestrel 51.8 min, Lumen 54.0 min, by buying Tune-ups (the 1.3 no-nitro bot was still stuck at the Coastal Crown after 2 hours). Same-seed race checks: the Stock Cup is won only by the Kestrel at T4 (the Altamar, Ironhorse and Lumen lose), Midnight Run only by the Lumen, the Main Event final by a T6 Kestrel 10/10 with Perfect boosts and 5/10 with late ones.
+
+**Real play in the browser** (production build, UI only): a returning Downtown save won The Main Event final against Nova Sato (champion card, $2,580 broken down as purse $900 + Perfect ×2 $180 + rival $1,500), revealed the Lumen RS ("T7 parts now fit · +51 km/h"), raced and won Midnight Run in it, reloaded — Lumen owned and active, title counted once. Also checked: Shop at every stage, Paint shop preview → buy → applied in Showroom, reveal and race, restoration stages, speed-trap result in km/h, knockout heat-out message.
+
+**Layout** (320×568 … 1280×800, landscape, 125% text, fresh and late saves, Garage/Race/Showroom/guide/Settings/Shop/Paint shop): no sideways scroll, clipped text, overlapping controls or targets under 40 px. `npm run check:input`: 24/24.
+
+**Smoke** (`npm run smoke` at `/Rev-Up/`): 22/22 on a fresh build and 22/22 upgrading from the 1.3 build on `gh-pages` (scoped service worker, offline relaunch with a merge and a race, staged update with one navigation, save intact). The offline-ready check now reads Settings, since the notice no longer covers a new player's first screen. One earlier run against the old build failed its merge check once because the 1.3 starter bench cascaded a merge — a property of the old build's random starter layout, not of 1.4.
+
+**Performance** (`npm run perf`, 390×844 @3×, 4× CPU slowdown, software rendering): dragging on a full board p95 16.7 ms; live race 52 fps (1.3: 49–54); reveal 52–57 fps; usable Garage on a cold throttled load 2.1 s (1.3: 1.6 s — the bundle grew ~14 KB gzipped). The busiest new scene (Downtown night, Lumen with Surge, 4×): p95 16.8 ms.
+
 ### 1.3 · Open Road
 
 **Automated tests** (`npm test`): 70 passing. New in 1.3: the teach-through-play steps (fresh save walk-through, out-of-order play, resume after closing mid-step, Skip, a returning save opening at its progress with no beginner prompts, the equip-cap tip), the Open Road rules (event-gated unlock, class-meet car switch, medals paying once per medal, trophies awarded once, parts above the cap running at the cap tier, crew nitro), and a chapter playthrough.
@@ -210,6 +295,10 @@ Keystones (T3 Tires, T4 Turbo, T5 Engine) are crafted well before their Rep in e
 | Reveal | 51 fps, p95 33 ms | 53 fps, p95 33 ms |
 
 ## Known limitations
+
+- Downtown Nights is a short chapter for a skilled player (about 8 minutes from the Altamar to the Lumen); the long tail is optional — goals, medals, the Paint shop and records.
+- The no-nitro player reaches the Lumen at 54 min by spending on Tune-ups and repeats each Downtown event 7–18 times (never more than 3 in a row).
+- No physical phone was tested; device numbers are emulation.
 
 - At 320×568 with 125 % text and very large balances, the bench reaches its 36 px minimum and the Garage body scrolls a little to reach the overflow tray.
 - The coach callout sits over part of the bench while it points at the pair to merge.
