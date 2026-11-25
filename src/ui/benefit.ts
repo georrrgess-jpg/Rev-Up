@@ -31,18 +31,12 @@ export function partGain(s: GameState, car: CarId, part: Pick<Part, 'f' | 't' | 
   const cur = fitted(s, car)[part.f];
   const better = after[FAMILIES[part.f].stat as keyof Stats] > before[FAMILIES[part.f].stat as keyof Stats] + 1e-9;
   const capped = part.t > cls.cap;
-  const vs = cur ? `than its T${cur.t}` : 'in its empty slot';
+  const vs = cur ? `over its T${cur.t}` : 'in its empty slot';
   return {
     better, capped,
     text: better ? `On your ${cls.model}: ${statDelta(part.f, before, after)} ${vs}${capped ? ` (runs at T${cls.cap}, its limit)` : ''}`
       : `Your ${cls.model} already has a T${cur?.t ?? '?'} ${FAMILIES[part.f].name} fitted — this one would not add speed${capped ? ` (it runs parts up to T${cls.cap})` : ''}`,
   };
-}
-
-/** Ingredients toward a crafted tier, in T1 units: 2^(t-1) per part below the target tier. */
-export function ingredients(s: GameState, f: Family, tier: number): { have: number; need: number } {
-  const have = allParts(s).filter((p) => p.f === f && p.t < tier).reduce((n, p) => n + 2 ** (p.t - 1), 0);
-  return { have, need: 2 ** (tier - 1) };
 }
 
 /** Empty slots on a car and bench parts that would make it faster. */

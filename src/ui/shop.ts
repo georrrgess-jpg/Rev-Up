@@ -13,7 +13,8 @@ import {
 } from '../data/tables';
 import { familyIcon } from '../render/parts';
 import type { App } from './app';
-import { ingredients, partGain } from './benefit';
+import { bestBuy, ingredients } from '../core/tutorial';
+import { partGain } from './benefit';
 import { fmt, h } from './dom';
 
 export type ShopTab = 'parts' | 'garage' | 'style';
@@ -28,43 +29,8 @@ const UPGRADE_LOOK: Record<UpgradeId, { icon: string; kind: string }> = {
   lockup: { icon: '⌂', kind: 'Away earnings' },
 };
 
-type Pick =
-  | { kind: 'order'; fam: Family; tier: number; price: number; title: string; why: string }
-  | { kind: 'tune'; price: number; title: string; why: string }
-  | { kind: 'upgrade'; id: UpgradeId; price: number; title: string; why: string };
-
-/** The one purchase that helps most now (affordable first), or the next thing worth saving for. */
-export function shopPick(s: GameState): { pick: Pick | null; affordable: boolean } {
-  const g = P.goalStatus(s);
-  const maxT = B.orderMaxTier(s);
-  const options: Pick[] = [];
-  if (g && !g.keystoneDone) {
-    const fam = FAMILIES[g.family];
-    const { have, need } = ingredients(s, g.family, g.tier);
-    for (let t = Math.min(maxT, g.tier - 1); t >= 1; t--) {
-      const add = 2 ** (t - 1);
-      if (have >= need) break;
-      options.push({
-        kind: 'order', fam: g.family, tier: t, price: PART_ORDER_PRICE[t],
-        title: `T${t} ${fam.name}`,
-        why: `Toward the T${g.tier} ${fam.name} the ${g.car.model} needs: ingredients ${Math.min(have, need)}/${need} → ${Math.min(need, have + add)}/${need}. You still merge it yourself.`,
-      });
-    }
-  }
-  const stage = s.tune?.[s.activeCar] ?? 0;
-  if (stage < TUNE_STAGES) {
-    options.push({ kind: 'tune', price: tunePrice(s.activeCar, stage), title: `Tune-up stage ${stage + 1}`, why: `${tuneGain(s)} for your ${carById(s.activeCar).model}.` });
-  }
-  for (const u of UPGRADES) {
-    if (!P.upgradeShown(s, u)) continue;
-    const next = u.levels[s.upgrades[u.id] ?? 0];
-    if (next) options.push({ kind: 'upgrade', id: u.id, price: next.cost, title: u.name, why: next.label });
-  }
-  const can = options.find((o) => o.price <= s.cash);
-  if (can) return { pick: can, affordable: true };
-  const cheapest = options.slice().sort((a, b) => a.price - b.price)[0] ?? null;
-  return { pick: cheapest, affordable: false };
-}
+/** The Shop's recommendation; the same rule decides whether the guide's "spend" beat has anything to show. */
+export const shopPick = bestBuy;
 
 function tuneGain(s: GameState): string {
   const car = s.activeCar;
@@ -131,7 +97,8 @@ export function openShop(app: App, focusFamily?: Family, startTab: ShopTab = 'pa
         const goalLine = goalFam === fam && g ? (() => {
           const { have, need: n } = ingredients(s, fam!, g.tier);
           const add = tier < g.tier ? 2 ** (tier - 1) : 0;
-          return add ? `For the ${g.car.model}: ingredients for a T${g.tier} ${FAMILIES[fam!].name} ${Math.min(have, n)}/${n} → ${Math.min(n, have + add)}/${n}. Merge them yourself — that counts as the craft.` : null;
+          if (have >= n) return `For the ${g.car.model}: you already hold enough ${FAMILIES[fam!].plural} to craft the T${g.tier} — merge them up, no purchase needed.`;
+          return add ? `For the ${g.car.model}: ingredients for a T${g.tier} ${FAMILIES[fam!].name} ${have}/${n} → ${Math.min(n, have + add)}/${n}. Merge them yourself — that counts as the craft.` : null;
         })() : null;
         const famBtn = (f: Family) => h('button', {
           class: `btn fam-pick${f === fam ? ' on' : ''}`, 'aria-pressed': String(f === fam),

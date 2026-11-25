@@ -4,7 +4,7 @@ import { Game } from '../src/core/game';
 import { RaceSim } from '../src/core/race';
 import { MemoryKV, encodeSave, saveKey } from '../src/core/save';
 import { newGame } from '../src/core/state';
-import { BEGINNER_STEPS, tutorialStep } from '../src/core/tutorial';
+import { BEGINNER_STEPS, bestBuy, tutorialStep } from '../src/core/tutorial';
 
 const T0 = 1_700_000_000_000;
 const at = (s: ReturnType<typeof newGame>, r: number, c: number) => ({ zone: 'board' as const, i: r * s.cols + c });
@@ -30,9 +30,18 @@ describe('teach-through-play steps', () => {
     g.fitRecommended('junker', T0 + 1600); // and the rest, as the Fit Parts view suggests
     expect(tutorialStep(g.state)).toBe('race1');
     race(g, T0 + 5000);
-    expect(g.state.cash).toBeGreaterThanOrEqual(45);
-    expect(tutorialStep(g.state)).toBe('spend'); // use the payout in the Shop
-    g.orderPart('tires', 1, T0 + 40_000);
+    // use the payout: the beat appears once the Shop has a useful buy you can afford (here after a second purse)
+    const buy = bestBuy(g.state);
+    if (!buy.affordable) {
+      expect(tutorialStep(g.state)).toBe('goalCard');
+      g.transact((s) => { s.cash += 60; return []; }, T0 + 35_000);
+    }
+    expect(tutorialStep(g.state)).toBe('spend');
+    const pick = bestBuy(g.state).pick!;
+    expect(pick.price).toBeLessThanOrEqual(g.state.cash);
+    if (pick.kind === 'order') g.orderPart(pick.fam, pick.tier, T0 + 40_000);
+    else if (pick.kind === 'tune') g.buyTune('junker');
+    else g.buyUpgrade(pick.id);
     expect(tutorialStep(g.state)).toBe('goalCard'); // then the exact remaining requirements
     g.markTip('goalCard');
     expect(tutorialStep(g.state)).toBe('craftGoal'); // starter Tires pairs → T3 Tires for the Corsa Rojo

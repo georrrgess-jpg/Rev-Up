@@ -633,10 +633,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
    ===================================================================================================== */
 
 /* ---- top bar: Cash and Rep are tappable explainers; Rep shows the next threshold ---- */
-.topbar button.chip { min-height: 34px; cursor: pointer; position: relative; }
-.topbar button.chip::after { content: ''; position: absolute; inset: -5px -2px; } /* 44 px hit area */
+.topbar .chip { min-height: 44px; } /* same height as the icon buttons: a 44 px target without overflow */
+.topbar button.chip { cursor: pointer; }
 .chip .of { color: var(--dim); font-size: var(--fs-2xs); font-weight: var(--w-strong); margin-left: -2px; }
-.topbar.compact .chip .of { display: none; }
+.topbar.no-of .chip .of { display: none; }
+/* Rep keeps its word when compact: a ★ glyph would read as Downtown stars */
+.topbar.compact .chip.rep .g { display: none; }
+.topbar.compact .chip.rep .w { display: inline; }
 .explainer .last { color: var(--text); font-weight: var(--w-strong); }
 .explainer .need { display: flex; flex-direction: column; align-items: flex-end; font-weight: var(--w-heavy); color: #f0d9a8; white-space: nowrap; }
 .explainer .need small { color: var(--muted); font-weight: var(--w-strong); font-size: var(--fs-2xs); }

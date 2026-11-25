@@ -17,6 +17,8 @@ export interface CoachStep {
   text: string;
   /** Show "Got it": the step only ends when dismissed (contextual tips). */
   ack?: boolean;
+  /** Where the callout goes when there is room: above the target (default) or below it. */
+  prefer?: 'above' | 'below';
 }
 
 export class Coach {
@@ -68,8 +70,9 @@ export class Coach {
     const cx = (Math.min(...rects.map((r) => r.left)) + Math.max(...rects.map((r) => r.right))) / 2 - host.left;
     const w = this.el.offsetWidth;
     const hgt = this.el.offsetHeight;
-    const above = top - hgt - 14 >= 4;
+    const fitsAbove = top - hgt - 14 >= 4;
     const below = bottom + 12 + hgt <= host.height - 4;
+    const above = fitsAbove && !(this.step.prefer === 'below' && below);
     // a tall target with no room either side (a big card): sit over its lower edge instead of off-screen
     const y = above ? top - hgt - 12 : below ? bottom + 12 : Math.max(4, host.height - hgt - 8);
     const x = Math.max(8, Math.min(host.width - w - 8, cx - w / 2));
@@ -99,7 +102,7 @@ const SEL = {
   nitro: '.topbar .chip.nitro',
   raceLive: '.view.on [data-coach="race-live"]',
   raceFit: '.view.on [data-coach="race-fit"]',
-  raceQuick: '.view.on [data-coach="race-quick"]',
+  raceQuick: '.view.on [data-coach="race-quick"], .view.on .btn.quick:not(.off)',
   shopPick: '.sheet [data-coach="shop-pick"]',
   fitRecommended: '.sheet [data-coach="fit-recommended"]',
 };
@@ -222,7 +225,8 @@ export class GuideCoach {
         if (sheet) return null;
         const ev = P.recommendedEvent(s);
         const text = `Race ${ev.name}: a win pays $${ev.payout.cash[0]} and ${ev.payout.rep[0]} Rep. Rep counts toward new cars; cash is for the Shop.`;
-        if (route === 'race') return one(this.find(SEL.raceLive), text);
+        // in the Race menu the facts (track, difficulty, pay) sit above the button: keep them readable
+        if (route === 'race') { const c = one(this.find(SEL.raceLive), `${text} Tap NITRO in the amber boost zones.`); return c && { ...c, prefer: 'below' }; }
         return route === 'garage' ? one(this.find(SEL.race), text) : null;
       }
       case 'spend': {

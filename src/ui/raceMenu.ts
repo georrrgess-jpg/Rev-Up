@@ -67,7 +67,7 @@ export class RaceView implements View {
     const fs = fitStatus(s);
     const fitMsg = fs.empty.length
       ? `${fs.empty.length === 1 ? `The ${FAMILIES[fs.empty[0]].name} slot is` : `${fs.empty.length} part slots are`} empty on your ${cls.model}. Empty slots add nothing.`
-      : fs.better.length ? `A better ${fs.better.map((f) => FAMILIES[f].name).join(' and ')} is on your bench, not on the car.` : '';
+      : fs.better.length ? `${fs.better.length === 1 && fs.better[0] !== 'tires' ? `A better ${FAMILIES[fs.better[0]].name} is` : `Better ${fs.better.map((f) => FAMILIES[f].name).join(' and ')} are`} on your bench, not on the car.` : '';
     this.fitBar.hidden = !fitMsg;
     this.fitBar.replaceChildren(...(fitMsg ? [h('span', { class: 'grow' }, fitMsg),
       h('button', { class: 'btn sm primary', 'data-coach': 'race-fit', onclick: () => openFitParts(this.app) }, 'Fit parts')] : []));

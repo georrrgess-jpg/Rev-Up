@@ -170,8 +170,11 @@ export class App {
   fitTop() {
     const bar = this.topBar ?? (this.topBar = this.root.querySelector('.topbar'));
     if (!bar) return;
-    bar.classList.remove('compact', 'wrap');
+    bar.classList.remove('compact', 'wrap', 'no-of');
     const clipping = () => Object.values(this.chips).some((c) => c.scrollWidth > c.clientWidth + 1);
+    if (!clipping()) return;
+    // first give up the Rep threshold ("/70": the goal card and the Rep sheet show it too), then the words
+    bar.classList.add('no-of');
     if (!clipping()) return;
     bar.classList.add('compact');
     // enlarged text or very large balances: let the bar take a second row rather than cut numbers off
