@@ -133,9 +133,9 @@ export class Game {
     this.input(now);
     return this.transact((d) => I.installPart(d, car, from), now);
   }
-  removePart(car: CarId, family: Family, now = Date.now()) {
+  removePart(car: CarId, family: Family, to?: SlotRef, now = Date.now()) {
     this.input(now);
-    return this.transact((d) => I.removePart(d, car, family), now);
+    return this.transact((d) => I.removePart(d, car, family, to), now);
   }
   movePartBetweenCars(fromCar: CarId, family: Family, toCar: CarId, now = Date.now()) {
     this.input(now);
