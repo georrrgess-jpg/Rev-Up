@@ -63,6 +63,36 @@ export const roadColors = (theme: string) => { const p = palOf(theme); return { 
 // ---------------------------------------------------------------- tiles
 
 type C2 = CanvasRenderingContext2D;
+
+/** The largest font size (px) at which `text` fits a box of inner size maxW × maxH, capped at maxPx. Measured with
+ *  the real font (canvas measureText, ascent + descent), so a wide fallback font or a different DPR never spills the
+ *  text over its sign. */
+export function fitFontPx(c: C2, text: string, maxW: number, maxH: number, maxPx: number, weight = 900, family = 'system-ui, sans-serif'): number {
+  c.font = `${weight} ${maxPx}px ${family}`;
+  const m = c.measureText(text);
+  const w = Math.max(1e-6, m.width);
+  const asc = m.actualBoundingBoxAscent || maxPx * 0.72;
+  const desc = m.actualBoundingBoxDescent || 0;
+  const h = Math.max(1e-6, asc + desc);
+  return Math.max(1, Math.min(maxPx, (maxPx * maxW) / w, (maxPx * maxH) / h));
+}
+
+/** Draw `text` centred in a sign box (x, y, w, h) with `pad` on every side, at the largest size that fits (≤ maxPx). */
+export function signText(c: C2, text: string, x: number, y: number, w: number, h: number, pad: number, color: string, maxPx: number, weight = 900, family = 'system-ui, sans-serif') {
+  const px = fitFontPx(c, text, w - 2 * pad, h - 2 * pad, maxPx, weight, family);
+  c.font = `${weight} ${px}px ${family}`;
+  const m = c.measureText(text);
+  const asc = m.actualBoundingBoxAscent || px * 0.72;
+  const desc = m.actualBoundingBoxDescent || 0;
+  const align = c.textAlign, base = c.textBaseline;
+  c.textAlign = 'center';
+  c.textBaseline = 'alphabetic';
+  c.fillStyle = color;
+  // optical centre: put the ink box (ascent + descent) in the middle of the sign
+  c.fillText(text, x + w / 2, y + h / 2 + (asc - desc) / 2);
+  c.textAlign = align;
+  c.textBaseline = base;
+}
 interface Layer { cv: HTMLCanvasElement; par: number; top: number; w: number; emit: { x: number; y: number; k: string }[] }
 interface Built { key: string; sky: HTMLCanvasElement; layers: Layer[]; fore: Layer | null }
 let built: Built | null = null;
@@ -177,7 +207,7 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         c.fillStyle = '#2b1426'; c.fillRect(x - 58 * u, hz - 96 * u, 1.5 * u, 34 * u);
         c.fillStyle = '#e0a12a'; c.fillRect(x - 70 * u, hz - 62 * u, 26 * u, 10 * u);
         c.fillStyle = '#ffcf3a'; c.fillRect(x + 14 * u, hz - 60 * u, 64 * u, 20 * u);
-        c.fillStyle = '#2b1426'; c.font = `900 ${11 * u}px system-ui, sans-serif`; c.fillText("RAY'S YARD", x + 17 * u, hz - 46 * u);
+        signText(c, "RAY'S YARD", x + 14 * u, hz - 60 * u, 64 * u, 20 * u, 3.5 * u, '#2b1426', 11 * u);
       }, 2);
     });
     add(0.3, hz - 40 * u, rt, (c, place) => {
@@ -208,7 +238,7 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         for (const dx of [-14, -5, 5, 14]) c.fillRect(x + dx * u, hz - 40 * u, 2 * u, 50 * u);
         poly(c, [x - 22 * u, hz - 40 * u, x + 22 * u, hz - 40 * u, x + 18 * u, hz - 70 * u, x - 18 * u, hz - 70 * u], '#eef2f4');
         poly(c, [x - 20 * u, hz - 70 * u, x + 20 * u, hz - 70 * u, x, hz - 84 * u], '#c8432f');
-        c.fillStyle = '#c8432f'; c.font = `900 ${10 * u}px system-ui, sans-serif`; c.fillText('MAPLE', x - 17 * u, hz - 51 * u);
+        signText(c, 'MAPLE', x - 17 * u, hz - 64 * u, 34 * u, 18 * u, 2 * u, '#c8432f', 10 * u); // inside the tank's narrow top
       }, 3);
     });
     add(0.3, hz - 40 * u, rt, (c, place) => {
@@ -438,7 +468,8 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         const crowd = ['#e2337a', '#ffd23f', '#38e1ff', '#ffffff', '#ff7a2f'];
         for (let i = 0; i < 46; i++) disc(c, x - 66 * u + (i % 23) * 6 * u, y - 24 * u + Math.floor(i / 23) * 9 * u, 2.2 * u, crowd[i % 5]);
         c.fillStyle = '#d6202a'; c.fillRect(x - 70 * u, y - 36 * u, 140 * u, 6 * u);
-        c.fillStyle = '#ffffff'; c.font = `900 ${10 * u}px system-ui, sans-serif`; c.fillText('SUMMIT GALA', x - 34 * u, y - 37.5 * u);
+        c.fillRect(x - 42 * u, y - 49 * u, 84 * u, 14 * u); // the name board above the banner, sized for its text
+        signText(c, 'SUMMIT GALA', x - 42 * u, y - 49 * u, 84 * u, 14 * u, 2.5 * u, '#ffffff', 10 * u);
       }, 20);
     });
   }

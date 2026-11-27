@@ -1,4 +1,4 @@
-import { SceneView, drawBackdrop, drawForeground, drawRoadDressing, hash, roadColors, sceneLights } from '../render/scene';
+import { SceneView, drawBackdrop, drawForeground, drawRoadDressing, hash, roadColors, sceneLights, signText } from '../render/scene';
 import { resultCard } from './results';
 import type { RaceView } from './raceMenu';
 import { carStyle } from '../core/style';
@@ -91,10 +91,12 @@ export class RaceScreen {
   private missTold = false;
   private outcome: RaceOutcome | null = null;
   private lastFrameDt = 0;
+  private closed = false;
 
   constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
     // the live race takes the player's SHIFT input; Quick Race and the bots shift for themselves
     this.sim = new RaceSim({ ...setup, shift: 'manual' });
+    if (import.meta.env.DEV) (window as unknown as { __race?: RaceScreen }).__race = this;
     const rev = carById(setup.player.car).rev;
     this.hum = new EngineHum(rev.base, rev.peak, setup.player.car);
     this.reduced = app.game.state.settings.reducedMotion;
@@ -149,7 +151,8 @@ export class RaceScreen {
     document.addEventListener('keydown', this.onKey);
     document.addEventListener('visibilitychange', this.onVis);
     window.addEventListener('blur', this.onVis);
-    requestAnimationFrame(() => {
+    this.raf = requestAnimationFrame(() => {
+      if (this.closed) return;
       this.resize();
       this.last = performance.now();
       this.raf = requestAnimationFrame((t) => this.frame(t));
@@ -202,7 +205,10 @@ export class RaceScreen {
   }
 
   private close() {
+    if (this.closed) return;
+    this.closed = true;
     cancelAnimationFrame(this.raf);
+    clearTimeout(this.gradeTimer);
     this.hum.stop();
     document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('visibilitychange', this.onVis);
@@ -232,6 +238,7 @@ export class RaceScreen {
     if (this.countdown > 0 || this.paused || this.finished) return;
     const r = this.sim.tapShift();
     if (r === 'wait') this.showGrade('Wait for green', 'warn');
+    else if (r === 'hold') this.showGrade('Braking — wait', 'warn');
   }
 
   /** A shift happened (tapped or automatic): grade it on the HUD, in sound, and teach the first miss. */
@@ -254,6 +261,8 @@ export class RaceScreen {
   private shiftHud(t: number) {
     const sim = this.sim;
     const p = sim.player;
+    // cue, window and needle all come from the sim's one shift attempt (the same state a tap is judged on)
+    const att = sim.attempt;
     const cue: ShiftCue = this.countdown > 0 || this.finished ? 'off' : sim.shiftCue();
     if (cue !== this.cue) {
       if (cue === 'green' && this.cue !== 'late' && this.app.game.state.settings.nitroCue) sfx.shiftCue();
@@ -271,7 +280,12 @@ export class RaceScreen {
     }
     const ls = sim.lastShift;
     if (ls && ls !== this.shiftShown) { this.shiftShown = ls; this.onShift(ls); }
-    this.gauge.draw(this.countdown > 0 ? 0.14 : sim.rpmFrac(p), p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt);
+    this.gauge.draw(this.countdown > 0 ? 0.14 : att.f, p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt, att.band);
+    if (import.meta.env.DEV) {
+      // dev-only frame trace for the shift cue (Playwright reads window.__shiftTrace when it exists)
+      const tr = (window as unknown as { __shiftTrace?: unknown[] }).__shiftTrace;
+      if (tr) tr.push({ t: Math.round(t), st: +sim.t.toFixed(3), gear: p.gear, f: +att.f.toFixed(4), id: att.id, acue: att.cue, needle: +(this.gauge as unknown as { needle: number }).needle.toFixed(4), band: (this.gauge as unknown as { band: number[] }).band.join('-'), cue, braking: p.braking, dt: +this.lastFrameDt.toFixed(4) });
+    }
   }
 
   private showCallout(text: string, cls: string, ms = 900) {
@@ -282,7 +296,10 @@ export class RaceScreen {
   }
 
   private frame(t: number) {
+    // a callback queued before close() (or a duplicate loop) never runs the race or its shift cue again
+    if (this.closed) return;
     this.raf = requestAnimationFrame((tt) => this.frame(tt));
+    if (t <= this.last) return; // stale or duplicate timestamp: nothing new to show
     let dt = (t - this.last) / 1000;
     this.last = t;
     if (dt > 0.1) dt = 0.1; // long frames never jump the simulation
@@ -586,9 +603,7 @@ export class RaceScreen {
       ctx.fillRect(x, roadTop - 46 * this.dpr, 3 * this.dpr, 42 * this.dpr);
       ctx.fillStyle = '#f2a33a';
       ctx.fillRect(x - 22 * this.dpr, roadTop - 64 * this.dpr, 48 * this.dpr, 20 * this.dpr);
-      ctx.fillStyle = '#1d1208';
-      ctx.font = `800 ${Math.round(13 * this.dpr)}px Barlow, system-ui`;
-      ctx.fillText('BEND ›', x - 18 * this.dpr, roadTop - 49 * this.dpr);
+      signText(ctx, 'BEND ›', x - 22 * this.dpr, roadTop - 64 * this.dpr, 48 * this.dpr, 20 * this.dpr, 3 * this.dpr, '#1d1208', 13 * this.dpr, 800, 'Barlow, system-ui');
     }
 
     // cars by lane (back lanes first)

@@ -21,7 +21,7 @@
 @keyframes shiftgo { from { box-shadow: 0 6px 0 #0d3d20, 0 0 0 0 rgba(93,255,138,.6); } to { box-shadow: 0 6px 0 #0d3d20, 0 0 0 10px rgba(93,255,138,0); } }
 
 .shiftgrade {
-  position: absolute; bottom: calc(100% + 10px); left: 0; white-space: nowrap; pointer-events: none;
+  position: absolute; bottom: calc(100% + 10px); left: 0; width: max-content; max-width: calc(100vw - 32px); pointer-events: none;
   padding: 4px 10px; border-radius: 999px; background: rgba(8,10,14,.82); font-size: var(--fs-xs); font-weight: var(--w-heavy);
   opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
 }
@@ -80,3 +80,6 @@
 .race-telemetry .tm b { white-space: nowrap; }
 @container (max-width: 92px) { .race-telemetry .tm b { font-size: var(--fs-sm); } }
 @container (max-width: 58px) { .race-telemetry .tm b { white-space: normal; } }
+
+/* The race clock sits over bright sky and clouds: a soft dark halo keeps it legible on any scene. */
+.racescreen .hud .time { text-shadow: 0 0 4px rgba(0,0,0,.85), 0 0 1px #000, 0 2px 0 #000; }

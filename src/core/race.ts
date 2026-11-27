@@ -59,6 +59,23 @@ export interface Racer {
   braking: boolean;
 }
 
+/**
+ * One shift attempt: the single state both the HUD cue and the SHIFT tap are judged from. It is refreshed once per
+ * sim step (never by the renderer), so the screen and the judgment always see the same numbers, and its window stays
+ * fixed for as long as the attempt lasts. A new attempt (new `id`) opens after every gear change and after braking.
+ * - `hold`: braking for (or held at the limit of) a bend, the box blipping down: no cue, and a tap is not a shift.
+ */
+export interface ShiftAttempt {
+  id: number;
+  /** Gear the attempt shifts out of (0 = first). */
+  gear: number;
+  /** Green window as fractions of the redline (fixed for the attempt). */
+  band: [number, number];
+  /** Engine speed at the last sim step (what the tach shows and what a tap is judged on). */
+  f: number;
+  cue: 'off' | 'hold' | 'soon' | 'green' | 'late';
+}
+
 export interface ShiftRecord { t: number; into: number; grade: ShiftGrade; rpm: number; cost: number }
 
 export interface Coach { kind: 'shift' | 'boost' | 'build'; text: string; lost: number }
@@ -138,6 +155,8 @@ export const SHIFT = {
   minTap: 0.45,
   /** No second shift within this many seconds. */
   debounce: 0.25,
+  /** After a braking downshift, the next gear's cue waits this long once the car is pulling again. */
+  settleS: 0.12,
   /** Practice race: the green band opens this much lower. */
   practiceWiden: 0.08,
   /** Auto downshift (rev-matched, free) while braking for a bend drags the revs below this. */
@@ -173,6 +192,11 @@ export class RaceSim {
   nitroTaps: number[] = [];
   private pendingCost = 0;
   private lastShiftT = -1;
+  /** Sim time of the player's last braking downshift. */
+  private lastDownT = -1;
+  private attemptSeq = 0;
+  /** The current shift attempt (see ShiftAttempt). */
+  attempt: ShiftAttempt = { id: 0, gear: 0, band: [0, 0], f: 0, cue: 'off' };
   private nitroStart: number;
 
   constructor(readonly setup: RaceSetup) {
@@ -196,6 +220,7 @@ export class RaceSim {
     }
     // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured. It shifts clean.
     this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false, 'clean');
+    this.refreshAttempt();
   }
 
   ghost!: Racer;
@@ -217,6 +242,7 @@ export class RaceSim {
     c.usedWindows = new Set(this.usedWindows);
     c.shiftLog = this.shiftLog.map((s) => ({ ...s }));
     c.nitroTaps = [...this.nitroTaps];
+    c.attempt = { ...this.attempt, band: [...this.attempt.band] as [number, number] };
     return c;
   }
 
@@ -274,15 +300,31 @@ export class RaceSim {
     return !!next && !this.usedWindows.has(next.segIndex) && p.v > 1 && (next.start - p.x) / p.v < 1.4;
   }
 
-  /** Shift light state for the HUD: off, approaching the band, in the green, or past it. */
+  /** Shift light state for the HUD: off, approaching the band, in the green, or past it (from the shift attempt). */
   shiftCue(): 'off' | 'soon' | 'green' | 'late' {
+    const c = this.attempt.cue;
+    return c === 'hold' ? 'off' : c;
+  }
+
+  /** Recompute the shift attempt from the player's state after a step. The window is only (re)read when a new attempt
+   *  opens; within one attempt only the engine speed and the cue move. */
+  private refreshAttempt() {
     const p = this.player;
-    if (this.topGear(p) || p.cut > 0 || p.finishTime !== null || p.v < 2 || this.boostZoneNear()) return 'off';
+    const a = this.attempt;
     const f = this.rpmFrac(p);
-    const [lo, hi] = this.band(p);
-    if (f > hi) return 'late';
-    if (f >= lo) return 'green';
-    return f >= lo - 0.12 ? 'soon' : 'off';
+    const settling = this.lastDownT >= 0 && this.t - this.lastDownT < SHIFT.settleS;
+    const hold = !this.topGear(p) && p.finishTime === null && (p.braking || settling);
+    if (p.gear !== a.gear || (a.cue === 'hold' && !hold) || a.id === 0) {
+      this.attemptSeq++;
+      a.id = this.attemptSeq;
+      a.gear = p.gear;
+      a.band = this.band(p);
+    }
+    a.f = f;
+    const [lo, hi] = a.band;
+    if (hold) a.cue = 'hold';
+    else if (this.topGear(p) || p.cut > 0 || p.finishTime !== null || p.v < 2 || this.boostZoneNear()) a.cue = 'off';
+    else a.cue = f > hi ? 'late' : f >= lo ? 'green' : f >= lo - 0.12 ? 'soon' : 'off';
   }
 
   tapNitro(): 'perfect' | 'boost' | 'empty' | 'busy' {
@@ -304,14 +346,18 @@ export class RaceSim {
     return perfect ? 'perfect' : 'boost';
   }
 
-  /** The player's SHIFT input. Ignored when it cannot mean a shift (top gear, mid-shift, revs far too low). */
-  tapShift(): ShiftGrade | 'top' | 'busy' | 'wait' {
+  /** The player's SHIFT input, judged on the current shift attempt: exactly the window and engine speed the HUD shows.
+   *  Ignored when it cannot mean a shift (top gear, mid-shift, revs far too low, braking for a bend, or a second tap
+   *  on an attempt that already shifted). */
+  tapShift(): ShiftGrade | 'top' | 'busy' | 'wait' | 'hold' {
     const p = this.player;
+    const a = this.attempt;
     if (this.done || p.finishTime !== null || p.cut > 0 || p.v < 1 || this.t - this.lastShiftT < SHIFT.debounce) return 'busy';
     if (this.topGear(p)) return 'top';
-    const f = this.rpmFrac(p);
+    if (a.cue === 'hold') return 'hold';
+    const f = a.f;
     if (f < SHIFT.minTap) return 'wait';
-    const [lo, hi] = this.band(p);
+    const [lo, hi] = a.band;
     const grade: ShiftGrade = f < lo ? 'early' : f <= hi ? 'clean' : 'late';
     this.upshift(p, grade);
     return grade;
@@ -337,9 +383,14 @@ export class RaceSim {
     const d = drivetrainFor(r.car);
     const f = this.rpmFrac(r);
     // a bend dragged the revs down: the box blips down a gear for free
-    if (r.gear > 0 && f < SHIFT.downshiftBelow && r.braking && r.v / (this.gearTop(r) * d.gears[r.gear - 1]) < 0.9) { r.gear--; return; }
+    if (r.gear > 0 && f < SHIFT.downshiftBelow && r.braking && r.v / (this.gearTop(r) * d.gears[r.gear - 1]) < 0.9) {
+      r.gear--;
+      if (r.isPlayer) this.lastDownT = this.t;
+      return;
+    }
     const [lo, hi] = this.band(r);
-    if (r.isPlayer && this.practice && r.policy === 'manual' && this.boostZoneNear() && f >= (lo + hi) / 2) return this.upshift(r, 'assist');
+    // (never while braking: an upshift there would only be blipped straight back down)
+    if (r.isPlayer && this.practice && r.policy === 'manual' && !r.braking && this.boostZoneNear() && f >= (lo + hi) / 2) return this.upshift(r, 'assist');
     switch (r.policy) {
       case 'clean': if (f >= lo + (hi - lo) * 0.8) this.upshift(r, 'clean'); break;
       case 'early': if (f >= lo - 0.1) this.upshift(r, 'early'); break;
@@ -433,6 +484,7 @@ export class RaceSim {
     }
     this.t += dt;
     this.steps++;
+    this.refreshAttempt();
     if (this.racers.every((r) => r.finishTime !== null)) this.done = true;
     else if (this.t >= RACE.safetyCutoffS) {
       this.done = true;

@@ -8,6 +8,8 @@ import { h } from './dom';
 export type ShiftCue = 'off' | 'soon' | 'green' | 'late';
 
 const GEAR = ['1', '2', '3', '4', '5', '6', '7', '8'];
+/** Seconds the needle takes to glide across a jump (a gear change). */
+export const GLIDE_S = 0.12;
 
 export class Gauge {
   el: HTMLCanvasElement;
@@ -15,8 +17,11 @@ export class Gauge {
   private dpr = 1;
   private key = '';
   private needle = 0; // displayed fraction of the redline
+  private gear = -1;
+  /** A short eased glide across a jump in engine speed (a gear change, the launch); null while the needle tracks. */
+  private glide: { from: number; t: number } | null = null;
   private readonly redline: number;
-  private readonly band: [number, number];
+  private band: [number, number];
   private readonly gaugeMph: number;
 
   constructor(car: CarId, private reduced: boolean, band?: [number, number]) {
@@ -33,12 +38,30 @@ export class Gauge {
     this.key = '';
   }
 
-  /** f: engine speed as a fraction of the redline; mph: the speedometer reading (already converted once). */
-  draw(f: number, gear: number, mph: number, cue: ShiftCue, t: number, dt: number) {
+  /** Needle position for this frame. Between jumps it is exactly the engine speed the SHIFT tap is judged on (no lag,
+   *  so the needle is inside the green arc exactly when a tap is clean). A jump — a gear change, the launch — is
+   *  bridged by one eased glide of GLIDE_S, the same length at any frame rate, then it tracks again. */
+  private moveNeedle(target: number, gear: number, dt: number) {
+    if (this.reduced || this.gear < 0) { this.needle = target; this.gear = gear; this.glide = null; return; }
+    if (gear !== this.gear || Math.abs(target - this.needle) > 0.15) this.glide = { from: this.needle, t: 0 };
+    this.gear = gear;
+    if (this.glide) {
+      this.glide.t += Math.max(0, Math.min(dt, 0.1));
+      const k = Math.min(1, this.glide.t / GLIDE_S);
+      const e = 1 - (1 - k) * (1 - k);
+      this.needle = this.glide.from + (target - this.glide.from) * e;
+      if (k >= 1) this.glide = null;
+    } else this.needle = target;
+  }
+
+  /** f: engine speed as a fraction of the redline; mph: the speedometer reading (already converted once); band: the
+   *  shift attempt's green window (fixed for the attempt), so the arc is always the window a tap is judged on. */
+  draw(f: number, gear: number, mph: number, cue: ShiftCue, t: number, dt: number, band?: [number, number]) {
+    if (band && band[1] > band[0]) this.band = band;
     const target = Math.max(0, Math.min(1.06, f));
-    this.needle = this.reduced ? target : this.needle + (target - this.needle) * Math.min(1, dt / 0.05);
+    this.moveNeedle(target, gear, dt);
     const blink = cue === 'late' && !this.reduced ? Math.floor(t * 8) % 2 : 0;
-    const key = `${Math.round(this.needle * 200)}|${gear}|${mph}|${cue}|${blink}|${this.el.width}`;
+    const key = `${Math.round(this.needle * 400)}|${gear}|${mph}|${cue}|${blink}|${this.band.join()}|${this.el.width}`;
     if (key === this.key) return;
     this.key = key;
     const ctx = this.ctx;
@@ -47,8 +70,9 @@ export class Gauge {
     const s = this.dpr;
     ctx.clearRect(0, 0, W, H);
     const cx = W / 2;
-    const R = Math.min(W * 0.42, H * 0.44);
-    const cy = H - R * 0.92 - 6 * this.dpr; // the arc's open bottom carries the mph readout
+    // the whole backing disc (R + 6 px) fits the canvas: nothing is cut flat at the bottom edge
+    const R = Math.max(10 * s, Math.min(W * 0.42, H / 2 - 7 * s));
+    const cy = H - R - 6.5 * s; // the arc's open bottom carries the mph readout
     const a0 = Math.PI * 0.8;
     const sweep = Math.PI * 1.4;
     const maxF = 1.08;
