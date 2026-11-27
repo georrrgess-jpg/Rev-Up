@@ -6,8 +6,7 @@ import { carStyle } from '../core/style';
 import { resumeAudio, sfx, suspendAudio } from '../audio';
 import { music } from '../audio-api';
 import { RaceAudio, RivalAudio, launchControlSound } from '../audio-race';
-import { CircuitResult, Ghost, commitCircuit, explainFinish, ghostDelta, ghostX, keepsGhost, readGhost } from '../core/circuit';
-import type { GameEvent } from '../core/events';
+import { CircuitResult, Ghost, explainFinish, ghostDelta, ghostX, keepsGhost, readGhost } from '../core/circuit';
 import { openFitParts } from './fit';
 import { DownshiftRecord, GearEvent, RaceOutcome, RaceSetup, RaceSim, ShiftRecord, SimAudioState, speedMph } from '../core/race';
 import { drivetrainFor } from '../data/drivetrain';
@@ -557,10 +556,7 @@ export class RaceScreen {
     const committed = this.app.game.commitRace(this.raceId, outcome);
     this.result = committed ?? this.app.game.state.lastResult;
     // the Circuit side (ghost, ladder, series and milestone prizes), once per race, right after its commit
-    if (committed && !rival) {
-      const car = this.setup.player.car;
-      this.app.game.transact((d) => { const ev: GameEvent[] = []; this.circuit = commitCircuit(d, this.raceId, car, outcome, ev); return ev; });
-    }
+    if (committed && !rival) this.circuit = this.app.game.circuitResult; // committed inside Game.commitRace (Progression, 1.9)
     this.rivalsAudio.stop();
     const big = !!(this.result?.boss || this.result?.heat?.champion || this.app.game.state.pendingReveal);
     if (big) sfx.fanfare(); else if (outcome.place === 1) sfx.win(); else sfx.lose();

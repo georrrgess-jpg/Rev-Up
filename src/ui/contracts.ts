@@ -6,6 +6,7 @@
 // every screen working. When the lead integrates, these globs can become static imports without touching callers.
 import * as B from '../core/board';
 import * as P from '../core/progression';
+import * as CX from '../core/circuit';
 import type { SlotRef } from '../core/events';
 import type { Game } from '../core/game';
 import type { App } from './app';
@@ -169,8 +170,18 @@ export async function openShelfOr(app: App) {
 // ---------------------------------------------------------------- competition
 
 export function competitionSummary(s: GameState): CompetitionSummary | null {
-  const f = fn<(s: GameState) => CompetitionSummary | null>(compMods, 'competitionSummary');
-  if (f) { try { return f(s); } catch (err) { console.warn('competitionSummary failed', err); } }
+  // Racing's Circuit summary (src/core/circuit.ts), mapped onto the Race menu's strip
+  try {
+    const c = CX.competitionSummary(s);
+    const n = c.ladder.next;
+    const tr = c.trials.filter((t) => t.best != null).sort((a, b) => b.medal - a.medal)[0];
+    return {
+      ladder: { position: c.ladder.position, total: c.ladder.of, label: 'Rival ladder' },
+      nextRival: n ? { name: n.name, eventId: n.event, prize: n.prize, ready: n.open } : undefined,
+      series: { name: c.series.name, round: Math.min(c.series.rounds.length, c.series.wins + (c.series.next ? 1 : 0)), of: c.series.rounds.length, points: c.series.points },
+      ghost: tr ? { eventId: tr.event, best: tr.best ?? undefined, text: `${tr.name} ${tr.best!.toFixed(2)} s${tr.nextMedal ? ` · ${tr.nextMedal.name} ${tr.nextMedal.target.toFixed(1)} s` : ''}` } : null,
+    };
+  } catch (err) { console.warn('competitionSummary failed', err); }
   // fallback: the rival ladder (one boss per district) and the next rival you can challenge
   const bosses = EVENTS.filter((e) => e.boss && !e.heatOf);
   const beaten = bosses.filter((e) => s.bosses.includes(e.boss!.rival));

@@ -13,6 +13,7 @@ import * as PJ from './projects'; // Scrap & surplus
 import * as J from './jobs'; // Job Board (New mechanic)
 import * as G from './goals'; // 1.9 Next Goal
 import * as SH from './shelf'; // 1.9 Parts Shelf
+import * as CI from './circuit'; // 1.9 Circuit (Racing workstream)
 import { settleTutorialForExistingSave } from './tutorial';
 import { RaceOutcome, RaceSetup, RaceSim, leanOutcome } from './race';
 import { KV, LoadResult, loadGame, writeGame } from './save';
@@ -325,6 +326,8 @@ export class Game {
     return setup;
   }
   get pendingRaceId() { return this.state.pendingRace?.id ?? null; }
+  /** The Circuit side of the last committed live race (ghost delta, ladder, series and milestone prizes). */
+  circuitResult: CI.CircuitResult | null = null;
   commitRace(raceId: number, outcome: RaceOutcome, now = Date.now()): LastResult | null {
     if (this.rivalRace?.id === raceId) return this.commitRivalRun(raceId, outcome, now); // Rival Runs hook
     this.input(now);
@@ -336,6 +339,9 @@ export class Game {
       res = P.commitRace(d, { raceId, mode: 'live', outcome: leanOutcome(outcome) }, ev);
       if (res) J.onRace(d, J.raceSummary(raceId, outcome, jobCar, (res as LastResult).eventId), now, ev); // Job Board: in the race's single-use commit
       if (res) ev.push(...F.consumeKits(d, raceId, nitroBefore, outcome.nitroUsed ?? 0));
+      // 1.9 Circuit (core/circuit.ts): ghost, rival ladder, series and milestone prizes, in the same transaction
+      // (keyed by raceId, so a repeat commit pays nothing)
+      this.circuitResult = res ? CI.commitCircuit(d, raceId, jobCar, outcome, ev) : null;
       return ev;
     }, now);
     return res;

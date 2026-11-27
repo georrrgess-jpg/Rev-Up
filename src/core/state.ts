@@ -1,5 +1,6 @@
 import { installLegacyLoadout } from './install';
 import { sanitizeSurplus } from './projects'; // Scrap & surplus
+import { cleanGhosts } from './circuit'; // 1.9 Circuit ghosts
 import {
   ACTIVE_FAMILIES, BOARD_BASE, CarId, Family, NITRO_CAP, Quality, STARTER_CRATES, TRAY_SLOTS,
 } from '../data/tables';
@@ -375,6 +376,7 @@ export function migrate(raw: unknown): GameState | null {
   if (!g.jobs || typeof g.jobs !== 'object' || Array.isArray(g.jobs)) delete merged.jobs;
   sanitizeSurplus(merged); // ---- Scrap & surplus: well-formed builds and kits, or none
   sanitizeCircuit(merged, g); // ---- 1.9 Circuit: shelf, goal pick, paid stages, upgrade credit
+  cleanGhosts(merged); // ---- 1.9 Circuit time-trial ghosts (core/circuit.ts): malformed ones dropped
   if (fromV1) { merged.v = SAVE_VERSION; installLegacyLoadout(merged); }
   return validateState(merged).length === 0 ? merged : null;
 }
