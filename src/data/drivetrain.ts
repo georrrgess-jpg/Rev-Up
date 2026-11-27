@@ -79,8 +79,9 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   ardent: { gears: [0.3, 0.43, 0.56, 0.69, 0.83, 1.26], idle: 1300, redline: 10200, band: [0.86, 0.975], windowS: 0.45, shiftS: 0.016, autoS: 0.32, lowPull: 0.66, gaugeMph: 220, topScale: 1.12, accelScale: 1.0, pullExp: 2.3 },
   // Meridian LT: a long-tail highway car with a big-torque V8. Five tall gears (first runs to over 90 mph), a low
   // redline and a wide band; strong pull below it (lowPull 0.86), so few shifts that each carry a lot of speed, and a
-  // long top end (pullExp 2.9) that keeps pulling on a kilometre of causeway.
-  meridian: { gears: [0.37, 0.58, 0.78, 0.98, 1.35], idle: 800, redline: 7400, band: [0.76, 0.95], windowS: 0.5, shiftS: 0.022, lowPull: 0.86, gaugeMph: 280, topScale: 1.38, accelScale: 0.8, pullExp: 2.9 },
+  // long top end (pullExp 3.4: the pull barely fades until the very top) that keeps pulling on a kilometre of
+  // causeway, where it beats the Mako and the Sovereign; it still loses the Grand Riviera and the Port Sprint to them.
+  meridian: { gears: [0.37, 0.58, 0.78, 0.98, 1.35], idle: 800, redline: 7400, band: [0.76, 0.95], windowS: 0.5, shiftS: 0.022, lowPull: 0.86, gaugeMph: 290, topScale: 1.4, accelScale: 0.95, pullExp: 3.4 },
   // Tempest E4: four electric motors and a three-speed box (two shifts a race): full torque from zero rpm (lowPull 1),
   // a 15,500 rpm motor redline, the quickest shifts in the game and a wide green. Its signature is launch control
   // (data/circuit.ts LAUNCH_CONTROL): tap LAUNCH on GO for more traction and pull through the launch segment.

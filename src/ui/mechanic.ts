@@ -262,15 +262,18 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       cancelAnimationFrame(raf);
       const target = LOOK[area];
       if (reduced()) { look.hood = target.hood; look.light = target.light; draw(); return; }
-      let last = performance.now();
+      // a fixed, short ease (about 24 frames): the detailed car is redrawn each frame, so the open must not linger
+      const from = { hood: look.hood, light: look.light };
+      if (Math.abs(target.hood - from.hood) < 0.004 && Math.abs(target.light - from.light) < 0.004) { draw(); return; }
+      const DUR = 400;
+      let t0 = -1;
       const step = (now: number) => {
-        const dt = Math.min(0.05, (now - last) / 1000);
-        last = now;
-        const k = 1 - Math.exp(-dt * 7);
-        look.hood += (target.hood - look.hood) * k;
-        look.light += (target.light - look.light) * k;
-        const done = Math.abs(target.hood - look.hood) < 0.004 && Math.abs(target.light - look.light) < 0.004;
-        if (done) { look.hood = target.hood; look.light = target.light; }
+        if (t0 < 0) t0 = now;
+        const u = Math.min(1, (now - t0) / DUR);
+        const e = 1 - (1 - u) ** 3; // ease out
+        look.hood = from.hood + (target.hood - from.hood) * e;
+        look.light = from.light + (target.light - from.light) * e;
+        const done = u >= 1;
         draw();
         if (!done && canvas.isConnected) raf = requestAnimationFrame(step);
       };
