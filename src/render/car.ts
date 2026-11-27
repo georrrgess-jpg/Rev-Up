@@ -13,7 +13,7 @@ type P = { x: number; y: number };
 /** Profile vertex: x, y (metres, y up), corner radius, tag for the edge that starts here ('g' = glass). */
 type V = [number, number, number?, string?];
 
-interface WheelStyle { kind: 'steel' | 'cover' | 'sport' | 'dish' | 'center' | 'aero' | 'gravel' | 'race'; rim: number; tire: string; side?: string; caliper?: string; rimCol?: string }
+interface WheelStyle { kind: 'steel' | 'cover' | 'sport' | 'dish' | 'center' | 'aero' | 'gravel' | 'race' | 'forged' | 'split' | 'blade'; rim: number; tire: string; side?: string; caliper?: string; rimCol?: string }
 
 /** What can be seen through the side glass: seat colour, an optional roll cage, the dash. */
 interface Cabin { seat: string; cage?: boolean; single?: boolean }
@@ -147,7 +147,64 @@ const DEFS: Record<string, CarDef> = {
     belt: 0.88, wheel: { kind: 'aero', rim: 0.78, tire: '#111113', side: '#1b1b1f', caliper: '#36f0d0' },
     cabin: { seat: '#1e2a30', single: true },
   },
+  // Vireo 9R — short, nimble mid-engine V10 coupe: cab-forward teardrop canopy, deep side scoop, glass engine
+  // cover, high twin exits through the deck, a ducktail. The shortest wheelbase of the supercars.
+  vireo: {
+    L: 4.35, width: 1.96, rx: 0.9, fx: 3.46, r: 0.34, tireW: 0.14, rearTireW: 0.165, sill: 0.15, archGap: 0.03, flare: 0.05,
+    profile: [[0.07, 0.17, 0.02], [0, 0.3, 0.03], [0, 0.74, 0.03], [0.05, 0.88, 0.02], [0.3, 0.86, 0.04], [0.62, 0.9, 0.1], [1.5, 1.06, 0.22],
+      [2.0, 1.15, 0.2], [2.42, 1.13, 0.12, 'g'], [3.16, 0.8, 0.06], [4.0, 0.64, 0.18], [4.32, 0.48, 0.08], [4.35, 0.3, 0.03], [4.26, 0.15, 0.02]],
+    glass: [
+      [[1.64, 0.86, 0.03], [1.96, 1.05, 0.07], [2.37, 1.07, 0.04], [3.0, 0.81, 0.03]],
+    ],
+    belt: 0.84, wheel: { kind: 'forged', rim: 0.78, tire: '#121214', side: '#1d1d20', caliper: '#f4f1ea', rimCol: '#1a1b1f' },
+    cabin: { seat: '#e23c2e' },
+  },
+  // Mako TT — wide front-engined twin-turbo brute: long hood with a power bulge and heat extractors, cabin set
+  // far back, fastback into a kicked-up tail, shark gills behind the front wheels, quad exits.
+  mako: {
+    L: 4.62, width: 2.06, rx: 0.92, fx: 3.6, r: 0.355, tireW: 0.15, rearTireW: 0.18, sill: 0.17, archGap: 0.03, flare: 0.085,
+    profile: [[0.07, 0.19, 0.02], [0, 0.33, 0.03], [0, 0.8, 0.03], [0.04, 0.93, 0.02], [0.42, 0.92, 0.06], [1.15, 1.17, 0.24], [1.75, 1.24, 0.16],
+      [2.12, 1.22, 0.1, 'g'], [2.76, 0.9, 0.05], [4.12, 0.79, 0.16], [4.56, 0.62, 0.1], [4.62, 0.36, 0.04], [4.52, 0.18, 0.02]],
+    glass: [
+      [[1.2, 0.94, 0.02], [1.52, 1.13, 0.07], [1.86, 1.16, 0.03], [1.86, 0.94, 0.02]],
+      [[1.95, 0.94, 0.02], [1.95, 1.16, 0.03], [2.1, 1.17, 0.05], [2.62, 0.93, 0.02]],
+    ],
+    belt: 0.92, wheel: { kind: 'split', rim: 0.76, tire: '#111112', side: '#1c1c1e', caliper: '#c7f23a', rimCol: '#3a3d42' },
+    cabin: { seat: '#151719' },
+  },
+  // Sovereign — the flagship: a long, very low mid-engined V12 hybrid with a canopy cabin, flying buttresses over
+  // a louvred engine deck, a long tail, and a blade of light across the nose and the tail.
+  sovereign: {
+    L: 5.0, width: 2.04, rx: 1.02, fx: 4.0, r: 0.36, tireW: 0.14, rearTireW: 0.17, sill: 0.13, archGap: 0.025, flare: 0.04,
+    profile: [[0.06, 0.15, 0.02], [0, 0.29, 0.03], [0, 0.68, 0.06], [0.1, 0.8, 0.05], [1.2, 0.9, 0.3], [2.2, 1.08, 0.32], [2.78, 1.09, 0.16, 'g'],
+      [3.52, 0.78, 0.08], [4.55, 0.62, 0.22], [4.97, 0.42, 0.08], [5.0, 0.28, 0.03], [4.9, 0.13, 0.02]],
+    glass: [
+      [[1.78, 0.86, 0.03], [2.04, 0.98, 0.05], [2.2, 0.99, 0.02], [2.2, 0.86, 0.02]],
+      [[2.3, 0.85, 0.03], [2.42, 1.02, 0.06], [2.76, 1.04, 0.04], [3.36, 0.8, 0.03]],
+    ],
+    belt: 0.82, wheel: { kind: 'blade', rim: 0.8, tire: '#111113', side: '#1c1c1f', caliper: '#c9a24a', rimCol: '#dcdfe2' },
+    cabin: { seat: '#6b3a24' },
+  },
 };
+
+/** Engine bay for the service bay (hood / engine cover): span along the car, layout, cam-cover colour. */
+interface EngineDef { x0: number; x1: number; mid?: boolean; kind: 'i3' | 'i4' | 'v6' | 'v8' | 'v10' | 'v12'; col: string; turbo?: number; hybrid?: boolean; lid?: 'paint' | 'glass' | 'louvre' }
+const ENGINES: Record<string, EngineDef> = {
+  junker: { x0: 2.56, x1: 3.42, kind: 'i3', col: '#59605a' },
+  beater: { x0: 3.12, x1: 3.95, kind: 'i4', col: '#3b4f72' },
+  hothatch: { x0: 2.62, x1: 3.62, kind: 'i4', col: '#c8241d', turbo: 1 },
+  muscle: { x0: 3.12, x1: 4.55, kind: 'v8', col: '#d0501f' },
+  tourer: { x0: 3.08, x1: 4.38, kind: 'v12', col: '#9b1f1c' },
+  tuner: { x0: 2.6, x1: 3.68, kind: 'i4', col: '#c62f22' },
+  super: { x0: 0.6, x1: 1.72, mid: true, kind: 'v6', col: '#6a4fd0', hybrid: true, lid: 'louvre' },
+  rally: { x0: 2.66, x1: 3.66, kind: 'i4', col: '#e0a91f', turbo: 1 },
+  gt: { x0: 3.06, x1: 4.36, kind: 'v8', col: '#d6202a' },
+  proto: { x0: 0.6, x1: 2.05, mid: true, kind: 'v8', col: '#36f0d0', hybrid: true, lid: 'louvre' },
+  vireo: { x0: 0.6, x1: 1.5, mid: true, kind: 'v10', col: '#e23c2e', lid: 'glass' },
+  mako: { x0: 2.8, x1: 4.1, kind: 'v8', col: '#c7f23a', turbo: 2 },
+  sovereign: { x0: 0.72, x1: 2.0, mid: true, kind: 'v12', col: '#c9a24a', hybrid: true, lid: 'louvre' },
+};
+const engineFor = (id: string): EngineDef => ENGINES[id] ?? ENGINES.muscle;
 const defFor = (id: string): CarDef => DEFS[id] ?? DEFS.muscle;
 
 /** Factory paint and trim the art was designed around (D copies these into CARS for the new cars). */
@@ -155,15 +212,20 @@ export const FACTORY_LOOKS: Record<string, { paint: string; trim: string }> = {
   rally: { paint: '#1f62c9', trim: '#f5c518' },
   gt: { paint: '#d5dade', trim: '#d6202a' },
   proto: { paint: '#1d4e6b', trim: '#36f0d0' },
+  vireo: { paint: '#e23c2e', trim: '#f4f1ea' },
+  mako: { paint: '#1c2a24', trim: '#c7f23a' },
+  sovereign: { paint: '#f1ece2', trim: '#c9a24a' },
 };
 /** Ids that have their own drawing (the rest fall back to the muscle body). */
-export const ART_CARS = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto'] as const;
+export const ART_CARS = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign'] as const;
+/** The supercars shown on a turning platform under a spotlight in the Showroom. */
+export const PLATFORM_CARS: readonly string[] = ['vireo', 'mako', 'sovereign'];
 
 /** Real length of each class, so the race can show the Muscle longer than the Tapeback. */
 export const carLengthM = (id: CarId | string) => defFor(id).L;
 
 /** Height of the headlamp centres on the front plane. */
-const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63, tuner: 0.62, super: 0.5, rally: 0.66, gt: 0.6, proto: 0.5 } as Record<string, number>)[id] ?? 0.65;
+const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63, tuner: 0.62, super: 0.5, rally: 0.66, gt: 0.6, proto: 0.5, vireo: 0.44, mako: 0.53, sovereign: 0.42 } as Record<string, number>)[id] ?? 0.65;
 
 // ---------------------------------------------------------------- colour helpers
 
@@ -250,7 +312,7 @@ function geometry(id: string): Geo {
     const a = out[i], b = out[(i + 1) % out.length];
     const n = normal(a, b);
     if (tags[i] !== 'g' && tags[i] !== 'w' && n.y > 0.55 && n.x * D.x + n.y * D.y > 0) top.push({ a, b });
-    if (n.x > 0.7 && tags[i] !== 'w') { front.push(a); front.push(b); }
+    if (n.x > 0.7 && tags[i] !== 'w' && a.x > d.L * 0.6) { front.push(a); front.push(b); } // (degenerate arch-end edges can face forward)
   }
   front.sort((p, q) => q.y - p.y);
   const g: Geo = { out, tags, glass: d.glass.map((w) => rounded(w).pts), top, front, D };
@@ -440,16 +502,23 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
   ctx.save();
   ctx.translate(wx, cy);
   const k = d.wheel.kind;
+  const dark = k === 'race' || k === 'aero' || k === 'forged' || k === 'split';
+  const braked = k !== 'steel' && k !== 'cover';
   if (!detail && blur >= 0.6) {
     // fully blurred at race speed: spokes cannot be seen, so draw only the smeared disc (cheaper than the rim)
     ctx.fillStyle = '#07080a';
     ctx.beginPath(); ctx.arc(0, 0, R * 1.02, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = k === 'steel' ? 'rgb(70,74,77)' : k === 'gravel' ? 'rgb(190,192,188)' : k === 'race' || k === 'aero' ? 'rgb(52,54,60)' : 'rgb(96,101,106)';
+    ctx.fillStyle = k === 'steel' ? 'rgb(70,74,77)' : k === 'gravel' ? 'rgb(190,192,188)' : dark ? 'rgb(52,54,60)' : k === 'blade' ? 'rgb(150,154,158)' : 'rgb(96,101,106)';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = k === 'steel' ? 'rgb(120,124,126)' : k === 'gravel' ? 'rgb(232,233,228)' : k === 'race' || k === 'aero' ? (d.wheel.caliper ?? '#888') : 'rgb(170,176,182)';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.55, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = R * 0.04;
     for (const q of [0.45, 0.72]) { ctx.beginPath(); ctx.arc(0, 0, R * q, angle % 6, (angle % 6) + 2.2); ctx.stroke(); }
+    if (braked && d.wheel.caliper) {
+      // the caliper does not spin, so it stays sharp through the blur and carries the car's colour into the race
+      ctx.fillStyle = d.wheel.caliper;
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.8, Math.PI * 0.55, Math.PI * 0.95); ctx.arc(0, 0, R * 0.56, Math.PI * 0.95, Math.PI * 0.55, true); ctx.closePath(); ctx.fill();
+    }
     ctx.restore();
     return;
   }
@@ -460,19 +529,32 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
   well.addColorStop(0, '#2a2e33'); well.addColorStop(1, '#0b0c0e');
   ctx.fillStyle = well;
   ctx.beginPath(); ctx.arc(D.x * 0.05, D.y * 0.05, R * 0.94, 0, Math.PI * 2); ctx.fill();
-  if (k === 'sport' || k === 'dish' || k === 'center' || k === 'aero' || k === 'gravel' || k === 'race') {
+  if (braked) {
     // brake disc (with a machined ring) and caliper sit behind the spokes and do not rotate
+    const big = k === 'race' || k === 'aero' || k === 'forged' || k === 'split' || k === 'blade';
     const disc = ctx.createRadialGradient(-R * 0.2, R * 0.2, R * 0.1, 0, 0, R * 0.8);
-    disc.addColorStop(0, '#9aa1a8'); disc.addColorStop(1, '#4d5258');
+    if (big) { disc.addColorStop(0, '#5d6268'); disc.addColorStop(0.6, '#3d4146'); disc.addColorStop(1, '#2a2d31'); } // carbon-ceramic
+    else { disc.addColorStop(0, '#9aa1a8'); disc.addColorStop(1, '#4d5258'); }
     ctx.fillStyle = disc;
-    ctx.beginPath(); ctx.arc(0, 0, R * 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.82, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(30,33,36,0.6)'; ctx.lineWidth = R * 0.04;
     ctx.beginPath(); ctx.arc(0, 0, R * 0.62, 0, Math.PI * 2); ctx.stroke();
     if (detail) {
-      ctx.fillStyle = d.wheel.caliper ?? '#3a3f44';
-      ctx.beginPath(); ctx.arc(0, 0, R * 0.78, Math.PI * 0.52, Math.PI * 0.98); ctx.arc(0, 0, R * 0.5, Math.PI * 0.98, Math.PI * 0.52, true); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.beginPath(); ctx.arc(0, 0, R * 0.76, Math.PI * 0.6, Math.PI * 0.75); ctx.arc(0, 0, R * 0.7, Math.PI * 0.75, Math.PI * 0.6, true); ctx.closePath(); ctx.fill();
+      // cross-drilled rotor face (the holes turn with the wheel), then the fixed caliper with its bridge and highlight
+      ctx.save(); ctx.rotate(-angle);
+      ctx.fillStyle = 'rgba(12,13,15,0.7)';
+      for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2, rr = R * (i % 2 ? 0.7 : 0.76); ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, R * 0.022, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+      const cal = d.wheel.caliper ?? '#3a3f44';
+      ctx.fillStyle = lit(hexOf(cal), -0.35);
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.84, Math.PI * 0.5, Math.PI * 1.0); ctx.arc(0, 0, R * 0.48, Math.PI * 1.0, Math.PI * 0.5, true); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = cal;
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.8, Math.PI * 0.52, Math.PI * 0.98); ctx.arc(0, 0, R * 0.52, Math.PI * 0.98, Math.PI * 0.52, true); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.77, Math.PI * 0.6, Math.PI * 0.8); ctx.arc(0, 0, R * 0.72, Math.PI * 0.8, Math.PI * 0.6, true); ctx.closePath(); ctx.fill();
+    } else if (d.wheel.caliper) {
+      ctx.fillStyle = d.wheel.caliper;
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.8, Math.PI * 0.55, Math.PI * 0.95); ctx.arc(0, 0, R * 0.56, Math.PI * 0.95, Math.PI * 0.55, true); ctx.closePath(); ctx.fill();
     }
   } else if (k === 'steel' && detail) {
     // drum brake behind the steel wheel's holes
@@ -597,6 +679,58 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
     ctx.beginPath(); ctx.ellipse(0, 0, R * 0.42, R * 0.07, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#efe2b8';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.08, 0, Math.PI * 2); ctx.fill();
+  } else if (k === 'forged') {
+    // forged Y-spoke: five forked spokes in gloss black with a machined face edge and a bright lip
+    const col = d.wheel.rimCol ?? '#1a1b1f';
+    ctx.strokeStyle = '#b9bfc5'; ctx.lineWidth = R * 0.05;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.97, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = R * 0.08;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.89, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      ctx.save(); ctx.rotate((i * Math.PI * 2) / 5);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(R * 0.16, -R * 0.07); ctx.lineTo(R * 0.5, -R * 0.06); ctx.lineTo(R * 0.88, -R * 0.2); ctx.lineTo(R * 0.88, -R * 0.1);
+      ctx.lineTo(R * 0.58, 0); ctx.lineTo(R * 0.88, R * 0.1); ctx.lineTo(R * 0.88, R * 0.2); ctx.lineTo(R * 0.5, R * 0.06); ctx.lineTo(R * 0.16, R * 0.07);
+      ctx.closePath(); ctx.fill();
+      // machined chamfer catching the light on one edge of each fork
+      ctx.strokeStyle = 'rgba(214,220,226,0.75)'; ctx.lineWidth = R * 0.02;
+      ctx.beginPath(); ctx.moveTo(R * 0.18, -R * 0.07); ctx.lineTo(R * 0.5, -R * 0.06); ctx.lineTo(R * 0.87, -R * 0.2); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#26282d'; ctx.beginPath(); ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e23c2e'; ctx.beginPath(); ctx.arc(0, 0, R * 0.08, 0, Math.PI * 2); ctx.fill();
+  } else if (k === 'split') {
+    // split seven-spoke in satin graphite, a coloured pinstripe on the lip
+    const col = d.wheel.rimCol ?? '#3a3d42';
+    ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = R * 0.1;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = d.wheel.caliper ?? '#c7f23a'; ctx.lineWidth = R * 0.025;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.95, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 7; i++) {
+      ctx.save(); ctx.rotate((i * Math.PI * 2) / 7);
+      for (const s of [-1, 1]) {
+        ctx.fillStyle = s < 0 ? lit(col, 0.25) : col;
+        ctx.beginPath(); ctx.moveTo(R * 0.2, s * R * 0.015); ctx.lineTo(R * 0.88, s * R * 0.05); ctx.lineTo(R * 0.88, s * R * 0.13); ctx.lineTo(R * 0.2, s * R * 0.07); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.fillStyle = '#202226'; ctx.beginPath(); ctx.arc(0, 0, R * 0.24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = d.wheel.caliper ?? '#c7f23a'; ctx.beginPath(); ctx.arc(0, 0, R * 0.07, 0, Math.PI * 2); ctx.fill();
+  } else if (k === 'blade') {
+    // polished blade wheel: twelve thin twisted spokes, a wide bright lip, a gold centre
+    const lip = ctx.createLinearGradient(-R, R, R, -R);
+    lip.addColorStop(0, '#ffffff'); lip.addColorStop(0.5, '#9ea5ab'); lip.addColorStop(1, '#eceff1');
+    ctx.strokeStyle = lip; ctx.lineWidth = R * 0.11;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.93, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 12; i++) {
+      ctx.save(); ctx.rotate((i * Math.PI * 2) / 12);
+      ctx.fillStyle = i % 2 ? '#c3c8cd' : (d.wheel.rimCol ?? '#dcdfe2');
+      ctx.beginPath(); ctx.moveTo(R * 0.2, -R * 0.03); ctx.quadraticCurveTo(R * 0.55, -R * 0.02, R * 0.88, R * 0.1); ctx.lineTo(R * 0.88, R * 0.16); ctx.quadraticCurveTo(R * 0.55, R * 0.05, R * 0.2, R * 0.03); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#c9a24a'; ctx.beginPath(); ctx.arc(0, 0, R * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f3e3b0'; ctx.beginPath(); ctx.arc(-R * 0.04, R * 0.04, R * 0.08, 0, Math.PI * 2); ctx.fill();
   } else {
     // deep dish: polished lip, recessed dark dish, five slots, chrome centre
     const lip = ctx.createLinearGradient(-R, R, R, -R);
@@ -618,6 +752,11 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
     ctx.fillStyle = '#e8eaec';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2); ctx.fill();
   }
+  if (detail && (k === 'sport' || k === 'dish' || k === 'forged' || k === 'split' || k === 'gravel')) {
+    // lug nuts round the hub
+    ctx.fillStyle = k === 'dish' ? '#f2f4f5' : '#9aa1a8';
+    for (let i = 0; i < 5; i++) { const a = (i * Math.PI * 2) / 5 + 0.63; ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.15, Math.sin(a) * R * 0.15, R * 0.03, 0, Math.PI * 2); ctx.fill(); }
+  }
   if (blur > 0) {
     // spinning fast: spokes smear into a disc with soft concentric streaks
     ctx.globalAlpha = 0.75 * blur;
@@ -635,7 +774,7 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
 
 // ---------------------------------------------------------------- body layers
 
-interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; paint: string; trim: string; stripe: string | null; detail: boolean; mat?: PaintMaterial; restore: number; liv?: string }
+interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; paint: string; trim: string; stripe: string | null; detail: boolean; mat?: PaintMaterial; restore: number; liv?: string; /** 0..1 extra key light */ lt?: number; /** 0..1 hood / engine cover opening */ hood?: number }
 
 /** Ground shadow, far wheels, extruded planes, wheel wells, near panel and its details (everything behind the near wheels). */
 function backLayer(c: Ctx, shadow: boolean) {
@@ -679,7 +818,7 @@ function backLayer(c: Ctx, shadow: boolean) {
     if (tag === 'b') return null;
     if (tag === 'g') return null; // drawn below with pillars
     const up = Math.max(0, n.y), fwd = Math.max(0, n.x);
-    let col = lit(paint, 0.03 + up * 0.17 - fwd * 0.26);
+    let col = lit(paint, 0.03 + up * (0.17 + (c.lt ?? 0) * 0.14) - fwd * (0.26 - (c.lt ?? 0) * 0.08));
     if (roofFade && up > 0.9 && a.y > 1.25) col = mix(col, '#d9b9a2', 0.42); // sun-faded roof
     return col;
   });
@@ -732,7 +871,7 @@ function windshield(c: Ctx) {
   ctx.strokeStyle = '#0f151b'; ctx.lineWidth = 0.03;
   ctx.beginPath(); ctx.moveTo(cowl.x, cowl.y); ctx.lineTo(cowl.x + D.x, cowl.y + D.y); ctx.stroke();
   // restrained sky reflection across the glass
-  ctx.strokeStyle = 'rgba(220,236,248,0.22)'; ctx.lineWidth = 0.05;
+  ctx.strokeStyle = `rgba(220,236,248,${0.22 + (c.lt ?? 0) * 0.18})`; ctx.lineWidth = 0.05;
   ctx.beginPath();
   ctx.moveTo(top.x + D.x * 0.25, top.y + D.y * 0.25 - 0.02);
   ctx.lineTo(cowl.x + D.x * 0.55, cowl.y + D.y * 0.55 + 0.03);
@@ -740,15 +879,17 @@ function windshield(c: Ctx) {
 }
 
 function nearPanel(c: Ctx) {
-  const { ctx, id, d, g, paint, trim, detail } = c;
-  // base paint: sky-lit shoulder, mid tone, darker rocker, with a soft horizon reflection under the beltline
+  const { ctx, id, d, g, paint, trim } = c;
+  const lt = c.lt ?? 0;
+  // base paint: sky-lit shoulder, mid tone, darker rocker, with a soft horizon reflection under the beltline;
+  // an extra key light (showroom spot, service bay lamp) lifts the shoulder and opens up the shadows
   const grad = ctx.createLinearGradient(0, 1.45, 0, 0.15);
-  grad.addColorStop(0, lit(paint, 0.22));
-  grad.addColorStop(0.32, lit(paint, 0.12));
-  grad.addColorStop(0.45, lit(paint, 0.02));
-  grad.addColorStop(0.62, lit(paint, -0.08));
-  grad.addColorStop(0.68, lit(paint, 0.06));
-  grad.addColorStop(1, lit(paint, -0.42));
+  grad.addColorStop(0, lit(paint, 0.22 + lt * 0.16));
+  grad.addColorStop(0.32, lit(paint, 0.12 + lt * 0.12));
+  grad.addColorStop(0.45, lit(paint, 0.02 + lt * 0.06));
+  grad.addColorStop(0.62, lit(paint, -0.08 + lt * 0.03));
+  grad.addColorStop(0.68, lit(paint, 0.06 + lt * 0.05));
+  grad.addColorStop(1, lit(paint, -0.42 + lt * 0.1));
   path(ctx, g.out);
   ctx.fillStyle = grad;
   ctx.fill();
@@ -764,9 +905,15 @@ function nearPanel(c: Ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, hz - 0.065, d.L, 0.012);
   if (c.mat) paintMaterial(c);
   sideLivery(c);
-  // a long specular streak from the stage light
-  ctx.fillStyle = c.mat === 'matte' ? 'rgba(255,255,255,0.03)' : c.mat ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.14)';
+  // a long specular streak from the stage light; with an extra key light it widens into a soft highlight band
+  const spec = c.mat === 'matte' ? 0.03 : c.mat ? 0.22 : 0.14;
+  ctx.fillStyle = `rgba(255,255,255,${spec + lt * (c.mat === 'matte' ? 0.04 : 0.16)})`;
   ctx.beginPath(); ctx.moveTo(d.L * 0.18, d.belt - 0.09); ctx.lineTo(d.L * 0.86, d.belt - 0.13); ctx.lineTo(d.L * 0.84, d.belt - 0.165); ctx.lineTo(d.L * 0.16, d.belt - 0.12); ctx.closePath(); ctx.fill();
+  if (lt > 0 && c.mat !== 'matte') {
+    const band = ctx.createLinearGradient(0, d.belt + 0.02, 0, d.belt - 0.34);
+    band.addColorStop(0, 'rgba(255,255,255,0)'); band.addColorStop(0.45, `rgba(255,252,244,${0.2 * lt})`); band.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = band; ctx.fillRect(0, d.belt - 0.34, d.L, 0.36);
+  }
   if (id === 'tourer') {
     // two-tone: cream lower body under a chrome divide
     ctx.fillStyle = trim; ctx.fillRect(0, 0, d.L, 0.5);
@@ -795,10 +942,17 @@ function nearPanel(c: Ctx) {
   ctx.globalAlpha = 1;
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
   ctx.fillRect(0, d.belt - 0.08, d.L, -0.05);
-  // arch shading follows each wheel opening
+  // arch shading follows each wheel opening; above it, the fender swells into a lit crown
   for (const [wx, gap] of [[d.fx, d.archGap], [d.rx, d.archGap + d.flare * 0.5]] as const) {
+    const ar = d.r + gap;
+    const crown = ctx.createRadialGradient(wx - 0.05, d.r + ar + 0.06, 0.02, wx, d.r + ar, ar * 1.35);
+    crown.addColorStop(0, `rgba(255,255,255,${0.13 + lt * 0.08})`); crown.addColorStop(0.55, 'rgba(255,255,255,0.03)'); crown.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = crown;
+    ctx.beginPath(); ctx.ellipse(wx, d.r + ar + 0.02, ar * 1.35, Math.max(0.05, Math.min(0.24, d.belt - d.r - ar)), 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 0.045;
-    ctx.beginPath(); ctx.arc(wx, d.r + 0.01, d.r + gap + 0.03, 0.05, Math.PI - 0.05); ctx.stroke();
+    ctx.beginPath(); ctx.arc(wx, d.r + 0.01, ar + 0.03, 0.05, Math.PI - 0.05); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + lt * 0.1})`; ctx.lineWidth = 0.012;
+    ctx.beginPath(); ctx.arc(wx, d.r + 0.01, ar + 0.065, 0.35, Math.PI - 0.35); ctx.stroke();
   }
   if (id === 'muscle') {
     // broad rear haunch: a lit swell above the rear wheel and a shadowed waist ahead of it
@@ -816,7 +970,9 @@ function nearPanel(c: Ctx) {
   ctx.strokeStyle = 'rgba(6,8,10,0.85)';
   path(ctx, g.out);
   ctx.stroke();
-  if (detail || id === 'junker') panelDetails(c);
+  // construction details are part of each car's identity, so they are drawn at every size (cached in races);
+  // only the tiny ones (handles, badges) check `detail`
+  panelDetails(c);
   sideGlass(c);
   if (c.stripe) signatureStripe(c);
   void trim;
@@ -891,7 +1047,7 @@ function liveryCol(c: Ctx): string {
   return lum(c.paint) > 0.5 ? '#15171b' : '#f4f2ec';
 }
 /** Each car's race number when a livery calls for one. */
-const NUMBERS: Record<string, string> = { junker: '11', beater: '4', hothatch: '16', muscle: '45', tourer: '7', tuner: '86', super: '1', rally: '5', gt: '27', proto: '01' };
+const NUMBERS: Record<string, string> = { junker: '11', beater: '4', hothatch: '16', muscle: '45', tourer: '7', tuner: '86', super: '1', rally: '5', gt: '27', proto: '01', vireo: '9', mako: '88', sovereign: '00' };
 
 function roundel(c: Ctx, x: number, y: number, r: number, num: string, square = false) {
   const { ctx } = c;
@@ -1084,7 +1240,7 @@ function panelDetails(c: Ctx) {
     // a contrast lower band with the model number, a fuel filler and a red tow hook at the back
     ctx.fillStyle = trim; ctx.fillRect(0.05, lo - 0.02, d.L - 0.12, 0.14);
     ctx.fillStyle = c.stripe ?? '#e8641c'; ctx.fillRect(0.05, lo + 0.12, d.L - 0.12, 0.03);
-    if (detail) { ctx.save(); ctx.translate(2.62, lo + 0.03); ctx.scale(0.011, -0.011); ctx.fillStyle = '#f1efe9'; ctx.font = '900 11px sans-serif'; ctx.fillText('1600', 0, 0); ctx.restore(); }
+    if (detail) { ctx.save(); ctx.translate(2.02, lo + 0.03); ctx.scale(0.011, -0.011); ctx.fillStyle = '#f1efe9'; ctx.font = '900 11px sans-serif'; ctx.fillText('1600', 0, 0); ctx.restore(); }
     ctx.fillStyle = '#1b1d21'; ctx.beginPath(); ctx.arc(0.55, 0.78, 0.045, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#d23a2a'; ctx.fillRect(-0.06, 0.26, 0.08, 0.05);
     ctx.fillStyle = '#a5201b'; ctx.beginPath(); ctx.roundRect(0.0, 0.6, 0.1, 0.16, 0.02); ctx.fill();
@@ -1155,6 +1311,92 @@ function panelDetails(c: Ctx) {
     seam(ctx, [[3.36, 0.86], [3.2, 0.5], [3.1, lo]]);
     ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.beginPath(); ctx.roundRect(0.85, 0.55, 0.42, 0.28, 0.05); ctx.fill();
     ctx.save(); ctx.translate(0.9, 0.6); ctx.scale(0.022, -0.022); ctx.fillStyle = '#0b0d12'; ctx.font = 'italic 900 11px sans-serif'; ctx.fillText('01', 0, 0); ctx.restore();
+  } else if (id === 'vireo') {
+    seam(ctx, [[1.66, 0.84], [1.7, 0.5], [1.78, lo]]);
+    seam(ctx, [[3.04, 0.8], [3.06, 0.45], [3.0, lo]]);
+    if (detail) { ctx.fillStyle = '#121316'; ctx.beginPath(); ctx.roundRect(1.98, 0.7, 0.16, 0.03, 0.015); ctx.fill(); }
+    // the deep side scoop behind the door feeding the V10, split by a blade in the trim colour
+    const sc = ctx.createLinearGradient(1.7, 0, 1.25, 0);
+    sc.addColorStop(0, '#020203'); sc.addColorStop(1, '#16171b');
+    ctx.fillStyle = sc;
+    ctx.beginPath(); ctx.moveTo(1.64, 0.8); ctx.lineTo(1.24, 0.74); ctx.lineTo(1.3, 0.42); ctx.lineTo(1.72, 0.34); ctx.quadraticCurveTo(1.56, 0.58, 1.64, 0.8); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = lit(paint, 0.45); ctx.lineWidth = 0.016; ctx.stroke();
+    ctx.fillStyle = trim;
+    ctx.beginPath(); ctx.moveTo(1.7, 0.42); ctx.quadraticCurveTo(1.5, 0.5, 1.27, 0.66); ctx.lineTo(1.28, 0.6); ctx.quadraticCurveTo(1.5, 0.45, 1.69, 0.37); ctx.closePath(); ctx.fill();
+    // carbon sill with a trim-colour line, and a C-shaped tail lamp wrapping the rear corner
+    ctx.fillStyle = '#111215'; ctx.fillRect(d.rx + d.r + 0.05, lo - 0.04, d.fx - d.rx - 2 * d.r - 0.1, 0.08);
+    ctx.fillStyle = c.stripe ?? trim; ctx.fillRect(d.rx + d.r + 0.05, lo + 0.04, d.fx - d.rx - 2 * d.r - 0.1, 0.014);
+    ctx.fillStyle = '#16090a'; ctx.beginPath(); ctx.roundRect(0.0, 0.58, 0.16, 0.2, 0.04); ctx.fill();
+    ctx.strokeStyle = '#ff2b22'; ctx.lineWidth = 0.03;
+    ctx.beginPath(); ctx.arc(0.1, 0.68, 0.065, Math.PI * 0.55, Math.PI * 1.45); ctx.stroke();
+    if (detail) { ctx.save(); ctx.translate(3.58, 0.56); ctx.scale(0.009, -0.009); ctx.fillStyle = trim; ctx.font = 'italic 900 11px sans-serif'; ctx.fillText('9R', 0, 0); ctx.restore(); }
+    // mirror on a slim stalk
+    ctx.strokeStyle = '#111215'; ctx.lineWidth = 0.02; ctx.beginPath(); ctx.moveTo(2.94, 0.82); ctx.lineTo(2.86, 0.9); ctx.stroke();
+    ctx.fillStyle = paint; ctx.beginPath(); ctx.roundRect(2.72, 0.88, 0.18, 0.09, 0.04); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.01; ctx.stroke();
+  } else if (id === 'mako') {
+    seam(ctx, [[1.88, 0.94], [1.9, 0.5], [1.98, lo]]);
+    seam(ctx, [[2.7, 0.92], [2.74, 0.5], [2.66, lo]]);
+    if (detail) handle(ctx, 2.02, 0.82);
+    // wide rear haunch: a lit swell above the rear wheel and a shadowed waist ahead of it
+    ctx.save(); path(ctx, c.g.out); ctx.clip();
+    const hh = ctx.createRadialGradient(d.rx, d.belt - 0.12, 0.05, d.rx, d.belt - 0.2, 0.85);
+    hh.addColorStop(0, 'rgba(255,255,255,0.22)'); hh.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hh; ctx.beginPath(); ctx.ellipse(d.rx + 0.05, d.belt - 0.2, 0.8, 0.22, -0.05, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // shark gills behind the front wheel, edged in the trim colour
+    for (const gx of [2.84, 2.97, 3.1]) {
+      ctx.fillStyle = '#050706';
+      ctx.beginPath(); ctx.moveTo(gx, 0.46); ctx.lineTo(gx + 0.045, 0.46); ctx.lineTo(gx + 0.12, 0.8); ctx.lineTo(gx + 0.075, 0.8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = c.stripe ?? trim; ctx.lineWidth = 0.012;
+      ctx.beginPath(); ctx.moveTo(gx + 0.045, 0.46); ctx.lineTo(gx + 0.12, 0.8); ctx.stroke();
+    }
+    // carbon skirt with an accent line, a thin wrapped tail lamp, the near pair of the quad exits
+    ctx.fillStyle = '#101211'; ctx.fillRect(d.rx + d.r + 0.08, d.sill - 0.03, d.fx - d.rx - 2 * d.r - 0.16, 0.1);
+    ctx.fillStyle = c.stripe ?? trim; ctx.fillRect(d.rx + d.r + 0.08, d.sill + 0.06, d.fx - d.rx - 2 * d.r - 0.16, 0.012);
+    ctx.fillStyle = '#2a0707'; ctx.fillRect(0.0, 0.74, 0.2, 0.07);
+    ctx.fillStyle = '#ff2a1e'; ctx.fillRect(0.0, 0.765, 0.2, 0.022);
+    for (const u of [0.2, 0.08]) {
+      const ex = -0.07 + c.g.D.x * u, ey = 0.27 + c.g.D.y * u;
+      ctx.fillStyle = '#2e3135'; ctx.beginPath(); ctx.roundRect(ex, ey - 0.055, 0.16, 0.11, 0.04); ctx.fill();
+      ctx.fillStyle = '#c9ced3'; ctx.beginPath(); ctx.ellipse(ex, ey, 0.032, 0.058, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#060607'; ctx.beginPath(); ctx.ellipse(ex, ey, 0.021, 0.042, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    mirror(ctx, 2.6, 0.93, paint);
+  } else if (id === 'sovereign') {
+    seam(ctx, [[2.22, 0.86], [2.24, 0.45], [2.3, lo]]);
+    seam(ctx, [[3.4, 0.8], [3.44, 0.45], [3.36, lo]]);
+    if (detail) { ctx.fillStyle = 'rgba(30,26,20,0.8)'; ctx.beginPath(); ctx.roundRect(2.42, 0.7, 0.18, 0.026, 0.013); ctx.fill(); }
+    // the long scallop that runs from the front wheel back into the side intake
+    ctx.save(); path(ctx, c.g.out); ctx.clip();
+    const sg = ctx.createLinearGradient(3.6, 0, 1.5, 0);
+    sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.26)');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.moveTo(3.6, 0.56); ctx.quadraticCurveTo(2.6, 0.66, 1.5, 0.66); ctx.lineTo(1.5, 0.3); ctx.quadraticCurveTo(2.6, 0.34, 3.6, 0.42); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${0.3 + (c.lt ?? 0) * 0.2})`; ctx.lineWidth = 0.014;
+    ctx.beginPath(); ctx.moveTo(3.6, 0.57); ctx.quadraticCurveTo(2.6, 0.675, 1.5, 0.675); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#050505';
+    ctx.beginPath(); ctx.moveTo(2.06, 0.64); ctx.quadraticCurveTo(1.62, 0.67, 1.47, 0.52); ctx.lineTo(1.5, 0.35); ctx.lineTo(2.0, 0.37); ctx.quadraticCurveTo(1.86, 0.5, 2.06, 0.64); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = trim; ctx.lineWidth = 0.012;
+    for (const yy of [0.44, 0.52]) { ctx.beginPath(); ctx.moveTo(1.5, yy); ctx.lineTo(1.9, yy + 0.01); ctx.stroke(); }
+    // the channel under the flying buttress, lit along its upper edge
+    ctx.fillStyle = '#07080a';
+    ctx.beginPath(); ctx.moveTo(0.7, 0.8); ctx.quadraticCurveTo(1.3, 0.86, 1.78, 0.94); ctx.lineTo(1.74, 0.87); ctx.quadraticCurveTo(1.3, 0.81, 0.9, 0.78); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = lit(paint, 0.3); ctx.lineWidth = 0.012;
+    ctx.beginPath(); ctx.moveTo(0.7, 0.805); ctx.quadraticCurveTo(1.3, 0.865, 1.78, 0.945); ctx.stroke();
+    // a fine gold line along the sill, and the rear light blade wrapping the tail
+    ctx.fillStyle = c.stripe ?? trim; ctx.fillRect(d.rx + d.r + 0.1, lo + 0.02, d.fx - d.rx - 2 * d.r - 0.2, 0.012);
+    ctx.fillStyle = 'rgba(255,40,40,0.25)'; ctx.fillRect(0.0, 0.69, 0.55, 0.06);
+    ctx.fillStyle = '#ff3a30'; ctx.beginPath(); ctx.moveTo(0.0, 0.705); ctx.lineTo(0.55, 0.718); ctx.lineTo(0.55, 0.726); ctx.lineTo(0.0, 0.735); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd6cc'; ctx.fillRect(0.0, 0.716, 0.3, 0.008);
+    if (detail) {
+      // a small enamelled crest on the front fender
+      ctx.fillStyle = trim;
+      ctx.beginPath(); ctx.moveTo(3.68, 0.66); ctx.lineTo(3.78, 0.66); ctx.lineTo(3.78, 0.6); ctx.quadraticCurveTo(3.73, 0.55, 3.73, 0.55); ctx.quadraticCurveTo(3.68, 0.58, 3.68, 0.6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#1d2a4a'; ctx.beginPath(); ctx.arc(3.73, 0.615, 0.022, 0, Math.PI * 2); ctx.fill();
+    }
+    mirror(ctx, 3.28, 0.8, paint);
   } else {
     seam(ctx, [[2.04, 0.96], [2.06, 0.5], [2.15, lo]]);
     seam(ctx, [[3.02, 0.94], [3.06, 0.55], [2.98, lo]]);
@@ -1225,7 +1467,7 @@ function sideGlass(c: Ctx) {
     gr.addColorStop(0, 'rgba(126,164,190,0.55)'); gr.addColorStop(0.4, 'rgba(46,70,92,0.32)'); gr.addColorStop(1, 'rgba(10,16,22,0.35)');
     ctx.fillStyle = gr; ctx.fillRect(xmin, ymin, xmax - xmin, ymax - ymin);
     // two crisp reflection bands from the stage light
-    ctx.fillStyle = 'rgba(232,242,250,0.2)';
+    ctx.fillStyle = `rgba(232,242,250,${0.2 + (c.lt ?? 0) * 0.14})`;
     ctx.beginPath(); ctx.moveTo(xmin + 0.1, ymax); ctx.lineTo(xmin + 0.3, ymax); ctx.lineTo(xmin + 0.14, ymin); ctx.lineTo(xmin - 0.06, ymin); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(232,242,250,0.1)';
     ctx.beginPath(); ctx.moveTo(xmin + 0.36, ymax); ctx.lineTo(xmin + 0.42, ymax); ctx.lineTo(xmin + 0.26, ymin); ctx.lineTo(xmin + 0.2, ymin); ctx.closePath(); ctx.fill();
@@ -1236,7 +1478,7 @@ function sideGlass(c: Ctx) {
 function signatureStripe(c: Ctx) {
   // earned signature finishes add a contrasting accent line under the beltline (hot hatch uses its own stripe)
   const { ctx, d, id } = c;
-  if (id === 'hothatch' || id === 'muscle' || id === 'tourer' || id === 'tuner' || id === 'super') return;
+  if (id === 'hothatch' || id === 'muscle' || id === 'tourer' || id === 'tuner' || id === 'super' || id === 'vireo' || id === 'mako' || id === 'sovereign') return;
   ctx.fillStyle = c.stripe!;
   ctx.beginPath(); ctx.moveTo(0.06, d.belt - 0.13); ctx.lineTo(d.L - 0.15, d.belt - 0.18); ctx.lineTo(d.L - 0.15, d.belt - 0.22); ctx.lineTo(0.06, d.belt - 0.17); ctx.closePath(); ctx.fill();
 }
@@ -1291,7 +1533,8 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     }
   };
   if (id === 'muscle') stripes([[0.34, 0.44], [0.56, 0.66]], c.stripe ?? trim);
-  if (id === 'muscle') {
+  const open = (c.hood ?? 0) > 0;
+  if (id === 'muscle' && !open) {
     // sculpted hood scoop on the hood plane, with its dark intake facing forward
     const y0 = 0.915;
     const base = (x: number, u: number) => pt(x + D.x * u, y0 - (x - 3.1) * 0.033 + D.y * u);
@@ -1364,7 +1607,7 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
   if (id === 'gt') {
     // louvres on the hood plane over the front wheel
     ctx.strokeStyle = 'rgba(5,6,8,0.85)'; ctx.lineWidth = 0.022;
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < (open ? 0 : 5); k++) {
       const x = 3.55 + k * 0.1, y = ty(x);
       ctx.beginPath(); ctx.moveTo(x + D.x * 0.18, y + D.y * 0.18); ctx.lineTo(x + D.x * 0.42, y + D.y * 0.42); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x + D.x * 0.58, y + D.y * 0.58); ctx.lineTo(x + D.x * 0.82, y + D.y * 0.82); ctx.stroke();
@@ -1387,12 +1630,14 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     ctx.fillStyle = c.stripe ?? trim; ctx.fillRect(-0.12, 1.36, 0.76, 0.03);
   }
   if (id === 'proto') {
-    // shark fin along the centreline from the roof to the tail
-    const u = 0.5;
-    const fin: P[] = [pt(2.2, 1.12), pt(0.55, 1.33), pt(0.2, 1.33), pt(0.2, 0.96), pt(1.4, 0.99)].map((p) => pt(p.x + D.x * u, p.y + D.y * u));
-    fillPts(ctx, fin, lit(paint, -0.08));
-    ctx.strokeStyle = lit(paint, 0.45); ctx.lineWidth = 0.012;
-    ctx.beginPath(); ctx.moveTo(fin[0].x, fin[0].y); ctx.lineTo(fin[1].x, fin[1].y); ctx.stroke();
+    // shark fin along the centreline from the roof to the tail (it lifts with the engine cover)
+    if (!open) {
+      const u = 0.5;
+      const fin: P[] = [pt(2.2, 1.12), pt(0.55, 1.33), pt(0.2, 1.33), pt(0.2, 0.96), pt(1.4, 0.99)].map((p) => pt(p.x + D.x * u, p.y + D.y * u));
+      fillPts(ctx, fin, lit(paint, -0.08));
+      ctx.strokeStyle = lit(paint, 0.45); ctx.lineWidth = 0.012;
+      ctx.beginPath(); ctx.moveTo(fin[0].x, fin[0].y); ctx.lineTo(fin[1].x, fin[1].y); ctx.stroke();
+    }
     // full-width wing with tall endplates
     const wing: P[] = [pt(-0.1, 1.2), pt(0.56, 1.24), pt(0.54, 1.29), pt(-0.08, 1.27)];
     extrude(ctx, wing, null, D, (n) => (n.y > 0.4 ? '#2a2e34' : '#0c0d10'));
@@ -1403,6 +1648,92 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     // diffuser fins under the tail
     ctx.fillStyle = '#0b0c0f';
     for (let k = 0; k < 4; k++) ctx.fillRect(-0.04 + k * 0.06, 0.04, 0.02, 0.14);
+  }
+  /** A patch on the top planes between x0..x1 and u0..u1 (across the car), lifted by `lift`. */
+  const topPatch = (x0: number, x1: number, u0: number, u1: number, lift = 0, n = 8): P[] => {
+    const near: P[] = [], far: P[] = [];
+    for (let k = 0; k <= n; k++) {
+      const x = x0 + ((x1 - x0) * k) / n, y = ty(x) + lift;
+      near.push(pt(x + D.x * u0, y + D.y * u0)); far.push(pt(x + D.x * u1, y + D.y * u1));
+    }
+    return [...near, ...far.reverse()];
+  };
+  /** A line across the car on the top plane at x, from u0 to u1. */
+  const across = (x: number, u0: number, u1: number, lift = 0) => {
+    const y = ty(x) + lift;
+    ctx.beginPath(); ctx.moveTo(x + D.x * u0, y + D.y * u0); ctx.lineTo(x + D.x * u1, y + D.y * u1); ctx.stroke();
+  };
+  if (id === 'vireo') {
+    if (!open) {
+      // glass engine cover: the red V10 cam covers show through tinted, louvred glass
+      fillPts(ctx, topPatch(0.66, 1.42, 0.12, 0.88), '#0c0e12');
+      for (const u of [0.3, 0.7]) fillPts(ctx, topPatch(0.76, 1.32, u - 0.09, u + 0.09, -0.01, 6), lit(engineFor(id).col, -0.25));
+      fillPts(ctx, topPatch(0.76, 1.32, 0.44, 0.56, -0.01, 6), '#2a2c31');
+      ctx.strokeStyle = 'rgba(210,225,235,0.28)'; ctx.lineWidth = 0.014;
+      for (let k = 0; k < 7; k++) across(0.72 + k * 0.1, 0.12, 0.88, 0.005);
+      const gl = ctx.createLinearGradient(0.66, 0, 1.42, 0);
+      gl.addColorStop(0, 'rgba(150,190,220,0.05)'); gl.addColorStop(0.6, `rgba(190,220,240,${0.2 + (c.lt ?? 0) * 0.15})`); gl.addColorStop(1, 'rgba(150,190,220,0.05)');
+      fillPts(ctx, topPatch(0.66, 1.42, 0.12, 0.88), gl);
+      // frunk vents
+      for (const [u0, u1] of [[0.18, 0.4], [0.6, 0.82]] as const) fillPts(ctx, topPatch(3.55, 3.85, u0, u1, 0, 3), '#08090b');
+    }
+    // high twin exits through the rear deck, just ahead of the ducktail
+    for (const u of [0.58, 0.42]) {
+      const ex = 0.38 + D.x * u, ey = ty(0.38) + D.y * u + 0.03;
+      ctx.fillStyle = '#2b2d31'; ctx.beginPath(); ctx.roundRect(ex - 0.02, ey - 0.04, 0.14, 0.08, 0.03); ctx.fill();
+      ctx.fillStyle = '#c7ccd1'; ctx.beginPath(); ctx.ellipse(ex - 0.02, ey, 0.024, 0.045, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#4b3a6a'; ctx.beginPath(); ctx.ellipse(ex - 0.02, ey, 0.017, 0.035, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#050506'; ctx.beginPath(); ctx.ellipse(ex - 0.02, ey, 0.011, 0.025, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // ducktail, extruded full width, edged in the trim colour
+    const dt: P[] = [pt(0.01, 0.86), pt(0.34, 0.87), pt(0.31, 0.93), pt(0.02, 0.97)];
+    extrude(ctx, dt, null, D, (n) => (n.y > 0.4 ? lit(paint, 0.15) : lit(paint, -0.25)));
+    fillPts(ctx, dt, lit(paint, -0.05));
+    ctx.strokeStyle = c.stripe ?? trim; ctx.lineWidth = 0.014; ctx.beginPath(); ctx.moveTo(0.02, 0.965); ctx.lineTo(0.31, 0.93); ctx.stroke();
+  }
+  if (id === 'mako') {
+    if (!open) {
+      // the power bulge down the middle of the long hood, flanked by two heat extractors over the turbos
+      const lift = 0.05;
+      const sideA = topPatch(2.95, 4.0, 0.33, 0.33, 0, 8), topB = topPatch(2.95, 4.0, 0.33, 0.67, lift, 8);
+      fillPts(ctx, [...sideA.slice(0, 9), ...topB.slice(0, 9).reverse()], lit(paint, -0.12));
+      fillPts(ctx, topB, lit(paint, 0.2 + (c.lt ?? 0) * 0.1));
+      ctx.strokeStyle = lit(paint, 0.5); ctx.lineWidth = 0.012;
+      ctx.beginPath(); topB.slice(0, 9).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+      for (const [u0, u1] of [[0.1, 0.27], [0.73, 0.9]] as const) {
+        fillPts(ctx, topPatch(3.25, 3.75, u0, u1, 0, 4), '#060707');
+        ctx.strokeStyle = lit(paint, 0.1); ctx.lineWidth = 0.016;
+        for (let k = 0; k < 5; k++) across(3.29 + k * 0.1, u0, u1, 0.004);
+      }
+    }
+    // carbon roof panel
+    fillPts(ctx, topPatch(1.3, 2.05, 0.25, 0.75, 0.002, 6), '#141615');
+    // kicked-up tail spoiler, extruded across the width
+    const sp: P[] = [pt(0.0, 0.92), pt(0.4, 0.92), pt(0.36, 0.97), pt(0.02, 1.01)];
+    extrude(ctx, sp, null, D, (n) => (n.y > 0.4 ? lit(paint, 0.18) : lit(paint, -0.25)));
+    fillPts(ctx, sp, lit(paint, -0.04));
+    ctx.strokeStyle = c.stripe ?? trim; ctx.lineWidth = 0.014; ctx.beginPath(); ctx.moveTo(0.02, 1.005); ctx.lineTo(0.36, 0.97); ctx.stroke();
+  }
+  if (id === 'sovereign') {
+    if (!open) {
+      // louvred engine deck between the flying buttresses, gold strakes across it
+      fillPts(ctx, topPatch(0.45, 1.75, 0.16, 0.84), '#0d0e10');
+      ctx.strokeStyle = mix(trim, '#000000', 0.25); ctx.lineWidth = 0.016;
+      for (let k = 0; k < 11; k++) across(0.52 + k * 0.11, 0.18, 0.82, 0.004);
+      // two slim vents in the front hood
+      for (const [u0, u1] of [[0.2, 0.36], [0.64, 0.8]] as const) {
+        fillPts(ctx, topPatch(3.95, 4.3, u0, u1, 0, 3), '#0a0a0b');
+        ctx.strokeStyle = trim; ctx.lineWidth = 0.01; across(3.95, u0, u1, 0.003);
+      }
+    }
+    // the glass roof
+    const gr = ctx.createLinearGradient(2.2, 0, 2.75, 0);
+    gr.addColorStop(0, '#1b2a36'); gr.addColorStop(0.5, `rgba(120,150,175,${0.9})`); gr.addColorStop(1, '#16222c');
+    fillPts(ctx, topPatch(2.15, 2.72, 0.18, 0.82, 0.002, 6), gr);
+    // a slim lip spoiler on the long tail
+    const lp: P[] = [pt(0.03, 0.8), pt(0.34, 0.82), pt(0.33, 0.855), pt(0.04, 0.85)];
+    extrude(ctx, lp, null, D, (n) => (n.y > 0.4 ? lit(paint, 0.12) : lit(paint, -0.2)));
+    fillPts(ctx, lp, lit(paint, -0.06));
   }
   // ---- bumpers: a short extruded lip beyond each end, plus the wrap on the near side
   const bumper = (end: 'front' | 'rear', y0: number, y1: number, wrap: number, face: string | CanvasGradient, top: string, frontFace: string, sag = 0) => {
@@ -1535,6 +1866,50 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     fillPts(ctx, quadFP(g, 0.0, 1.0, 0.1, 0.15), '#0b0c0f');
     fillPts(ctx, quadFP(g, 0.0, 1.0, 0.475, 0.5), lampOn ? '#ffffff' : '#e9fffb');
     fillPts(ctx, quadFP(g, 0.0, 1.0, 0.455, 0.475), lampOn ? 'rgba(80,255,225,0.95)' : 'rgba(54,240,208,0.7)');
+  } else if (id === 'vireo') {
+    // two deep lower intakes with mesh, a trim-coloured splitter, and slim slanted lamps with a vertical fang DRL
+    for (const [u0, u1] of [[0.04, 0.34], [0.66, 0.96]] as const) {
+      fillPts(ctx, [fp(g, u0, 0.35), fp(g, u1, 0.32), fp(g, u1, 0.19), fp(g, u0, 0.19)], '#050506');
+      for (let k = 0; k < 3; k++) fillPts(ctx, quadFP(g, u0 + 0.02, u1 - 0.02, 0.22 + k * 0.035, 0.228 + k * 0.035), '#24262a');
+    }
+    fillPts(ctx, quadFP(g, 0.0, 1.0, 0.13, 0.17), c.stripe ?? trim);
+    for (const [u0, u1, s] of [[0.02, 0.26, 1], [0.74, 0.98, -1]] as const) {
+      const a = s > 0 ? 0.4 : 0.43, b = s > 0 ? 0.43 : 0.4;
+      fillPts(ctx, [fp(g, u0, a), fp(g, u1, b), fp(g, u1, b + 0.06), fp(g, u0, a + 0.06)], '#0d0f12');
+      fillPts(ctx, [fp(g, u0 + 0.02, a + 0.015), fp(g, u1 - 0.02, b + 0.015), fp(g, u1 - 0.02, b + 0.045), fp(g, u0 + 0.02, a + 0.045)], lens(false));
+      const uf = s > 0 ? u1 - 0.05 : u0 + 0.05;
+      fillPts(ctx, quadFP(g, uf - 0.01, uf + 0.01, 0.36, (a + b) / 2 + 0.05), lampOn ? '#ffffff' : '#f0f6ff');
+    }
+  } else if (id === 'mako') {
+    // a huge mesh mouth split in three, slim angry lamps under trim-coloured brows, a carbon splitter
+    fillPts(ctx, quadFP(g, 0.05, 0.95, 0.2, 0.45), '#040505');
+    ctx.strokeStyle = '#1d2120'; ctx.lineWidth = 0.012;
+    for (let k = 0; k < 9; k++) {
+      const a = fp(g, 0.07 + k * 0.1, 0.22), b = fp(g, 0.12 + k * 0.1, 0.43);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    for (const u of [0.36, 0.64]) fillPts(ctx, quadFP(g, u - 0.015, u + 0.015, 0.2, 0.45), lit(paint, -0.1));
+    fillPts(ctx, quadFP(g, -0.02, 1.02, 0.13, 0.18), '#0e100f');
+    fillPts(ctx, quadFP(g, 0.0, 1.0, 0.175, 0.185), c.stripe ?? trim);
+    for (const [u0, u1, s] of [[0.02, 0.27, 1], [0.73, 0.98, -1]] as const) {
+      const a = s > 0 ? 0.5 : 0.53, b = s > 0 ? 0.53 : 0.5;
+      fillPts(ctx, [fp(g, u0, a), fp(g, u1, b), fp(g, u1, b + 0.055), fp(g, u0, a + 0.055)], '#0b0d0c');
+      fillPts(ctx, [fp(g, u0 + 0.03, a + 0.012), fp(g, u1 - 0.03, b + 0.012), fp(g, u1 - 0.03, b + 0.04), fp(g, u0 + 0.03, a + 0.04)], lens(false));
+      fillPts(ctx, [fp(g, u0, a + 0.06), fp(g, u1, b + 0.06), fp(g, u1, b + 0.075), fp(g, u0, a + 0.075)], c.stripe ?? trim);
+    }
+  } else if (id === 'sovereign') {
+    // the front light blade across the whole nose, lamp pods tucked under its ends, a wide grille of fine slats
+    fillPts(ctx, quadFP(g, 0.1, 0.9, 0.18, 0.36), '#060607');
+    for (let k = 0; k < 5; k++) fillPts(ctx, quadFP(g, 0.12, 0.88, 0.205 + k * 0.032, 0.211 + k * 0.032), mix(trim, '#000000', 0.35));
+    fillPts(ctx, quadFP(g, -0.01, 1.01, 0.11, 0.15), '#0c0c0d');
+    for (const [u0, u1] of [[0.02, 0.2], [0.8, 0.98]] as const) {
+      fillPts(ctx, quadFP(g, u0, u1, 0.37, 0.425), '#0d0e10');
+      fillPts(ctx, quadFP(g, u0 + 0.02, u0 + 0.08, 0.38, 0.415), lens(false));
+      fillPts(ctx, quadFP(g, u1 - 0.08, u1 - 0.02, 0.38, 0.415), lens(false));
+    }
+    fillPts(ctx, quadFP(g, 0.0, 1.0, 0.43, 0.47), lampOn ? 'rgba(255,244,220,0.6)' : 'rgba(241,226,190,0.35)');
+    fillPts(ctx, quadFP(g, 0.0, 1.0, 0.443, 0.457), lampOn ? '#ffffff' : '#fbf3df');
+    fillPts(ctx, ellipseFP(g, 0.5, 0.52, 0.035, 0.03), trim);
   } else {
     // full-width dark grille with quad round headlights inset in chrome bezels and amber parking lamps
     fillPts(ctx, quadFP(g, 0.0, 1.0, 0.5, 0.86), '#d3d8dc');
@@ -1583,17 +1958,233 @@ function beam(c: Ctx, k: number) {
   ctx.beginPath(); ctx.moveTo(p.x, p.y + 0.12); ctx.lineTo(p.x + 4.5, p.y + 0.5); ctx.lineTo(p.x + 4.5, -0.1); ctx.lineTo(p.x, p.y - 0.15); ctx.closePath(); ctx.fill();
 }
 
+/** Nitro trail per car: exit height(s), length scale and colours (light trails on the hybrids, flames elsewhere). */
+const TRAILS: Record<string, { ys: number[]; len: number; cols: [string, string, string, string]; x0?: number }> = {
+  super: { ys: [0.3], len: 2.2, cols: ['rgba(255,255,255,0.95)', 'rgba(190,140,255,0.9)', 'rgba(255,80,190,0.45)', 'rgba(120,60,255,0)'] },
+  proto: { ys: [0.3], len: 2.2, cols: ['rgba(255,255,255,0.95)', 'rgba(90,255,230,0.9)', 'rgba(60,140,255,0.45)', 'rgba(40,90,255,0)'] },
+  // Vireo: short, hot blue-white flames out of the high deck exits
+  vireo: { ys: [0.98], len: 0.8, x0: 0.32, cols: ['rgba(240,250,255,0.98)', 'rgba(110,170,255,0.9)', 'rgba(255,120,60,0.5)', 'rgba(255,80,30,0)'] },
+  // Mako: twin anti-lag fireballs from the quad exits
+  mako: { ys: [0.27, 0.3], len: 1.0, cols: ['rgba(255,250,220,0.98)', 'rgba(255,190,60,0.92)', 'rgba(255,90,30,0.5)', 'rgba(200,40,10,0)'] },
+  // Sovereign: a long champagne light trail from the hybrid system
+  sovereign: { ys: [0.34], len: 2.4, cols: ['rgba(255,255,255,0.95)', 'rgba(255,226,160,0.9)', 'rgba(255,170,90,0.4)', 'rgba(255,200,120,0)'] },
+};
+
 function flame(c: Ctx, k: number, phase: number) {
   const { ctx } = c;
-  const surge = c.id === 'super' || c.id === 'proto'; // light trails instead of flames: violet Surge, cyan plasma
-  const len = (0.9 + 0.5 * k + 0.08 * Math.sin(phase * 5)) * (surge ? 2.2 : 1);
-  const y = 0.3;
-  const gr = ctx.createLinearGradient(0, 0, -len, 0);
-  if (c.id === 'proto') { gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.2, 'rgba(90,255,230,0.9)'); gr.addColorStop(0.6, 'rgba(60,140,255,0.45)'); gr.addColorStop(1, 'rgba(40,90,255,0)'); }
-  else if (surge) { gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.2, 'rgba(190,140,255,0.9)'); gr.addColorStop(0.6, 'rgba(255,80,190,0.45)'); gr.addColorStop(1, 'rgba(120,60,255,0)'); }
+  const tr = TRAILS[c.id];
+  const len = (0.9 + 0.5 * k + 0.08 * Math.sin(phase * 5)) * (tr?.len ?? 1);
+  const x0 = (tr?.x0 ?? 0) + 0.02;
+  const gr = ctx.createLinearGradient(x0, 0, x0 - len, 0);
+  if (tr) { gr.addColorStop(0, tr.cols[0]); gr.addColorStop(0.2, tr.cols[1]); gr.addColorStop(0.6, tr.cols[2]); gr.addColorStop(1, tr.cols[3]); }
   else { gr.addColorStop(0, 'rgba(255,255,240,0.95)'); gr.addColorStop(0.25, k > 1 ? 'rgba(255,214,94,0.9)' : 'rgba(120,205,255,0.9)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); }
   ctx.fillStyle = gr;
-  ctx.beginPath(); ctx.moveTo(0.02, y + 0.07); ctx.quadraticCurveTo(-len * 0.5, y + 0.12, -len, y); ctx.quadraticCurveTo(-len * 0.5, y - 0.1, 0.02, y - 0.06); ctx.closePath(); ctx.fill();
+  (tr?.ys ?? [0.3]).forEach((y, i) => {
+    const l = len * (i ? 0.8 + 0.2 * Math.sin(phase * 7) : 1);
+    ctx.beginPath(); ctx.moveTo(x0, y + 0.07); ctx.quadraticCurveTo(x0 - l * 0.5, y + 0.12, x0 - l, y); ctx.quadraticCurveTo(x0 - l * 0.5, y - 0.1, x0, y - 0.06); ctx.closePath(); ctx.fill();
+  });
+}
+
+// ---------------------------------------------------------------- service bay: engine bay, hood, focus
+
+/** Points along the top planes over the engine, at u across the car (0 near side → 1 far side), dropped by dy. */
+function bayEdge(g: Geo, e: EngineDef, u: number, dy = 0, n = 10): P[] {
+  const pts: P[] = [];
+  for (let k = 0; k <= n; k++) { const x = e.x0 + ((e.x1 - e.x0) * k) / n; pts.push(pt(x + g.D.x * u, topAt(g, x) + g.D.y * u + dy)); }
+  return pts;
+}
+const bayPoly = (g: Geo, e: EngineDef, u0 = 0.05, u1 = 0.95) => [...bayEdge(g, e, u0), ...bayEdge(g, e, u1).reverse()];
+const hoodAngle = (e: EngineDef, amount: number) => Math.max(0, Math.min(1, amount)) * (e.mid ? 1.0 : 1.15);
+
+/** The lid (hood / engine cover) rotated open about its hinge: near-edge points at u, in car metres. */
+function lidEdge(g: Geo, e: EngineDef, amount: number, u: number): P[] {
+  const pts = bayEdge(g, e, 0, 0, 8);
+  if (e.mid) pts.reverse(); // mid-engine covers hinge at the cabin end and lift the tail end
+  const H = pts[0];
+  const a = hoodAngle(e, amount) * (e.mid ? -1 : 1);
+  const cs = Math.cos(a), sn = Math.sin(a);
+  return pts.map((p) => { const dx = p.x - H.x, dy = p.y - H.y; return pt(H.x + dx * cs - dy * sn + g.D.x * u, H.y + dx * sn + dy * cs + g.D.y * u); });
+}
+
+function engineBay(c: Ctx, amount: number) {
+  const { ctx, g, id, paint, detail } = c;
+  const e = engineFor(id);
+  const D = g.D;
+  const ty = (x: number) => topAt(g, x);
+  const P3 = (x: number, u: number, dy: number) => pt(x + D.x * u, ty(x) + D.y * u + dy);
+  const strip = (xa: number, xb: number, u0: number, u1: number, dy: number, fill: string | CanvasGradient, n = 5) => {
+    const a: P[] = [], b: P[] = [];
+    for (let k = 0; k <= n; k++) { const x = xa + ((xb - xa) * k) / n; a.push(P3(x, u0, dy)); b.push(P3(x, u1, dy)); }
+    fillPts(ctx, [...a, ...b.reverse()], fill);
+    return a;
+  };
+  const bay = bayPoly(g, e);
+  // the bay: a dark cavity, the far inner fender wall in body colour
+  const fl = ctx.createLinearGradient(0, ty(e.x0) + D.y, 0, ty(e.x0) - 0.1);
+  fl.addColorStop(0, '#22252b'); fl.addColorStop(1, '#08090b');
+  fillPts(ctx, bay, fl);
+  ctx.save();
+  path(ctx, bay); ctx.clip();
+  const far = bayEdge(g, e, 0.95);
+  fillPts(ctx, [...far, ...far.map((p) => pt(p.x, p.y - 0.11)).reverse()], lit(paint, -0.38));
+  ctx.restore();
+  // the engine itself stands proud of the fender line, so it reads in a side view
+  const span = e.x1 - e.x0;
+  const ea = e.mid ? e.x0 + 0.08 : e.x0 + 0.1, eb = e.mid ? e.x1 - 0.08 : e.x0 + span * 0.72;
+  strip(ea - 0.05, eb + 0.05, 0.16, 0.84, -0.02, '#050607');
+  const vee = e.kind[0] === 'v';
+  const cyl = { i3: 3, i4: 4, v6: 3, v8: 4, v10: 5, v12: 6 }[e.kind];
+  const banks = vee ? [0.3, 0.7] : [0.5];
+  const bw = vee ? 0.1 : 0.12;
+  if (vee) {
+    // intake plenum between the banks, with velocity stacks on the big engines
+    strip(ea + 0.04, eb - 0.04, 0.41, 0.59, 0.07, '#2c3035');
+    strip(ea + 0.04, eb - 0.04, 0.41, 0.41, 0.0, '#2c3035');
+    if (e.kind === 'v10' || e.kind === 'v12') {
+      for (let k = 0; k < cyl; k++) {
+        const x = ea + 0.08 + ((eb - ea - 0.16) * (k + 0.5)) / cyl;
+        for (const u of [0.45, 0.55]) { const p = P3(x, u, 0.09); ctx.fillStyle = '#c4c9ce'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.028, 0.016, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#121316'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.017, 0.009, 0, 0, Math.PI * 2); ctx.fill(); }
+      }
+    }
+  } else strip(ea + 0.05, eb - 0.05, 0.24, 0.34, 0.03, '#3a3e44');
+  for (const u of banks) {
+    // cam covers in the engine's colour, lit along the top edge, coil packs across them
+    const lo = strip(ea, eb, u - bw, u - bw, -0.02, e.col);
+    const edge = strip(ea, eb, u - bw, u + bw, 0.05, e.col);
+    fillPts(ctx, [...lo, ...edge.slice().reverse()], lit(e.col, -0.35));
+    strip(ea, eb, u - bw, u - bw * 0.4, 0.05, lit(e.col, 0.3));
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.012;
+    ctx.beginPath(); edge.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+    if (detail) for (let k = 0; k < cyl; k++) {
+      const x = ea + ((eb - ea) * (k + 0.5)) / cyl, p = P3(x, u, 0.055);
+      ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.03, 0.022, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (e.turbo) {
+    // turbochargers: heat-tinted housings at the hot end of the engine
+    const tx = e.mid ? ea - 0.02 : eb + 0.12;
+    for (const u of e.turbo > 1 ? [0.82, 0.18] : [0.2]) {
+      const p = P3(tx, u, 0.03);
+      const tg = ctx.createRadialGradient(p.x - 0.015, p.y + 0.015, 0.005, p.x, p.y, 0.08);
+      tg.addColorStop(0, '#f2b066'); tg.addColorStop(0.45, '#a8683c'); tg.addColorStop(1, '#3d3a37');
+      ctx.fillStyle = tg; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.08, 0.06, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.028, 0.021, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (e.hybrid) {
+    // orange high-voltage cables and an inverter box for the hybrid system
+    strip(e.mid ? e.x1 - 0.2 : e.x0 + 0.02, e.mid ? e.x1 - 0.05 : e.x0 + 0.16, 0.2, 0.8, -0.02, '#3b4452', 2);
+    ctx.strokeStyle = '#ff7a1a'; ctx.lineWidth = 0.02; ctx.lineCap = 'round';
+    for (const u of [0.12, 0.88]) { const a = P3(ea, u, -0.03), b = P3((ea + eb) / 2, u + 0.02, -0.05), q = P3(eb, u, -0.03); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(b.x, b.y, q.x, q.y); ctx.stroke(); }
+  }
+  if (!e.mid) {
+    // radiator across the front of the bay, strut-tower caps either side
+    strip(e.x1 - 0.13, e.x1 - 0.03, 0.08, 0.92, -0.03, '#15181b', 2);
+    ctx.strokeStyle = 'rgba(120,128,136,0.35)'; ctx.lineWidth = 0.006;
+    for (let k = 1; k < 8; k++) { const a = P3(e.x1 - 0.13, 0.08 + k * 0.105, -0.03), b = P3(e.x1 - 0.03, 0.08 + k * 0.105, -0.03); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  }
+  const sx = e.mid ? e.x0 + 0.12 : e.x1 - 0.3;
+  for (const u of [0.1, 0.9]) { const p = P3(sx, u, -0.01); ctx.fillStyle = '#8e959c'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.05, 0.035, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#4b5056'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.02, 0.014, 0, 0, Math.PI * 2); ctx.fill(); }
+  if (detail) {
+    // fluid caps: oil (yellow) and coolant (blue)
+    for (const [u, col, dx] of [[0.5, '#f1c232', 0.1], [0.86, '#3b8fe0', -0.2]] as const) {
+      const p = P3(Math.min(e.x1 - 0.05, Math.max(e.x0 + 0.05, (ea + eb) / 2 + dx)), u, -0.005);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.025, 0.018, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.014; path(ctx, bay); ctx.stroke();
+
+  // the lid, rotated about its hinge: its top (paint, glass or louvres) or its padded underside faces us
+  const a = hoodAngle(e, amount) * (e.mid ? -1 : 1);
+  const nrm = { x: -Math.sin(a), y: Math.cos(a) };
+  const topSide = nrm.x * D.x + nrm.y * D.y > 0;
+  const near = lidEdge(g, e, amount, 0.02), farE = lidEdge(g, e, amount, 0.98);
+  const lid = [...near, ...farE.slice().reverse()];
+  // gas strut from the bay to the lid
+  const sp = P3((e.x0 + e.x1) / 2, 0.1, -0.03), lp = lidEdge(g, e, amount, 0.1)[4];
+  ctx.strokeStyle = '#a3aab0'; ctx.lineWidth = 0.016; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(lp.x, lp.y); ctx.stroke();
+  if (topSide) {
+    fillPts(ctx, lid, e.lid === 'glass' ? 'rgba(18,24,30,0.92)' : lit(paint, 0.1 + (c.lt ?? 0) * 0.1));
+    if (e.lid) {
+      ctx.strokeStyle = e.lid === 'glass' ? 'rgba(200,220,235,0.3)' : 'rgba(0,0,0,0.65)'; ctx.lineWidth = 0.016;
+      for (let k = 2; k < near.length - 1; k++) {
+        const p0 = lidEdge(g, e, amount, 0.15)[k], p1 = lidEdge(g, e, amount, 0.85)[k];
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+      }
+    }
+  } else {
+    fillPts(ctx, lid, '#1a1c20');
+    const pad = [...lidEdge(g, e, amount, 0.14).slice(1, -1), ...lidEdge(g, e, amount, 0.86).slice(1, -1).reverse()];
+    fillPts(ctx, pad, '#2c2f34');
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.012;
+    for (let k = 2; k < near.length - 1; k += 2) {
+      const p0 = lidEdge(g, e, amount, 0.14)[k], p1 = lidEdge(g, e, amount, 0.86)[k];
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+    }
+  }
+  // lid edge thickness in body colour
+  ctx.strokeStyle = lit(paint, -0.3); ctx.lineWidth = 0.03; ctx.lineJoin = 'round';
+  ctx.beginPath(); near.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+}
+
+const FOCUS = '255,196,87';
+function glowPath(ctx: CanvasRenderingContext2D, trace: () => void, fill = false) {
+  if (fill) { trace(); ctx.fillStyle = `rgba(${FOCUS},0.16)`; ctx.fill(); }
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (const [w2, a] of [[0.09, 0.12], [0.05, 0.25], [0.018, 0.95]] as const) {
+    trace(); ctx.strokeStyle = `rgba(${FOCUS},${a})`; ctx.lineWidth = w2; ctx.stroke();
+  }
+}
+
+function focusOverlay(c: Ctx, which: 'engine' | 'wheels' | 'body') {
+  const { ctx, g, d, id } = c;
+  if (which === 'engine') {
+    const e = engineFor(id);
+    const bay = bayPoly(g, e, 0, 1);
+    glowPath(ctx, () => path(ctx, bay), true);
+  } else if (which === 'wheels') {
+    for (const wx of [d.rx, d.fx]) glowPath(ctx, () => { ctx.beginPath(); ctx.arc(wx, d.r, d.r * 1.1, 0, Math.PI * 2); }, true);
+  } else glowPath(ctx, () => path(ctx, g.out));
+}
+
+/** A tappable area on the canvas, in the same pixels as drawCar's x, y, w (top-left origin). */
+export interface ServiceZone { x: number; y: number; w: number; h: number }
+export interface ServiceZones {
+  /** hood / engine cover (includes the raised lid when `hood` > 0) */
+  engine: ServiceZone;
+  /** the near-side wheels: [rear, front] */
+  wheels: [ServiceZone, ServiceZone];
+  /** the whole car body (overlaps the others: test engine and wheels first) */
+  body: ServiceZone;
+}
+
+function boxOf(pts: P[], x: number, y: number, k: number, pad = 0): ServiceZone {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+  return { x: x + (x0 - pad) * k, y: y - (y1 + pad) * k, w: (x1 - x0 + 2 * pad) * k, h: (y1 - y0 + 2 * pad) * k };
+}
+
+/**
+ * Hit boxes of the engine (hood / engine cover), the two near wheels and the body for a car drawn with
+ * drawCar(ctx, id, x, y, w, …). Same pixel space as the draw call. Pass the same `hood` amount you draw with so
+ * the engine box covers the raised lid.
+ */
+export function serviceZones(id: CarId | string, x: number, y: number, w: number, hood = 0): ServiceZones {
+  const d = defFor(id), g = geometry(id), e = engineFor(id);
+  const k = w / d.L;
+  const eng = bayPoly(g, e, 0, 1);
+  if (hood > 0) eng.push(...lidEdge(g, e, hood, 0), ...lidEdge(g, e, hood, 1));
+  const wheelBox = (wx: number) => boxOf([pt(wx - d.r, 0), pt(wx + d.r, 2 * d.r)], x, y, k, 0.04);
+  const body = boxOf([...g.out, ...g.out.map((p) => pt(p.x + g.D.x, p.y + g.D.y))], x, y, k);
+  return { engine: boxOf(eng, x, y, k, 0.06), wheels: [wheelBox(d.rx), wheelBox(d.fx)], body };
+}
+
+/** Which service area is under a point (engine and wheels win over the body), or null. */
+export function serviceZoneAt(z: ServiceZones, px: number, py: number): 'engine' | 'wheels' | 'body' | null {
+  const inside = (b: ServiceZone) => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
+  if (inside(z.engine)) return 'engine';
+  if (z.wheels.some(inside)) return 'wheels';
+  return inside(z.body) ? 'body' : null;
 }
 
 // ---------------------------------------------------------------- cover & silhouette
@@ -1653,7 +2244,8 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
   if (o.cache && !o.silhouette && !o.cover) return drawCached(ctx, id, x, y, w, o, paint, trim);
   ctx.save();
   setupCtx(ctx, x, y, w, id);
-  const c: Ctx = { ctx, id, d, g, paint, trim, stripe: o.livery ?? null, detail, mat: o.style?.material, restore: o.style?.restore ?? 0, liv: o.style?.livery };
+  const hood = Math.max(0, Math.min(1, o.hood ?? 0));
+  const c: Ctx = { ctx, id, d, g, paint, trim, stripe: o.livery ?? null, detail, mat: o.style?.material, restore: o.style?.restore ?? 0, liv: o.style?.livery, lt: Math.max(0, Math.min(1, o.light ?? 0)), hood };
   if (o.silhouette) {
     if (o.shadow !== false) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(d.L / 2, 0.02, d.L * 0.55, 0.12, 0, 0, Math.PI * 2); ctx.fill(); }
     hull(c, '#0f141b');
@@ -1666,6 +2258,8 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
   backLayer(c, o.shadow !== false);
   for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, detail, g.D);
   frontLayer(c, o.headlights ?? 0, !!o.brake);
+  if (hood > 0) engineBay(c, hood);
+  if (o.focus) focusOverlay(c, o.focus);
   if (o.cover && o.cover > 0) drawCover(ctx, id, o.cover);
   ctx.restore();
 }
@@ -1772,3 +2366,6 @@ export function fitCanvas(c: HTMLCanvasElement, maxDpr = 2): { w: number; h: num
   }
   return { w, h, dpr };
 }
+
+/** @internal geometry probe for the art tests */
+export const _geometryForTest = (id: string) => geometry(id);

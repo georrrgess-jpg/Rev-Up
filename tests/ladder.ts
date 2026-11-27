@@ -82,6 +82,12 @@ export const LADDER_BUILDS: Record<string, Build[]> = {
   'altamar-tour': [B('tourer', [6, 6, 6], 'full'), B('tourer', [6, 6, 6], 'full + tune 3', 3)],
   'ta-summit': [B('gt', [8, 8, 8], 'Strata'), B('proto', [9, 9, 9], 'Halcyon')],
   'summit-gala': [B('proto', [8, 8, 9], 'arrival'), B('proto', [9, 9, 9], 'full'), B('gt', [8, 8, 8], 'Strata')],
+  // Azure Riviera: each supercar on the course that suits it, against the car before it
+  corniche: [B('vireo', [9, 9, 9], 'full'), B('proto', [9, 9, 9], 'Halcyon'), B('mako', [9, 9, 9], 'Mako')],
+  'ta-corniche': [B('vireo', [9, 9, 9], 'full')],
+  'riviera-night': [B('super', [7, 7, 7], 'full'), B('super', [7, 7, 7], 'full + tune 3', 3)],
+  'port-sprint': [B('mako', [9, 9, 9], 'full'), B('vireo', [9, 9, 9], 'Vireo'), B('proto', [9, 9, 9], 'Halcyon')],
+  'grand-riviera': [B('sovereign', [10, 9, 9], 'arrival (T10 engine)'), B('sovereign', [10, 10, 10], 'full'), B('mako', [9, 9, 9], 'Mako')],
 };
 
 // ---------------- Difficulty targets ----------------
@@ -127,6 +133,10 @@ export const TARGETS: Record<string, { cat: keyof typeof CATEGORY; ref: number }
   'summit-1000': { cat: 'boss', ref: 1 },
   'altamar-tour': { cat: 'late', ref: 0 },
   'summit-gala': { cat: 'boss', ref: 1 },
+  corniche: { cat: 'late', ref: 0 },
+  'riviera-night': { cat: 'late', ref: 0 },
+  'port-sprint': { cat: 'late', ref: 0 },
+  'grand-riviera': { cat: 'boss', ref: 0 },
 };
 
 /** Player finish time with an input (the player's run does not depend on the seed: no drafting). */

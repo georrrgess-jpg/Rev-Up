@@ -44,26 +44,27 @@ describe('baseline playthrough (simulation)', () => {
   });
 });
 
-// The whole ladder, fresh save → Halcyon X, for four kinds of player (tests/bot.ts):
+// The whole ladder, fresh save → Halcyon X → the Azure Riviera supercars (Vireo 9R, Mako TT, Sovereign), for four
+// kinds of player (tests/bot.ts):
 //   clean     every shift in the green, every boost a Perfect
 //   mixed     alternates clean shifts + Perfect boosts with late shifts + late boosts, race by race
 //   ordinary  always a beat late on the shift, Perfect boosts
 //   weak      never taps SHIFT (the automatic fallback every time), never uses nitro; buys Tune-ups
-const CARS = ['beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto'];
+const CARS = ['beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign'];
 
-describe('full ladder playthrough to the Halcyon X (simulation)', () => {
-  const runs = Object.entries(PLAYERS).flatMap(([kind, o]) => (kind === 'clean' || kind === 'mixed' ? [1, 2] : [1]).map((seed) => ({ kind, seed, log: runBot({ ...o, seed, untilCar: 'proto', maxS: 3 * 3600 }) })));
-  const finale = runBot({ ...PLAYERS.clean, seed: 1, untilWin: 'summit-gala', maxS: 3 * 3600 });
+describe('full ladder playthrough to the Sovereign (simulation)', () => {
+  const runs = Object.entries(PLAYERS).flatMap(([kind, o]) => (kind === 'clean' || kind === 'mixed' ? [1, 2] : [1]).map((seed) => ({ kind, seed, log: runBot({ ...o, seed, untilCar: 'sovereign', maxS: 4 * 3600 }) })));
+  const finale = runBot({ ...PLAYERS.clean, seed: 1, untilWin: 'grand-riviera', maxS: 4 * 3600 });
 
   it('prints milestones, races and repeats per player type', () => {
     for (const r of runs) {
       const m = r.log.milestones;
       console.log(`${r.kind.padEnd(8)} seed ${r.seed}: ${CARS.map((c) => `${c} ${fmtMin(m[c])} (${r.log.racesAt[c] ?? '—'})`).join(' · ')} | races ${r.log.races} (quick ${r.log.quick}) max repeat ${r.log.maxRepeat} longest losing run ${r.log.maxLossStreak}`);
     }
-    console.log(`clean seed 1: Summit Gala won at ${fmtMin(finale.milestones['win-summit-gala'])} (Halcyon at ${fmtMin(finale.milestones.proto)})`);
+    console.log(`clean seed 1: Summit Gala won at ${fmtMin(finale.milestones['win-summit-gala'])} (Halcyon at ${fmtMin(finale.milestones.proto)}) · Grand Riviera won at ${fmtMin(finale.milestones['win-grand-riviera'])} (Sovereign at ${fmtMin(finale.milestones.sovereign)})`);
   });
 
-  it('every player type reaches the Halcyon X, in ladder order, without grinding one race', () => {
+  it('every player type reaches the Sovereign, in ladder order, without grinding one race', () => {
     for (const r of runs) {
       const m = r.log.milestones;
       for (let i = 1; i < CARS.length; i++) expect(m[CARS[i]], `${r.kind} ${CARS[i]}`).toBeGreaterThanOrEqual(m[CARS[i - 1]]);
@@ -83,11 +84,28 @@ describe('full ladder playthrough to the Halcyon X (simulation)', () => {
     for (const r of runs) expect(r.log.milestones.proto - r.log.milestones.super).toBeGreaterThan(18 * 60);
   });
 
+  it('the Azure Riviera is a chapter of its own: about 20–30 minutes from the Halcyon to the Sovereign', () => {
+    const at = (kind: string) => Math.max(...runs.filter((r) => r.kind === kind).map((r) => r.log.milestones.sovereign));
+    expect(at('clean')).toBeLessThan(100 * 60);
+    expect(at('mixed')).toBeLessThan(110 * 60);
+    expect(at('ordinary')).toBeLessThan(110 * 60);
+    expect(at('weak')).toBeLessThan(160 * 60);
+    for (const r of runs) {
+      const m = r.log.milestones;
+      expect(m.sovereign - m.proto, r.kind).toBeGreaterThan(15 * 60);
+      expect(m.sovereign - m.proto, r.kind).toBeLessThan(40 * 60);
+      // each supercar arrives a few minutes after the one before (no instant double unlock)
+      expect(m.mako - m.vireo, r.kind).toBeGreaterThan(2 * 60);
+      expect(m.sovereign - m.mako, r.kind).toBeGreaterThan(5 * 60);
+    }
+  });
+
   it('losses stay short: a skilled player never loses one race more than 5 times running, a weak one 15', () => {
     for (const r of runs) expect(r.log.maxLossStreak, r.kind).toBeLessThanOrEqual(r.kind === 'weak' ? 15 : r.kind === 'clean' ? 5 : 8);
   });
 
-  it('the grand finale is won with the Halcyon soon after it is built', () => {
+  it('the grand finale is won with the Halcyon soon after it is built, and the Grand Riviera soon after the Sovereign', () => {
     expect(finale.milestones['win-summit-gala']).toBeLessThan(finale.milestones.proto + 15 * 60);
+    expect(finale.milestones['win-grand-riviera']).toBeLessThan(finale.milestones.sovereign + 15 * 60);
   });
 });

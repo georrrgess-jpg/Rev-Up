@@ -41,8 +41,9 @@ export class Gauge {
   /** Needle position for this frame. Between jumps it is exactly the engine speed the SHIFT tap is judged on (no lag,
    *  so the needle is inside the green arc exactly when a tap is clean). A jump — a gear change, the launch — is
    *  bridged by one eased glide of GLIDE_S, the same length at any frame rate, then it tracks again. */
-  private moveNeedle(target: number, gear: number, dt: number) {
-    if (this.reduced || this.gear < 0) { this.needle = target; this.gear = gear; this.glide = null; return; }
+  private moveNeedle(target: number, gear: number, dt: number, live: boolean) {
+    // while the light is green or red the needle is exactly the judged engine speed (never mid-glide)
+    if (this.reduced || this.gear < 0 || live) { this.needle = target; this.gear = gear; this.glide = null; return; }
     if (gear !== this.gear || Math.abs(target - this.needle) > 0.15) this.glide = { from: this.needle, t: 0 };
     this.gear = gear;
     if (this.glide) {
@@ -56,12 +57,13 @@ export class Gauge {
 
   /** f: engine speed as a fraction of the redline; mph: the speedometer reading (already converted once); band: the
    *  shift attempt's green window (fixed for the attempt), so the arc is always the window a tap is judged on. */
-  draw(f: number, gear: number, mph: number, cue: ShiftCue, t: number, dt: number, band?: [number, number]) {
+  /** held: braking (or settling after a downshift) — the arc stays where it is, dimmed, and is not a target. */
+  draw(f: number, gear: number, mph: number, cue: ShiftCue, t: number, dt: number, band?: [number, number], held = false) {
     if (band && band[1] > band[0]) this.band = band;
     const target = Math.max(0, Math.min(1.06, f));
-    this.moveNeedle(target, gear, dt);
+    this.moveNeedle(target, gear, dt, cue === 'green' || cue === 'late');
     const blink = cue === 'late' && !this.reduced ? Math.floor(t * 8) % 2 : 0;
-    const key = `${Math.round(this.needle * 400)}|${gear}|${mph}|${cue}|${blink}|${this.band.join()}|${this.el.width}`;
+    const key = `${Math.round(this.needle * 400)}|${gear}|${mph}|${cue}|${blink}|${held}|${this.band.join()}|${this.el.width}`;
     if (key === this.key) return;
     this.key = key;
     const ctx = this.ctx;
@@ -85,7 +87,7 @@ export class Gauge {
     };
     ctx.lineCap = 'butt';
     arc(0, maxF, 'rgba(255,255,255,0.16)', 7 * s);
-    arc(this.band[0], this.band[1], cue === 'green' ? '#5dff8a' : '#2f9e55', 7 * s);
+    arc(this.band[0], this.band[1], cue === 'green' ? '#5dff8a' : held ? 'rgba(47,158,85,0.38)' : '#2f9e55', 7 * s);
     arc(1, maxF, '#e5483a', 7 * s);
     // rpm ticks every 1000
     ctx.strokeStyle = 'rgba(255,255,255,0.6)';

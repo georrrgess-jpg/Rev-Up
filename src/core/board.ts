@@ -333,6 +333,17 @@ export function recycleParts(s: GameState, ids: number[]): GameEvent[] {
   return events;
 }
 
+/** What recycling these ids would do, by the same rule as recycleParts: the exact scrap it pays, and the parts it
+ *  leaves alone (starred, fitted to a car, or already gone). The Keep / Recycle sheet shows this before the tap. */
+export function recyclePreview(s: GameState, ids: number[]): { count: number; scrap: number; starred: number; fitted: number; missing: number } {
+  const want = new Set(ids);
+  const bench = allParts(s).filter((p) => want.has(p.id));
+  const fittedIds = new Set(Object.values(s.installed ?? {}).flatMap((sl) => Object.values(sl ?? {})).filter(Boolean).map((p) => (p as Part).id));
+  const press = bench.filter((p) => !isFavorite(s, p.id));
+  const fitted = [...want].filter((id) => fittedIds.has(id)).length;
+  return { count: press.length, scrap: press.reduce((a, p) => a + scrapValue(p), 0), starred: bench.length - press.length, fitted, missing: want.size - bench.length - fitted };
+}
+
 /** Workshop: order a part of the family and tier you pick, paid in scrap. Same tiers as the cash counter (the
  *  next car's own part must still be merged), charged once, delivered to the bench or first in the crate queue. */
 export function scrapOrder(s: GameState, family: Family, tier: number): GameEvent[] {

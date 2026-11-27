@@ -50,11 +50,29 @@
 /* ---- Shop: Scrap tab header and Fit Parts entry ---- */
 .workshop .uses-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 4px 0 8px; }
 .workshop .uses-strip .btn { min-height: 52px; text-align: left; justify-content: flex-start; }
-.fit .fit-build { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; }
-.fit .fit-build .grow { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--muted); }
-.fit .fit-build .grow b { color: var(--text); }
+/* ---- Shop: grouped by purpose (Mechanic Shop workstream) ---- */
+.workshop .btn.mech-entry { width: 100%; min-height: 56px; margin: 0 0 8px; justify-content: flex-start; gap: 10px; text-align: left; border-color: var(--amber); background: linear-gradient(90deg, #3a2a12, var(--panel2) 70%); }
+.workshop .btn.mech-entry .ico { font-size: var(--fs-xl); flex: none; }
+.workshop .btn.mech-entry .stack { display: flex; flex-direction: column; min-width: 0; }
+.workshop .btn.mech-entry small { font-weight: var(--w-strong); color: var(--muted); white-space: normal; overflow-wrap: anywhere; }
+.workshop .segs.five.five:has(> .seg) { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.workshop .segs.five .seg { min-width: 0; padding: 4px 2px; font-size: var(--fs-xs); overflow-wrap: anywhere; }
+/* each tier its own metal (T3 copper, T5 chrome, T7 violet …) */
+.workshop .tier-pick.metal { border: 1.5px solid color-mix(in srgb, var(--metal) 55%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 22%, var(--panel2)), var(--panel2)); min-height: 60px; padding: 4px 2px; min-width: 0; line-height: 1.15; }
+.workshop .tier-pick.metal b { color: var(--metal); text-shadow: 0 1px 0 rgba(0,0,0,.6); font-size: var(--fs-md); }
+.workshop .tier-pick.metal .mat { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workshop .tier-pick.metal .num { color: var(--amber2); font-weight: var(--w-heavy); }
+.workshop .tiers { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+.workshop .tier-lock { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60px; border: 1.5px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: var(--fs-2xs); line-height: 1.15; text-align: center; }
+.workshop .tier-lock b { font-size: var(--fs-sm); }
+.workshop .up-row.locked { opacity: .7; }
+.workshop .up-row .lock-tag { flex: none; max-width: 38%; font-size: var(--fs-2xs); color: var(--muted); text-align: right; overflow-wrap: anywhere; }
+.workshop .row .grow { min-width: 0; overflow-wrap: anywhere; }
+.workshop .style-row .lvl { color: var(--muted); font-weight: var(--w-body); }
 
 @media (max-width: 340px) {
   .fab .kits { grid-template-columns: 1fr; }
   .workshop .uses-strip { grid-template-columns: 1fr; }
+  .workshop .segs.five .seg { font-size: var(--fs-2xs); }
 }
+.workshop > .btn.close { margin-right: 0; }

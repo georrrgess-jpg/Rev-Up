@@ -6,7 +6,7 @@ import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
 import { STYLE_ITEMS, StyleItem, BLUEPRINT_FINISHES, CROWN_FINISH, CarId, DISTRICTS, ENABLED_CARS, EVENTS, RAY_FINISH, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
-import { FACTORY_LOOKS, LIVERIES, drawCar, fitCanvas } from '../render/car';
+import { FACTORY_LOOKS, LIVERIES, PLATFORM_CARS, drawCar, fitCanvas } from '../render/car';
 import { mph } from '../core/units';
 import { openFitParts } from './fit';
 import type { App, View } from './app';
@@ -24,15 +24,26 @@ const STAGES: Record<string, { wall: [string, string, string, string]; light: st
   rally: { wall: ['#07101f', '#1d3b6b', '#10203d', '#050a14'], light: '#e8f0ff50', floor: 'rgba(245,197,24,0.14)' },
   gt: { wall: ['#140707', '#4a1818', '#260c0c', '#0c0404'], light: '#ffe6dc4a', floor: 'rgba(255,60,46,0.16)' },
   proto: { wall: ['#020b0d', '#0f3d44', '#082226', '#020809'], light: '#b8fff250', floor: 'rgba(54,240,208,0.18)' },
+  vireo: { wall: ['#0d0606', '#3c1612', '#1e0b09', '#080303'], light: '#ffe2d650', floor: 'rgba(226,60,46,0.18)' },
+  mako: { wall: ['#040806', '#17271f', '#0c1510', '#030504'], light: '#e8ffc04a', floor: 'rgba(199,242,58,0.16)' },
+  sovereign: { wall: ['#0a0805', '#2e2416', '#17120b', '#060503'], light: '#ffeccb58', floor: 'rgba(201,162,74,0.2)' },
 };
 /** Factory look; the new cars use their art palette until the tables give them their own. */
 const lookOf = (id: CarId) => { const c = carById(id); const f = FACTORY_LOOKS[id]; return c.paint === '#555' && f ? f : { paint: c.paint, trim: c.trim }; };
 
-function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined, lit = 0, covered = false, locked = false, style?: CarStyle) {
+/** Rendered detailed cars, reused while a platform turns (one entry per canvas). */
+const carBitmaps = new WeakMap<HTMLCanvasElement, { key: string; cv: HTMLCanvasElement }>();
+
+/**
+ * Draw a car in its stage. `turn` (0..1) is the platform turn for the supercars: 0 = angled away, 1 = hero side
+ * view. The supercars stand on a round platform under a spotlight; the rest on a low plinth.
+ */
+function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined, lit = 0, covered = false, locked = false, style?: CarStyle, turn = 1) {
   const { w, h: height } = fitCanvas(canvas, 1.5);
   if (w < 2 || height < 2) return;
   const ctx = canvas.getContext('2d')!;
   const car = lookOf(id);
+  const platform = !locked && !covered && PLATFORM_CARS.includes(id);
   // stages: a plain garage bay for the early cars; prize cars get their own light (owned ones only)
   const st = locked || covered ? STAGES.junker : STAGES[id] ?? STAGES.junker;
   const wall = ctx.createLinearGradient(0, 0, 0, height);
@@ -57,24 +68,88 @@ function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined,
     ctx.stroke();
   }
   if (st.floor) { const fl = ctx.createRadialGradient(w * .5, height * .78, 0, w * .5, height * .78, w * .5); fl.addColorStop(0, st.floor); fl.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = fl; ctx.fillRect(0, height * .6, w, height * .4); }
-  const length = Math.min(w * .8, height * 1.7, 740); // room for bumpers, wings and the far side
-  const gy = height * (height > w * .8 ? .73 : .82);
-  if (!locked) {
-    // a low display plinth under the car with a soft rim light in the stage colour
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = st.floor ?? 'rgba(210,230,240,0.14)'; ctx.lineWidth = Math.max(1, length * 0.006);
-    ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0.1, Math.PI - 0.1); ctx.stroke();
+  const length = Math.min(w * (platform ? .74 : .8), height * (platform ? 1.5 : 1.7), 740); // room for bumpers, wings and the far side
+  const gy = height * (height > w * .8 ? .73 : platform ? .78 : .82);
+  const x0 = (w - length * 1.12) / 2 + length * 0.02;
+  const opts = {
+    paint: paint ?? car.paint, trim: car.trim, livery: finishStripe(id, paint), headlights: lit,
+    cover: covered ? 1 : 0, silhouette: locked, style, light: platform ? 0.55 + 0.3 * lit : lit * 0.3,
+  };
+  if (!platform) {
+    if (!locked) {
+      // a low display plinth under the car with a soft rim light in the stage colour
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = st.floor ?? 'rgba(210,230,240,0.14)'; ctx.lineWidth = Math.max(1, length * 0.006);
+      ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0.1, Math.PI - 0.1); ctx.stroke();
+    }
+    drawCar(ctx, id, x0, gy, length, opts);
+    return;
   }
-  drawCar(ctx, id, (w - length * 1.12) / 2 + length * 0.02, gy, length, {
-    paint: paint ?? car.paint,
-    trim: car.trim,
-    livery: finishStripe(id, paint),
-    headlights: lit,
-    cover: covered ? 1 : 0,
-    silhouette: locked,
-    style,
-  });
+  // ---- the supercar platform: a spotlight cone, a polished turning disc with rim lights, a reflection
+  const px = w / 2, py = gy - length * 0.02;
+  const rx = Math.min(w * 0.49, length * 0.64), ry = rx * 0.16, th = Math.max(3, ry * 0.38);
+  const spot = (st.floor ?? 'rgba(255,240,220,0.2)').replace(/[\d.]+\)$/, '');
+  const cone = ctx.createLinearGradient(0, 0, 0, py);
+  cone.addColorStop(0, `${spot}0.42)`); cone.addColorStop(1, `${spot}0.06)`);
+  ctx.fillStyle = cone;
+  ctx.beginPath(); ctx.moveTo(px - rx * 0.1, 0); ctx.lineTo(px + rx * 0.1, 0); ctx.lineTo(px + rx * 1.05, py); ctx.lineTo(px - rx * 1.05, py); ctx.closePath(); ctx.fill();
+  const pool = ctx.createRadialGradient(px, py + th, rx * 0.3, px, py + th, rx * 1.5);
+  pool.addColorStop(0, `${spot}0.3)`); pool.addColorStop(1, `${spot}0)`);
+  ctx.fillStyle = pool; ctx.beginPath(); ctx.ellipse(px, py + th, rx * 1.5, ry * 2, 0, 0, Math.PI * 2); ctx.fill();
+  const side = ctx.createLinearGradient(px - rx, 0, px + rx, 0);
+  side.addColorStop(0, '#121418'); side.addColorStop(0.5, '#3d4249'); side.addColorStop(1, '#0e1013');
+  ctx.fillStyle = side;
+  ctx.beginPath(); ctx.ellipse(px, py + th, rx, ry, 0, 0, Math.PI); ctx.lineTo(px - rx, py); ctx.ellipse(px, py, rx, ry, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
+  const top = ctx.createRadialGradient(px, py - ry * 0.3, rx * 0.1, px, py, rx);
+  top.addColorStop(0, '#4b4f57'); top.addColorStop(0.7, '#25282e'); top.addColorStop(1, '#17191d');
+  ctx.fillStyle = top; ctx.beginPath(); ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  // rim lights chase round the front edge as the platform turns
+  const ang = (turn - 1) * Math.PI * 0.9;
+  ctx.fillStyle = `${spot}1)`;
+  for (let i = 0; i < 18; i++) {
+    const a = ang + (i / 18) * Math.PI * 2, sn = Math.sin(a);
+    if (sn < 0) continue;
+    ctx.globalAlpha = 0.25 + 0.75 * sn;
+    ctx.fillRect(px + Math.cos(a) * rx - 2, py + sn * ry + th * 0.45 - 1.5, 4, 3);
+  }
+  ctx.globalAlpha = 1;
+  // the car itself is rendered once per size and look, then scaled through the turn
+  const bw = Math.round(length);
+  const key = `${bw}|${id}|${JSON.stringify(opts)}`;
+  let bm = carBitmaps.get(canvas);
+  if (!bm || bm.key !== key) {
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(bw * 1.3); cv.height = Math.round(bw * 0.5);
+    drawCar(cv.getContext('2d')!, id, bw * 0.06, bw * 0.42, bw, { ...opts, shadow: false, detail: true });
+    bm = { key, cv };
+    carBitmaps.set(canvas, bm);
+  }
+  const sx = 0.72 + 0.28 * turn;
+  const dx = x0 - bw * 0.06, dy = gy - bw * 0.42;
+  const blit = (alpha: number) => {
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.translate(px, 0); ctx.scale(sx, 1); ctx.translate(-px, 0);
+    ctx.drawImage(bm!.cv, dx, dy);
+    ctx.restore();
+  };
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.beginPath(); ctx.ellipse(px, gy - length * 0.02, length * 0.55 * sx, ry * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
+  ctx.translate(0, gy * 2); ctx.scale(1, -1);
+  blit(0.14);
+  ctx.restore();
+  blit(1);
+  if (turn < 1) {
+    // a highlight runs along the paint as the car comes round
+    const hx = px + length * sx * (0.6 - 1.2 * turn);
+    const g = ctx.createLinearGradient(hx - length * 0.12, 0, hx + length * 0.12, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,250,235,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.save(); ctx.beginPath(); ctx.rect(x0 - length * 0.1, gy - length * 0.4, length * 1.3, length * 0.42); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.fillStyle = g;
+    ctx.fillRect(hx - length * 0.12, gy - length * 0.36, length * 0.24, length * 0.36); ctx.restore();
+  }
 }
 
 const ordinalWord = (n: number) => ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'][n] ?? `${n}th`;
@@ -182,6 +257,15 @@ export class ShowroomView implements View {
     const finishButtons = h('div', { class: 'finish-options' });
     const finishName = h('div', { class: 'finish-title' });
     let lit = false;
+    // supercars: the platform turns the car round to its side view when the dialog opens (not with reduced motion)
+    let turn = PLATFORM_CARS.includes(id) && !state.settings.reducedMotion ? 0 : 1;
+    let turnRaf = 0;
+    const spin = (t0: number) => (now: number) => {
+      const k = Math.min(1, (now - t0) / 1600);
+      turn = k * k * (3 - 2 * k);
+      draw();
+      turnRaf = k < 1 && dialog.isConnected ? requestAnimationFrame(spin(t0)) : 0;
+    };
     // Paint shop preview: tapping an item you don't own shows it on the car before you buy.
     let preview: { item: StyleItem } | null = null;
     const soonItems = new Map<string, StyleItem>();
@@ -197,7 +281,7 @@ export class ShowroomView implements View {
         if (it.kind === 'material') style.material = it.value as PaintMaterial;
         if (it.kind === 'restore') style.restore = Number(it.value);
       }
-      studio(canvas, id, paint, lit ? 1 : 0, false, false, style);
+      studio(canvas, id, paint, lit ? 1 : 0, false, false, style, turn);
     };
     const lights = h('button', { class: 'btn sm', 'aria-pressed': 'false', onclick: () => {
       lit = !lit;
@@ -369,6 +453,7 @@ export class ShowroomView implements View {
     ));
     void active;
     const close = () => {
+      cancelAnimationFrame(turnRaf);
       dialog.remove();
       this.closeDialog = null;
       this.redrawInspect = null;
@@ -383,6 +468,7 @@ export class ShowroomView implements View {
     this.app.root.append(dialog);
     updateFinish();
     draw();
+    if (turn < 1) turnRaf = requestAnimationFrame((t0) => { turnRaf = requestAnimationFrame(spin(t0)); });
     closeBtn.focus({ preventScroll: true });
   }
 }

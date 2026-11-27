@@ -50,8 +50,10 @@ export const FAMILIES: Record<Family, FamilyDef> = {
 
 export const ACTIVE_FAMILIES: Family[] = (Object.keys(FAMILIES) as Family[]).filter((f) => FAMILIES[f].active);
 
-/** Highest tier reachable in this release (data supports T10). */
-export const MAX_TIER = 9; // tunable — T8 opens with the Corvo Rally and Strata GTR, T9 with the Halcyon X (cap T9)
+/** Highest tier reachable in this release. T8 opens with the Corvo Rally and Strata GTR, T9 with the Halcyon X,
+ *  and T10 with the Sovereign (the flagship, cap T10): two T9s merge into a T10 once you hold them, and the
+ *  Sovereign's keystone is a crafted T10 Engine. T10 is never sold (orders stop one tier below the top). */
+export const MAX_TIER = 10; // tunable
 export const DATA_MAX_TIER = 10;
 
 /** Stat contribution of a part by tier (index = tier). */
@@ -141,7 +143,7 @@ export const UPGRADES: UpgradeDef[] = [
 // Prices are set in runs of play: see README "Economy". Cash buys things; Rep marks progress; scrap buys crates.
 /** Order a Part: a known family and tier, by tier. Each tier costs a bit more than two of the tier below,
  *  so merging stays the cheaper route and buying is the reliable one. Keystones (a car's top tier) must be crafted. */
-export const PART_ORDER_PRICE = [0, 40, 90, 220, 520, 1200, 2800, 6500, 15000]; // T2 $90: affordable after the first race
+export const PART_ORDER_PRICE = [0, 40, 90, 220, 520, 1200, 2800, 6500, 15000, 32000]; // T2 $90: affordable after the first race; T9 sells once the Sovereign is the goal
 /** Quick Race cash, as a share of the live purse for that place, by Pit crew level. */
 export const QUICK_PAY_SHARE = [0.7, 0.85]; // live stays worth playing: the crew never earns the full purse
 /** Each Perfect boost pays this share of the event's win purse (live, at most two). */
@@ -163,7 +165,7 @@ export const nitroCapFor = (tankLevel: number) => NITRO_CAP + tankLevel;
  *  car for players who don't land Perfect boosts; skilled players can save the money. Not used in the Stock Cup. */
 export const TUNE_STAGES = 3;
 export const TUNE_STEP = 0.02;
-export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600, rally: 4500, gt: 5500, proto: 7000 };
+export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600, rally: 4500, gt: 5500, proto: 7000, vireo: 8000, mako: 9000, sovereign: 11000 };
 /** Stage 0→1, 1→2, 2→3: ×1, ×1.6, ×2.2 of the car's base, on a cash step (Tapeback $120 / $190 / $260). */
 export const tunePrice = (car: CarId, stage: number) => roundCash((TUNE_PRICE[car] ?? 1000) * (1 + stage * 0.6));
 
@@ -236,7 +238,7 @@ export const DISTRICTS: Record<DistrictId, { name: string; enabled: boolean }> =
   coastal: { name: 'Coastal Highway', enabled: true },
   meets: { name: 'Class meets', enabled: true },
   trials: { name: 'Time attack', enabled: true },
-  riviera: { name: 'Azure Riviera', enabled: false },
+  riviera: { name: 'Azure Riviera', enabled: true },
   neon: { name: 'Neon Skyline', enabled: false },
   desert: { name: 'Desert Proving Ground', enabled: true },
   summit: { name: 'The Summit', enabled: true },
@@ -304,25 +306,26 @@ export const CARS: CarClass[] = [
     paint: '#1d4e6b', trim: '#36f0d0', blurb: 'A closed-cockpit prototype with a shark fin and a light blade. The fastest thing in the game, and the hardest to drive well.',
     offlineRate: 16, rev: { base: 90, peak: 340 }, handling: 'The highest top speed (~225 mph on a long straight, fully built) and strong everywhere, with the narrowest shift light in the game: missed shifts cost it the most.',
   },
-  // ---- 1.8 supercars, after the Halcyon X (placeholders: the progression agent sets unlocks, district and events;
-  // they stay disabled until then)
+  // ---- Azure Riviera (after the Summit Gala): three supercars, each won on the course that suits the one before
+  // it. Rep + a crafted keystone + a won event, like the rest. The Vireo is the Summit Gala's prize; the Mako is won
+  // in the Vireo on the Corniche Hairpins; the Sovereign in the Mako on the Port Sprint, then the Grand Riviera.
   {
     id: 'vireo', name: 'Supercar', model: 'Vireo 9R', district: 'riviera', cap: 9,
-    base: { top: 52, accel: 7.8, grip: 1.42 }, unlock: { rep: 18000, family: 'tires', tier: 9 }, enabled: false,
+    base: { top: 50, accel: 7.0, grip: 1.72 }, unlock: { rep: 15000, family: 'tires', tier: 9, event: 'summit-gala' }, enabled: true,
     paint: '#e23c2e', trim: '#f4f1ea', blurb: 'A short, light mid-engine coupe with a screaming V10 and a glass engine cover. It wants the limiter.',
-    offlineRate: 16, rev: { base: 110, peak: 380 }, handling: 'Nimble and high-revving: the quickest change of direction in the game; wins the tight, technical courses.',
+    offlineRate: 16, rev: { base: 110, peak: 380 }, handling: 'Nimble and high-revving: the quickest change of direction in the game; wins the tight, technical courses. Short of the Halcyon on a long straight.',
   },
   {
     id: 'mako', name: 'Supercar', model: 'Mako TT', district: 'riviera', cap: 9,
-    base: { top: 55, accel: 8.2, grip: 1.3 }, unlock: { rep: 22000, family: 'turbo', tier: 9 }, enabled: false,
+    base: { top: 51, accel: 8.6, grip: 1.24 }, unlock: { rep: 18500, family: 'engine', tier: 9, event: 'corniche' }, enabled: true,
     paint: '#1c2a24', trim: '#c7f23a', blurb: 'A wide, angry twin-turbo coupe with side gills and quad exits. All shove, all the time.',
-    offlineRate: 17, rev: { base: 70, peak: 280 }, handling: 'Twin-turbo punch: the hardest pull out of slow corners and short straights; heavier through long sweepers.',
+    offlineRate: 17, rev: { base: 70, peak: 280 }, handling: 'Twin-turbo punch: the hardest launch and pull out of slow corners and short straights; heavier through long sweepers.',
   },
   {
     id: 'sovereign', name: 'Flagship', model: 'Sovereign', district: 'riviera', cap: 10,
-    base: { top: 58, accel: 7.9, grip: 1.4 }, unlock: { rep: 28000, family: 'engine', tier: 10 }, enabled: false,
+    base: { top: 58, accel: 8.4, grip: 1.36 }, unlock: { rep: 23000, family: 'engine', tier: 10, event: 'port-sprint' }, enabled: true,
     paint: '#f1ece2', trim: '#c9a24a', blurb: 'The flagship: a long, low V12 hybrid with a blade of light front and rear. The car the whole garage builds toward.',
-    offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The fastest car in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
+    offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The only car that runs T10 parts: the fastest in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
   },
   { id: 'hyper', name: 'Hypercar', model: 'One-of-one', district: 'summit', cap: 10, base: { top: 64, accel: 8.5, grip: 1.15 }, unlock: { rep: 99999, family: 'engine', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: 'Legacy placeholder (never enabled).', offlineRate: 10, rev: { base: 60, peak: 200 } },
 ];
@@ -339,6 +342,9 @@ export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: st
   rally: { name: 'Sandstorm', paint: '#d9a441', stripe: '#1f62c9' },
   gt: { name: 'Le Mans Night', paint: '#14181f', stripe: '#f2c94c' },
   proto: { name: 'Aurora', paint: '#0c1a2a', stripe: '#9b7bff' },
+  vireo: { name: 'Rosso Lacets', paint: '#9e1b22', stripe: '#f4f1ea' },
+  mako: { name: 'Deep Reef', paint: '#0f4a52', stripe: '#c7f23a' },
+  sovereign: { name: 'Royal Ink', paint: '#141a3a', stripe: '#d8b45a' },
 };
 
 export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
@@ -350,8 +356,10 @@ export const MAIN_EVENT_FINISH = { name: 'Main Event Neon', paint: '#e2337a' };
 export const RALLY_FINISH = { name: 'Canyon Ochre', paint: '#c2652a' };
 /** Won from Iver Kaas in the Summit Gala, the grand finale; usable on any car. */
 export const SUMMIT_FINISH = { name: 'Summit Ice', paint: '#bfe6f2' };
+/** Won from Aurelia Stern in the Grand Riviera, the flagship final; usable on any car. */
+export const RIVIERA_FINISH = { name: 'Riviera Gold', paint: '#c9a24a' };
 /** Blueprint finishes that any owned car can wear, by blueprint name. */
-export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH, MAIN_EVENT_FINISH, RALLY_FINISH, SUMMIT_FINISH];
+export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH, MAIN_EVENT_FINISH, RALLY_FINISH, SUMMIT_FINISH, RIVIERA_FINISH];
 
 export function finishStripe(car: CarId, paint: string | undefined): string | undefined {
   const finish = SIGNATURE_FINISHES[car];
@@ -376,7 +384,8 @@ export interface Segment {
   window?: [number, number]; // nitro window as fraction of segment
 }
 export interface Track {
-  id: 'scrapyard' | 'maple' | 'foundry' | 'harbor' | 'cliffs' | 'coast' | 'downtown' | 'bridge' | 'skyline' | 'dunes' | 'canyon' | 'mesa' | 'pass' | 'summit';
+  id: 'scrapyard' | 'maple' | 'foundry' | 'harbor' | 'cliffs' | 'coast' | 'downtown' | 'bridge' | 'skyline' | 'dunes' | 'canyon' | 'mesa' | 'pass' | 'summit'
+    | 'corniche' | 'port' | 'grand';
   name: string;
   district: DistrictId;
   segments: Segment[];
@@ -540,6 +549,47 @@ export const TRACKS: Record<Track['id'], Track> = {
       { type: 'highway', length: 280, window: [0.08, 0.38] },
     ],
   },
+  // ---- Azure Riviera (drawn with the coast scene until it has its own): one course per supercar's strength
+  corniche: {
+    id: 'corniche', name: 'Corniche Hairpins', district: 'riviera', theme: 'coast', course: 'Cliff road · five tight hairpins, short straights', favours: 'Grip and quick direction changes',
+    segments: [
+      { type: 'launch', length: 70 },
+      { type: 'bend', length: 55, radius: 24 },
+      { type: 'straight', length: 95, window: [0.05, 0.45] },
+      { type: 'bend', length: 50, radius: 20 },
+      { type: 'straight', length: 85, window: [0.05, 0.45] },
+      { type: 'bend', length: 55, radius: 26 },
+      { type: 'straight', length: 80 },
+      { type: 'bend', length: 50, radius: 22 },
+      { type: 'straight', length: 75 },
+      { type: 'bend', length: 45, radius: 21 },
+      { type: 'straight', length: 120, window: [0.05, 0.4] },
+    ],
+  },
+  port: {
+    id: 'port', name: 'Port Sprint', district: 'riviera', theme: 'coast', course: 'Harbour streets · a long launch, slow corners, short straights', favours: 'Acceleration: the launch and every corner exit',
+    segments: [
+      { type: 'launch', length: 185 },
+      { type: 'straight', length: 110, window: [0.05, 0.5] },
+      { type: 'bend', length: 50, radius: 44 },
+      { type: 'straight', length: 115, window: [0.04, 0.48] },
+      { type: 'bend', length: 50, radius: 42 },
+      { type: 'straight', length: 100 },
+      { type: 'bend', length: 45, radius: 46 },
+      { type: 'straight', length: 130, window: [0.04, 0.45] },
+    ],
+  },
+  grand: {
+    id: 'grand', name: 'Grand Riviera', district: 'riviera', theme: 'coast', course: 'Coast boulevard · three long straights, two fast sweepers', favours: 'Top speed, and nerve through the fast sweepers',
+    segments: [
+      { type: 'launch', length: 80 },
+      { type: 'highway', length: 380, window: [0.12, 0.4] },
+      { type: 'hwbend', length: 160, radius: 170 },
+      { type: 'highway', length: 340, window: [0.1, 0.38] },
+      { type: 'hwbend', length: 150, radius: 150 },
+      { type: 'highway', length: 400, window: [0.08, 0.36] },
+    ],
+  },
 };
 
 export const trackLength = (t: Track) => t.segments.reduce((a, s) => a + s.length, 0);
@@ -609,6 +659,14 @@ export const RIVALS: Record<string, Rival> = {
   nova3: { id: 'nova3', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Came up the mountain for one more race against you.', stats: { top: 70.0, accel: 12.4, grip: 1.85 } },
   bex: { id: 'bex', name: 'Bex Ardent', car: 'gt', paint: '#ff9e1b', line: 'Team orange. Never pits, never smiles.', stats: { top: 70.5, accel: 12.6, grip: 2.3 } },
   iver: { id: 'iver', name: 'Iver Kaas', car: 'proto', paint: '#f4f4f4', line: 'Built the Halcyon’s twin. Hosts the Summit Gala and has never lost it.', stats: { top: 78.0, accel: 14.6, grip: 2.5 }, boss: true },
+  // ---- Azure Riviera
+  ilse: { id: 'ilse', name: 'Ilse Brandvold', car: 'proto', paint: '#2f8fd6', line: 'Brought her Halcyon down from the Summit. Hates hairpins, wins them anyway.', stats: { top: 80.0, accel: 15.0, grip: 2.55 } },
+  anouk: { id: 'anouk', name: 'Anouk Vidal', car: 'vireo', paint: '#f2f0e6', line: 'Grew up above the Corniche. Brakes where everyone else lifts.', stats: { top: 79.0, accel: 15.5, grip: 2.65 } },
+  ravi: { id: 'ravi', name: 'Ravi Castellane', car: 'vireo', paint: '#1d6b4a', line: 'A test driver who never got the memo that testing is over.', stats: { top: 78.5, accel: 15.2, grip: 2.6 } },
+  dario: { id: 'dario', name: 'Dario Belmonte', car: 'mako', paint: '#e8c547', line: 'Runs the port at night. His Mako launches like a dropped anchor in reverse.', stats: { top: 82.0, accel: 15.8, grip: 2.5 } },
+  teo: { id: 'teo', name: 'Teo Marchand', car: 'mako', paint: '#3a3f47', line: 'Twin turbos, twin exhausts, one speed: all of it.', stats: { top: 82.5, accel: 16.0, grip: 2.55 } },
+  iver2: { id: 'iver2', name: 'Iver Kaas', car: 'proto', paint: '#f4f4f4', line: 'Lost the Gala to you. Followed you down to the sea for a rematch.', stats: { top: 82.0, accel: 15.3, grip: 2.6 } },
+  aurelia: { id: 'aurelia', name: 'Aurelia Stern', car: 'sovereign', paint: '#0d0d12', line: 'Hosts the Grand Riviera from the only other Sovereign. Has never seen anyone’s tail lights.', stats: { top: 90.0, accel: 17.0, grip: 2.85 }, boss: true },
 };
 
 export interface RaceEvent {
@@ -857,7 +915,37 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [1500, 1000, 750, 550], rep: [150, 100, 70, 50], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'proto' }, goals: { par: 32.0 },
     boss: { rival: 'iver', reward: { cash: 6000, crates: 8, blueprint: 'Summit Ice', badge: 'Summit Champion' } },
-    blurb: 'The grand finale. Every champion you have beaten, and Iver Kaas in the other Halcyon. Clean shifts or nothing.',
+    blurb: 'The grand finale. Every champion you have beaten, and Iver Kaas in the other Halcyon. Clean shifts or nothing. Win it for an invitation to the Riviera — and a Vireo 9R.',
+  },
+  // ---------------- Azure Riviera (after the Summit Gala): the supercars, one course for each ----------------
+  {
+    id: 'corniche', name: 'Corniche Hairpins', district: 'riviera', track: 'corniche', rivals: ['ilse', 'anouk', 'ravi'],
+    payout: { cash: [1300, 920, 690, 520], rep: [120, 84, 60, 46], crates: [4, 3, 2, 1] }, firstClear: { cash: 1600, crates: 5 },
+    requires: { car: 'vireo' }, goals: { par: 25.4 },
+    blurb: 'Five hairpins on the cliff road. The Vireo changes direction quicker than anything; a Halcyon is too long for it. Win it to be offered a Mako TT.',
+  },
+  {
+    id: 'ta-corniche', name: 'Corniche Time Attack', district: 'trials', track: 'corniche', rivals: [], timeAttack: { bronze: 25.7, silver: 25.2, gold: 24.9 },
+    payout: { cash: [160, 160, 160, 160], rep: [18, 18, 18, 18], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
+    requires: { car: 'vireo' }, blurb: 'Solo run down the Corniche. Five hairpins, five clean exits.',
+  },
+  {
+    id: 'riviera-night', name: 'Lumen Riviera Night', district: 'meets', track: 'grand', rivals: ['nova3', 'lux2', 'mina'], carOnly: 'super', trophy: 'Riviera Surge',
+    payout: { cash: [900, 640, 480, 360], rep: [70, 50, 36, 26], crates: [3, 2, 1, 0] }, firstClear: { cash: 1400, crates: 3 },
+    requires: { car: 'vireo' }, blurb: 'Lumen RSs only, flat out down the coast boulevard at night. A Surge boost on a long straight is still the fastest thing here.',
+  },
+  {
+    id: 'port-sprint', name: 'Port Sprint', district: 'riviera', track: 'port', rivals: ['dario', 'teo', 'iver2'],
+    payout: { cash: [1400, 1000, 750, 560], rep: [128, 90, 64, 48], crates: [4, 3, 2, 1] }, firstClear: { cash: 1800, crates: 5 },
+    requires: { car: 'mako' }, goals: { par: 18.1 },
+    blurb: 'A long launch off the quay and three slow corners between the yachts. Twin-turbo shove wins it. Win it to be offered the Sovereign.',
+  },
+  {
+    id: 'grand-riviera', name: 'Grand Riviera', district: 'riviera', track: 'grand', rivals: ['anouk', 'teo', 'aurelia'],
+    payout: { cash: [1800, 1250, 900, 680], rep: [170, 115, 80, 60], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
+    requires: { car: 'sovereign' }, goals: { par: 20.5 },
+    boss: { rival: 'aurelia', reward: { cash: 8000, crates: 8, blueprint: 'Riviera Gold', badge: 'Riviera Champion' } },
+    blurb: 'The flagship final: three long straights and two fast sweepers along the sea, against Aurelia Stern in the other Sovereign. Bring the T10 engine and clean shifts.',
   },
 ];
 
@@ -905,6 +993,10 @@ export const RIVAL_PACE: Record<string, number> = {
   'summit-1000': 1.069,
   'altamar-tour': 0.931,
   'summit-gala': 1.054,
+  corniche: 1.074,
+  'riviera-night': 0.985,
+  'port-sprint': 0.926,
+  'grand-riviera': 0.949,
 };
 const scaleStats = (st: Rival['stats'], k: number) => ({ top: +(st.top * k).toFixed(3), accel: +(st.accel * k).toFixed(3), grip: +(st.grip * k).toFixed(4) });
 for (const e of EVENTS) {

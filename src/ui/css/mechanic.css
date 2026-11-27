@@ -1,0 +1,140 @@
+/* Mechanic Shop: the service bay sheet (src/ui/mechanic.ts). Owned by the Mechanic Shop workstream; loaded after
+   style.css. Mobile first: 320 px phones up; every control is at least 44 px. Layout: a sticky top (title, the car,
+   area tabs), the scrolling panel, and a sticky foot (stat preview, status, the one action with its price). */
+
+.sheet:has(> .mech) { height: calc(100dvh - var(--safe-t) - 8px); max-height: calc(100dvh - var(--safe-t) - 8px); padding-top: 0; padding-bottom: 0; display: flex; flex-direction: column; }
+.mech { display: flex; flex-direction: column; min-height: 100%; }
+.mech > * { flex-shrink: 0; }
+
+/* ---- sticky top ---- */
+.mech-top { position: sticky; top: 0; z-index: 3; background: var(--panel); padding: 10px 0 4px; }
+.mech-head { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 6px; }
+.mech-head .grow { flex: 1; min-width: 0; }
+.mech-head h2 { margin: 0; font-size: var(--fs-lg); line-height: var(--lh-tight); }
+.mech-head p.d { margin: 0; font-size: var(--fs-xs); line-height: 1.2; overflow-wrap: anywhere; }
+.mech-head .chip.cash { flex: none; white-space: nowrap; }
+.mech-head .btn.close { position: static; float: none; margin: 0; flex: none; max-width: 42%; white-space: normal; line-height: 1.1; text-align: center; }
+
+.mech-bay { position: relative; height: clamp(118px, 24dvh, 210px); border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(120% 90% at 50% 0%, #2c3746 0%, #161c25 62%, #10141b 100%); transition: background .45s ease; }
+.mech[data-area="engine"] .mech-bay { background: radial-gradient(90% 90% at 70% 0%, #4a3520 0%, #1d1a18 60%, #10141b 100%); }
+.mech[data-area="wheels"] .mech-bay { background: radial-gradient(90% 90% at 28% 0%, #213a4e 0%, #151d27 62%, #10141b 100%); }
+.mech[data-area="body"] .mech-bay { background: radial-gradient(110% 100% at 50% 0%, #46505e 0%, #1d242f 60%, #10141b 100%); }
+.mech[data-area="tuning"] .mech-bay { background: radial-gradient(100% 90% at 50% 0%, #22362a 0%, #161d1c 62%, #10141b 100%); }
+.mech-bay::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 14%; background: repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 18px, transparent 18px 36px); pointer-events: none; }
+.mech-bay .mech-car { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+/* Pins: a 44 px tap target around a small label, sitting on the edge of its area. */
+.mech-pin { position: absolute; z-index: 2; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; }
+.mech-pin span { pointer-events: none; padding: 3px 9px; border-radius: 12px; border: 1px solid var(--line); background: rgba(16,21,28,.84); color: var(--text); font-weight: var(--w-heavy); font-size: var(--fs-2xs); white-space: nowrap; line-height: 1.2; }
+.mech-pin.on span { color: var(--amber-ink); background: var(--amber2); border-color: var(--amber2); box-shadow: 0 0 12px rgba(255,206,135,.45); }
+.mech-pin:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; border-radius: 14px; }
+.mech-outline { position: absolute; z-index: 1; pointer-events: none; border: 1.5px solid var(--amber2); border-radius: 12px; box-shadow: 0 0 0 1px rgba(255,206,135,.2), inset 0 0 16px rgba(255,206,135,.12); transition: left .3s ease, top .3s ease, width .3s ease, height .3s ease; }
+.mech-outline[hidden] { display: none; }
+
+.mech-areas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 6px 0 0; }
+.mech-areas .seg, .mech-fams .seg { min-height: 44px; padding: 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--muted); font-weight: var(--w-heavy); font-size: var(--fs-xs); line-height: 1.1; position: relative; min-width: 0; overflow-wrap: anywhere; }
+.mech-areas .seg.on, .mech-fams .seg.on { color: var(--amber-ink); background: var(--amber2); border-color: var(--amber2); }
+.mech-areas .dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+.mech-cars { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 2px; scrollbar-width: none; }
+.mech-cars .chipbtn { flex: none; min-height: 44px; padding: 6px 12px; border-radius: 22px; border: 1.5px solid var(--line); background: var(--bg2); font-weight: var(--w-strong); font-size: var(--fs-sm); color: var(--text); white-space: nowrap; }
+.mech-cars .chipbtn.on { border-color: var(--amber2); background: #3a2a12; color: var(--amber2); }
+.mech-cars .chipbtn small { color: var(--muted); font-weight: var(--w-body); }
+
+/* ---- panel ---- */
+.mech-panel { flex: 1 0 auto; padding-bottom: 8px; }
+.mech-panel h3 { margin: 12px 0 6px; }
+.mech-fams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
+.mech-fams .seg { display: flex; align-items: center; justify-content: center; gap: 4px 6px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.mech-fams .seg small { font-weight: var(--w-strong); font-size: var(--fs-2xs); opacity: .8; }
+.mech-fams .fi, .mech-fams .fi svg { width: 20px; height: 20px; display: inline-block; }
+
+.mech-fitted, .mech-opt { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); margin: 6px 0; }
+.mech-fitted { flex-wrap: wrap; }
+.mech-fitted .grow, .mech-opt .grow { flex: 1 1 120px; min-width: 0; display: flex; flex-direction: column; text-align: left; }
+.mech-fitted .t, .mech-opt .t { font-weight: var(--w-heavy); font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; line-height: 1.2; }
+.mech-fitted .d, .mech-opt .d { font-size: var(--fs-2xs); color: var(--muted); overflow-wrap: anywhere; line-height: 1.3; }
+.mech-fitted .btn { flex: none; min-width: 56px; }
+.mech-fitted .btns { display: flex; gap: 6px; margin-left: auto; }
+.mech .tile { flex: none; width: 40px; height: 40px; display: grid; place-items: center; }
+.mech .tile.ico { border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); color: var(--amber2); font-size: var(--fs-lg); }
+.mech .tile svg, .mech .tile .ptile { max-width: 40px; max-height: 40px; }
+.mech-list { display: flex; flex-direction: column; }
+.mech-opt { width: 100%; min-height: 56px; color: var(--text); font: inherit; cursor: pointer; }
+.mech-opt.on { border-color: var(--amber2); background: #33281a; box-shadow: inset 0 0 0 1px var(--amber2); }
+.mech-opt.other { border-style: dashed; }
+.mech-opt.done { opacity: .75; cursor: default; }
+.mech-opt .delta, .mech-opt .price { flex: none; font-weight: var(--w-heavy); font-size: var(--fs-sm); white-space: nowrap; }
+.mech-opt .delta.up { color: var(--green); }
+.mech-opt .delta.down { color: var(--red); }
+.mech-opt .delta.same { color: var(--dim); }
+.mech-opt .price { color: var(--amber2); }
+
+/* Order tiers: each tier its own metal, so T3 blue steel and T7 violet read apart at a glance. */
+.mech-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.mech-tier { min-height: 64px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 4px; border-radius: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--metal) 55%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 22%, var(--bg2)), var(--bg2)); color: var(--text); font: inherit; line-height: 1.15; }
+.mech-tier b { font-size: var(--fs-md); color: var(--metal); text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+.mech-tier small { font-size: var(--fs-2xs); }
+.mech-tier .mat { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mech-tier .price { color: var(--amber2); font-weight: var(--w-heavy); }
+.mech-tier .up { color: var(--green); font-weight: var(--w-heavy); }
+.mech-tier.short .price { color: var(--dim); }
+.mech-tier.on { border-color: var(--amber2); box-shadow: inset 0 0 0 1px var(--amber2), 0 0 10px rgba(255,206,135,.25); }
+
+/* Paint shop chips */
+.mech-group p.d { margin: 0 0 6px; font-size: var(--fs-xs); }
+.mech-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 6px; }
+.mech-chip { min-height: 52px; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 5px 8px; text-align: left; border-radius: 12px; border: 1.5px solid var(--line); background: var(--bg2); color: var(--text); font: inherit; font-weight: var(--w-heavy); font-size: var(--fs-xs); line-height: 1.15; }
+.mech-chip .stack { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.mech-chip small { font-weight: var(--w-strong); color: var(--amber2); font-size: var(--fs-2xs); }
+.mech-chip small.own { color: var(--green); }
+.mech-chip .swatch { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--paint); border: 2px solid rgba(255,255,255,.5); }
+.mech-chip.applied { border-color: var(--green); }
+.mech-chip.applied small { color: var(--green); }
+.mech-chip.on { border-color: var(--amber2); background: #33281a; box-shadow: inset 0 0 0 1px var(--amber2); }
+.mech-chip.locked { opacity: .62; border-style: dashed; }
+.mech-chip.locked small { color: var(--muted); }
+
+.mech-kits { margin-top: 10px; }
+.mech-kits summary { cursor: pointer; font-weight: var(--w-heavy); min-height: 44px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mech-kits summary small { color: var(--muted); font-weight: var(--w-strong); font-size: var(--fs-2xs); }
+
+/* ---- sticky foot: always reachable, above the home indicator ---- */
+.mech-foot { position: sticky; bottom: 0; z-index: 3; margin-top: auto; background: var(--panel); border-top: 1px solid var(--line); padding: 6px 0 calc(var(--safe-b) + 10px); box-shadow: 0 -10px 14px -8px rgba(0,0,0,.5); }
+.mech-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.mech-stats .ms { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 2px 6px; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 5px; line-height: 1.2; }
+.mech-stats .ms.key { border-color: var(--amber); }
+.mech-stats .sl { flex-basis: 100%; font-size: var(--fs-2xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mech-stats .sv { font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mech-stats .sd { font-size: var(--fs-2xs); font-weight: var(--w-heavy); color: var(--dim); white-space: nowrap; }
+.mech-stats .sd.up { color: var(--green); }
+.mech-stats .sd.down { color: var(--red); }
+.mech-note { margin: 4px 0 0 !important; font-size: var(--fs-xs) !important; line-height: 1.3 !important; color: var(--green) !important; overflow-wrap: anywhere; }
+.mech-note.bad { color: var(--amber2) !important; }
+.mech-note:empty { display: none; }
+.mech-commit { display: flex; gap: 6px; align-items: stretch; margin-top: 6px; }
+.mech-commit .btn { min-height: 52px; min-width: 0; }
+.mech-commit .btn.go { flex: 1 1 0; }
+.mech-commit .btn .stack { display: flex; flex-direction: column; align-items: center; min-width: 0; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+.mech-commit .btn small { font-weight: var(--w-strong); font-size: var(--fs-2xs); opacity: .9; }
+.mech-commit .btn.go.off { filter: saturate(.3); opacity: .75; }
+.mech-commit .btn.alt { flex: 0 1 auto; max-width: 30%; }
+.mech-commit .btn.alt small { color: var(--muted); }
+.mech-commit .btn.alt.off { opacity: .6; }
+.mech-commit.hint p { margin: 0; }
+
+@media (max-width: 359px) {
+  .mech-areas .seg { font-size: var(--fs-2xs); padding: 2px; }
+  .mech-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mech-head .chip.cash { display: none; }
+  .mech-commit .btn { padding: 4px 8px; }
+}
+@media (max-height: 620px) {
+  .mech-head p.d { display: none; }
+  .mech-bay { height: 112px; }
+}
+@media (min-width: 700px) {
+  .sheet:has(> .mech) { width: min(680px, 100%); }
+}
+html.reduced .mech-bay, html.reduced .mech-outline { transition: none; }

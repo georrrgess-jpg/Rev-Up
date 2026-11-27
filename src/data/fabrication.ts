@@ -53,5 +53,23 @@ export const KIT_SHELF_MAX = 5;
 export const FAB_OPEN_CARS = 4;
 /** Kit price in scrap by your best car's cap: half the recycle value of a part of that tier, on a 5-scrap step, so
  *  one surplus part of your top class always recycles into two kits (cap 2–4: 5 · cap 5: 15 · cap 6: 30 · cap 7: 60
- *  · cap 8: 125 · cap 9: 255). One kit a race, so the sink keeps pace with late-game surplus. */
-export const kitCost = (bestCap: number) => Math.max(5, Math.floor((SCRAP_VALUE[Math.max(1, Math.min(9, bestCap))] ?? 0) / 2 / 5) * 5);
+ *  · cap 8: 125 · cap 9: 255 · cap 10: 510). One kit a race, so the sink keeps pace with late-game surplus. */
+export const kitCost = (bestCap: number) => Math.max(5, Math.floor((SCRAP_VALUE[Math.max(1, Math.min(10, bestCap))] ?? 0) / 2 / 5) * 5);
+
+// ---------------- Concours restoration (a scrap sink for every car) ----------------
+
+/** Three permanent stages per owned car, paid in scrap: cosmetic and collection only, never performance. The third
+ *  stage earns the car's Concours badge. Priced by the car's cap so it stays a real sink late on: stage k costs
+ *  CONCOURS_MUL[k] × the recycle value of a part of that cap (with a floor), on a 5-scrap step — e.g. the Ironhorse
+ *  (cap 5) 50 / 100 / 160, the Halcyon (cap 9) 770 / 1,540 / 2,560, the Sovereign (cap 10) 1,540 / 3,070 / 5,120. */
+export const CONCOURS_STAGES = ['Detail and polish', 'Engine bay', 'Concours'] as const;
+export const CONCOURS_MUL = [1.5, 3, 5];
+export const CONCOURS_FLOOR = [30, 60, 100];
+/** Opens with the Build Sheets (the fourth car). */
+export const CONCOURS_OPEN_CARS = 4;
+export const concoursCost = (cap: number, stage: number) => {
+  if (stage < 0 || stage >= CONCOURS_STAGES.length) return 0;
+  const raw = Math.max(CONCOURS_FLOOR[stage], (SCRAP_VALUE[Math.max(1, Math.min(10, cap))] ?? 0) * CONCOURS_MUL[stage]);
+  return Math.round(raw / 5) * 5;
+};
+export const concoursBadge = (model: string) => `Concours ${model}`;

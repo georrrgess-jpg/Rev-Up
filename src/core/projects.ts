@@ -5,7 +5,7 @@
 // Only bench and spare-rack parts can be donated (never a fitted part). Owned by the Scrap & surplus workstream.
 import {
   BUILDS_OPEN_CARS, BUILD_POINTS_BY_REL, BUILD_QUALITY_MUL, BUILD_STAGE_BONUS, BUILD_STAGE_NAMES, BUILD_STAGE_PTS,
-  BUILD_STAGE_SEAL, BUILD_TRACK_NAME,
+  BUILD_STAGE_SEAL, BUILD_TRACK_NAME, CONCOURS_OPEN_CARS, CONCOURS_STAGES, concoursBadge, concoursCost,
 } from '../data/fabrication';
 import { ACTIVE_FAMILIES, CarId, FAMILIES, Family, SCRAP_VALUE, carById } from '../data/tables';
 import type { GameEvent, SlotRef } from './events';
@@ -158,6 +158,39 @@ export function surplusValue(s: GameState, p: Part) {
   return { scrap: SCRAP_VALUE[p.t] ?? 0, donate: bestDonation(s, p) };
 }
 
+// ---------------- Concours restoration (scrap sink) ----------------
+
+export const concoursOpen = (s: GameState) => s.owned.length >= CONCOURS_OPEN_CARS;
+export const concoursStage = (s: GameState, car: CarId) => Math.max(0, Math.min(CONCOURS_STAGES.length, Math.floor(s.concours?.[car] ?? 0)));
+
+/** The next restoration stage for a car: its exact scrap price, what it gives, and why it can't be bought (or null). */
+export function restoreInfo(s: GameState, car: CarId): { stage: number; of: number; name: string; cost: number; benefit: string; locked: string | null; maxed: boolean } {
+  const stage = concoursStage(s, car);
+  const of = CONCOURS_STAGES.length;
+  const maxed = stage >= of;
+  const cls = carById(car);
+  const cost = maxed ? 0 : concoursCost(cls.cap, stage);
+  const name = maxed ? 'Restored' : CONCOURS_STAGES[stage];
+  const benefit = maxed ? `The ${cls.model} is a Concours car` : stage === of - 1
+    ? `Stage ${of} of ${of}: the ${concoursBadge(cls.model)} badge for your Showroom (looks only, no performance)`
+    : `Stage ${stage + 1} of ${of}: ${name.toLowerCase()} for the ${cls.model} (looks only, no performance)`;
+  const locked = !concoursOpen(s) ? `Restoration opens with your ${CONCOURS_OPEN_CARS}th car` : !s.owned.includes(car) ? `Unlock the ${cls.model} first` : null;
+  return { stage, of, name, cost, benefit, locked, maxed };
+}
+
+/** Restore a car one stage for scrap (stages in order, each charged once; refused when short or fully restored).
+ *  Never touches cash or performance. */
+export function restoreCar(s: GameState, car: CarId): GameEvent[] {
+  const r = restoreInfo(s, car);
+  if (r.locked) return [{ type: 'invalid', reason: r.locked }];
+  if (r.maxed) return [{ type: 'invalid', reason: `The ${carById(car).model} is fully restored` }];
+  if (s.scrap < r.cost) return [{ type: 'invalid', reason: `Need ${r.cost - s.scrap} more scrap` }];
+  s.scrap -= r.cost;
+  (s.concours ??= {})[car] = r.stage + 1;
+  if (r.stage + 1 >= r.of && !s.badges.includes(concoursBadge(carById(car).model))) s.badges.push(concoursBadge(carById(car).model));
+  return [{ type: 'styleBought', item: `concours:${r.stage + 1}`, car }];
+}
+
 /** Keep a loaded save's build and kit records well formed (an older save has none). */
 export function sanitizeSurplus(g: GameState) {
   const ok = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 0;
@@ -180,4 +213,9 @@ export function sanitizeSurplus(g: GameState) {
     const inRace = g.fab.inRace && ok(g.fab.inRace.id) && Array.isArray(g.fab.inRace.kits) ? { id: g.fab.inRace.id, kits: g.fab.inRace.kits.filter((k) => typeof k === 'string') } : null;
     g.fab = { kits, armed, inRace };
   } else delete g.fab;
+  if (g.concours && typeof g.concours === 'object' && !Array.isArray(g.concours)) {
+    const out: NonNullable<GameState['concours']> = {};
+    for (const [car, n] of Object.entries(g.concours)) if (ok(n)) out[car as CarId] = Math.min(CONCOURS_STAGES.length, Math.floor(n));
+    g.concours = out;
+  } else delete g.concours;
 }

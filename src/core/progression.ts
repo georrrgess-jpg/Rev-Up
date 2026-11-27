@@ -14,7 +14,7 @@ export const PRINTER_BANK_CAP = 10; // printer pauses with this many unopened pr
 // ---------------- Difficulty ----------------
 
 /** Districts where rivals shift clean (the reference acceleration): from the Coastal Crown onward. */
-const CLEAN_RIVALS: DistrictId[] = ['coastal', 'downtown', 'desert', 'summit'];
+const CLEAN_RIVALS: DistrictId[] = ['coastal', 'downtown', 'desert', 'summit', 'riviera'];
 /** How well an event's rivals shift: 'ordinary' (a beat late) early on, 'clean' from the Coastal Crown onward.
  *  The race setup passes this as `RaceSetup.rivalShift`; a knockout heat uses its parent's. */
 export function rivalShiftFor(e: RaceEvent): 'ordinary' | 'clean' {
@@ -673,7 +673,13 @@ export function recommendedEvent(s: GameState): RaceEvent {
   }
   // Downtown Nights: goals not yet met are worth more than repeat Rep, and they open the next car.
   // (the last two races are skipped, so unfinished goals rotate instead of repeating one event)
-  const starHunt = open.filter((e) => e.goals && (s.stars?.[e.id] ?? 0) !== 7 && !(s.recentEvents ?? []).includes(e.id));
+  // Once no unlock waits on stars, an event whose goals you have tried several times (often the Perfect boost goal,
+  // for a player who doesn't use nitro) stops being pushed: the pick goes back to the best Rep, so the
+  // recommendation never parks a player on a low purse for a goal they aren't chasing.
+  const starsWanted = EVENTS.some((e) => e.requires.stars && !(s.events[e.id]?.starts) && starsIn(s) < e.requires.stars)
+    || ENABLED_CARS.some((c) => c.unlock?.stars && !s.owned.includes(c.id) && starsIn(s) < c.unlock.stars);
+  const starHunt = open.filter((e) => e.goals && (s.stars?.[e.id] ?? 0) !== 7 && !(s.recentEvents ?? []).includes(e.id)
+    && (starsWanted || (s.events[e.id]?.starts ?? 0) < 4));
   if (starHunt.length) return starHunt[0];
   // Repeat races: the best Rep per race, counting the Fresh route bonus, so the pick rotates between routes.
   const pool = open.filter((e) => !e.boss && !struggling(e) && (s.activeCar === 'muscle' || e.id !== 'foundry-final'));

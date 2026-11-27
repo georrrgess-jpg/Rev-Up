@@ -1,6 +1,9 @@
-// The Shop, grouped by purpose: Parts (order a part, scrap crates, tune-up) · Garage (upgrades) · Style (Paint
-// shop link). Every item says what it is, its exact price, what it does for you, and what you still need.
-// A "Best buy" card on top picks the purchase that helps the next car most. Owned by the mobile UX workstream.
+// The Shop, grouped by purpose: Parts (order a part, tune-up) · Crates · Garage (upgrades) · Style (looks, fitted
+// in the Mechanic Shop) · Scrap (kits, builds, scrap orders, polish, Keep / Recycle). Every item says what it is,
+// its exact price and currency, what it does for you, and what still locks it. A "Best buy" card on top picks the
+// purchase that helps the next car most; the Mechanic Shop card opens the service bay. Owned by the Mechanic Shop
+// workstream.
+import './css/mechanic.css';
 import { sfx } from '../audio';
 import * as B from '../core/board';
 import { computeLoadout } from '../core/loadout';
@@ -10,9 +13,12 @@ import { mph } from '../core/units';
 import {
   ACTIVE_FAMILIES, CRATE_SCRAP_COST, CRATE_TIER_ODDS, FAMILIES, Family, PART_ORDER_PRICE, TARGETED_CRATE_SCRAP_COST,
   TUNE_STAGES, UPGRADES, UpgradeId, carById, tunePrice, CarId, OFFLINE_BUDGET_RACES, QUALITY_BONUS, SCRAP_VALUE, polishCost,
-  scrapOrderCost,
+  scrapOrderCost, TARGETED_CRATE_CASH_COST, MAX_TIER,
 } from '../data/tables';
-import { familyIcon } from '../render/parts';
+import { MATERIAL, familyIcon, metalFor } from '../render/parts';
+import * as S from '../core/style';
+import { STYLE_ITEMS } from '../data/tables';
+import { openMechanic } from './mechanic';
 import type { App } from './app';
 import { bestBuy, ingredients } from '../core/tutorial';
 import { partGain, statDelta } from './benefit';
@@ -22,9 +28,12 @@ import { fabBench } from './fabrication'; // Scrap & surplus
 import * as PJ from '../core/projects'; // Scrap & surplus
 import { fmt, h } from './dom';
 
-export type ShopTab = 'parts' | 'garage' | 'style' | 'scrap';
+export type ShopTab = 'parts' | 'crates' | 'garage' | 'style' | 'scrap';
 
 /** What each upgrade is for, so different upgrades read differently at a glance. */
+/** When a hidden upgrade appears, in words. */
+const SHOWS_WHEN = { always: '', quick: 'Opens after your first race win', cars3: 'Opens with your third car', cars4: 'Opens with your fourth car', cars7: 'Opens with your seventh car' } as const;
+
 const UPGRADE_LOOK: Record<UpgradeId, { icon: string; kind: string }> = {
   grid: { icon: '▦', kind: 'Bench space' },
   printer: { icon: '⎙', kind: 'Free crates' },
@@ -36,6 +45,8 @@ const UPGRADE_LOOK: Record<UpgradeId, { icon: string; kind: string }> = {
 
 /** The Shop's recommendation; the same rule decides whether the guide's "spend" beat has anything to show. */
 export const shopPick = bestBuy;
+/** The parts counter never sells the top tier (it is always a craft). */
+const MAX_SOLD = MAX_TIER - 1;
 
 function tuneGain(s: GameState): string {
   const car = s.activeCar;
@@ -126,19 +137,21 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
           onclick: () => { fam = f; tier = 0; build(); },
         }, h('span', { html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, h('small', {}, f === goalFam ? 'Goal' : FAMILIES[f].statLabel));
         const tierBtn = (t: number) => h('button', {
-          class: `btn sm tier-pick${t === tier ? ' on' : ''}`, 'aria-pressed': String(t === tier),
+          class: `btn sm tier-pick metal${t === tier ? ' on' : ''}`, 'aria-pressed': String(t === tier), style: `--metal:${metalFor(t)}`,
+          'aria-label': `T${t} ${MATERIAL[t]}, $${PART_ORDER_PRICE[t]}`,
           onclick: () => { tier = t; build(); },
-        }, h('b', {}, `T${t}`), h('small', { class: 'num' }, `$${fmt(PART_ORDER_PRICE[t])}`));
+        }, h('b', {}, `T${t}`), h('small', { class: 'mat' }, MATERIAL[t]), h('small', { class: 'num' }, `$${fmt(PART_ORDER_PRICE[t])}`));
         const stage = s.tune?.[s.activeCar] ?? 0;
         const tPrice = tunePrice(s.activeCar, stage);
         return [
           h('h3', {}, 'Order a part'),
           h('p', { class: 'd' }, `A part you choose, delivered to your bench. Fit it to a car or merge it. Sold up to T${maxT}; the next car's own part must be crafted.`),
           h('div', { class: 'fams' }, ...ACTIVE_FAMILIES.map(famBtn)),
-          h('div', { class: 'tiers' }, ...Array.from({ length: maxT }, (_, k) => tierBtn(k + 1))),
+          h('div', { class: 'tiers' }, ...Array.from({ length: maxT }, (_, k) => tierBtn(k + 1)),
+            maxT < MAX_SOLD ? h('div', { class: 'tier-lock', 'aria-label': `T${maxT + 1} and up: merge them on the bench` }, h('b', {}, `T${maxT + 1}+`), h('small', {}, 'merge only')) : null),
           h('div', { class: 'item' },
             h('div', { class: 'item-head' }, h('span', { class: 'item-ico', html: familyIcon(fam!), 'aria-hidden': 'true' }),
-              h('div', { class: 'grow' }, h('div', { class: 't' }, `T${tier} ${FAMILIES[fam!].name}`), h('div', { class: 'd' }, `${FAMILIES[fam!].statLabel} part · guaranteed family and tier`)),
+              h('div', { class: 'grow' }, h('div', { class: 't' }, `T${tier} ${FAMILIES[fam!].name}`), h('div', { class: 'd' }, `${MATERIAL[tier]} · ${FAMILIES[fam!].statLabel} part · guaranteed family and tier`)),
               h('span', { class: 'price num' }, `$${fmt(price)}`)),
             h('ul', { class: 'facts' },
               h('li', { class: gain.better ? 'up' : '' }, gain.text),
@@ -160,7 +173,6 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
       // ---- Scrap workshop: order a chosen part, polish a part, sort spares, crates (all paid in scrap)
       const scrapTab = () => {
         if (!sTier || sTier > maxT) sTier = tier && tier <= maxT ? tier : maxT;
-        const odds = CRATE_TIER_ODDS[Math.min(s.upgrades.crateTier, CRATE_TIER_ODDS.length - 1)].map((w, i) => (w > 0 ? `${Math.round(w * 100)}% T${i + 1}` : '')).filter(Boolean).join(', ');
         const cost = scrapOrderCost(sTier);
         const back = SCRAP_VALUE[sTier];
         const gain = partGain(s, s.activeCar, { f: fam!, t: sTier, q: 'std' });
@@ -174,9 +186,10 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
           onclick: () => { fam = f; build(); },
         }, h('span', { html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, h('small', {}, f === goalFam ? 'Goal' : FAMILIES[f].statLabel));
         const tierBtn = (t: number) => h('button', {
-          class: `btn sm tier-pick${t === sTier ? ' on' : ''}`, 'aria-pressed': String(t === sTier),
+          class: `btn sm tier-pick metal${t === sTier ? ' on' : ''}`, 'aria-pressed': String(t === sTier), style: `--metal:${metalFor(t)}`,
+          'aria-label': `T${t} ${MATERIAL[t]}, ${scrapOrderCost(t)} scrap`,
           onclick: () => { sTier = t; build(); },
-        }, h('b', {}, `T${t}`), h('small', { class: 'num' }, `${fmt(scrapOrderCost(t))}`));
+        }, h('b', {}, `T${t}`), h('small', { class: 'mat' }, MATERIAL[t]), h('small', { class: 'num' }, `${fmt(scrapOrderCost(t))} scrap`));
         const goalLine = goalFam === fam && g ? (() => {
           const { have, need: n } = ingredients(s, fam!, g.tier);
           const add = sTier < g.tier ? 2 ** (sTier - 1) : 0;
@@ -237,16 +250,35 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
           h('h3', {}, 'Polish a part'),
           h('p', { class: 'd' }, `A standard part becomes Polished: +${Math.round((QUALITY_BONUS - 1) * 100)}% of its stat, like a lucky merge. Works on fitted parts, so older cars keep up. Merging a polished part rolls a new quality.`),
           ...(cands.length ? cands.slice(0, 6).map(polishRow) : [h('p', { class: 'd' }, 'Every fitted part is already Polished or Mint.')]),
-          h('h3', {}, 'Scrap crates'),
-          h('p', { class: 'd' }, `Crates now hold ${odds}.`),
+        ];
+      };
+
+      // ---- Crates: random parts for scrap (or a family crate for cash), odds shown up front
+      const crates = () => {
+        const odds = CRATE_TIER_ODDS[Math.min(s.upgrades.crateTier, CRATE_TIER_ODDS.length - 1)].map((w, i) => (w > 0 ? `${Math.round(w * 100)}% T${i + 1}` : '')).filter(Boolean).join(', ');
+        const full = !B.firstFree(s);
+        const crateBtn = (cost: number, cur: 'scrap' | 'cash', run: () => void, aria: string) => {
+          const have = cur === 'cash' ? s.cash : s.scrap;
+          const label = cur === 'cash' ? `$${fmt(cost)}` : `${fmt(cost)} scrap`;
+          return h('button', {
+            class: `btn sm buy${have < cost ? ' off' : ' primary'}`, 'aria-label': aria,
+            onclick: () => { if (have < cost) app.toast(cur === 'cash' ? `Need $${fmt(cost - have)} more` : `Need ${fmt(cost - have)} more scrap`); else { run(); sfx.cash(); } build(); },
+          }, h('span', { class: 'stack' }, label, have < cost ? h('small', { class: 'short' }, cur === 'cash' ? `$${fmt(cost - have)} more` : `${fmt(cost - have)} more`) : null));
+        };
+        return [
+          h('p', { class: 'd' }, `A crate is a surprise part: cheaper than a chosen order, but the tier is luck. Crates now hold ${odds}.${full ? ' Your bench is full: crates wait in the queue until you make room.' : ''}`),
+          h('div', { class: 'fams' }, ...ACTIVE_FAMILIES.map((f) => h('button', {
+            class: `btn fam-pick${f === fam ? ' on' : ''}`, 'aria-pressed': String(f === fam), onclick: () => { fam = f; build(); },
+          }, h('span', { html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, h('small', {}, f === goalFam ? 'Goal' : FAMILIES[f].statLabel)))),
           h('div', { class: 'row' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '?'),
-            h('div', { class: 'grow' }, h('div', { class: 't' }, 'Mystery crate'), h('div', { class: 'd' }, 'One random part, any family')),
-            h('button', { class: `btn sm${s.scrap < CRATE_SCRAP_COST ? ' off' : ''}`, onclick: () => { if (s.scrap < CRATE_SCRAP_COST) app.toast(`Need ${CRATE_SCRAP_COST - s.scrap} more scrap`); else game.buyCrate('std'); build(); } },
-              h('span', { class: 'stack' }, `${CRATE_SCRAP_COST} scrap`, s.scrap < CRATE_SCRAP_COST ? h('small', {}, `${CRATE_SCRAP_COST - s.scrap} more`) : null))),
+            h('div', { class: 'grow' }, h('div', { class: 't' }, 'Mystery crate'), h('div', { class: 'd' }, 'One random part, any family · paid in scrap')),
+            crateBtn(CRATE_SCRAP_COST, 'scrap', () => game.buyCrate('std'), `Mystery crate for ${CRATE_SCRAP_COST} scrap`)),
           h('div', { class: 'row' }, h('span', { class: 'up-ico', html: familyIcon(fam!), 'aria-hidden': 'true' }),
-            h('div', { class: 'grow' }, h('div', { class: 't' }, `${FAMILIES[fam!].name} crate`), h('div', { class: 'd' }, `A random-tier ${FAMILIES[fam!].name.toLowerCase()} part`)),
-            h('button', { class: `btn sm${s.scrap < TARGETED_CRATE_SCRAP_COST ? ' off' : ''}`, onclick: () => { if (s.scrap < TARGETED_CRATE_SCRAP_COST) app.toast(`Need ${TARGETED_CRATE_SCRAP_COST - s.scrap} more scrap`); else game.buyCrate('targeted', fam!); build(); } },
-              h('span', { class: 'stack' }, `${TARGETED_CRATE_SCRAP_COST} scrap`, s.scrap < TARGETED_CRATE_SCRAP_COST ? h('small', {}, `${TARGETED_CRATE_SCRAP_COST - s.scrap} more`) : null))),
+            h('div', { class: 'grow' }, h('div', { class: 't' }, `${FAMILIES[fam!].name} crate`), h('div', { class: 'd' }, `A random-tier ${FAMILIES[fam!].name.toLowerCase()} part · paid in scrap`)),
+            crateBtn(TARGETED_CRATE_SCRAP_COST, 'scrap', () => game.buyCrate('targeted', fam!), `${FAMILIES[fam!].name} crate for ${TARGETED_CRATE_SCRAP_COST} scrap`)),
+          h('div', { class: 'row' }, h('span', { class: 'up-ico', html: familyIcon(fam!), 'aria-hidden': 'true' }),
+            h('div', { class: 'grow' }, h('div', { class: 't' }, `${FAMILIES[fam!].name} crate · cash`), h('div', { class: 'd' }, `The same random-tier ${FAMILIES[fam!].name.toLowerCase()} part, paid in cash`)),
+            crateBtn(TARGETED_CRATE_CASH_COST, 'cash', () => game.buyCrate('cash', fam!), `${FAMILIES[fam!].name} crate for $${TARGETED_CRATE_CASH_COST}`)),
         ];
       };
 
@@ -270,16 +302,37 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
                 h('div', { class: 'd' }, next ? h('span', {}, 'Now: ', fx.now, h('span', { class: 'arrow', 'aria-hidden': 'true' }, ' → '), h('b', {}, fx.next)) : h('span', {}, `${fx.now} · fully upgraded`))),
               next ? buyBtn(next.cost, `$${fmt(next.cost)}`, () => game.buyUpgrade(u.id), `${u.name}: ${next.label}, $${next.cost}`) : h('span', { class: 'd done' }, '✓'));
           }),
-          UPGRADES.some((u) => !P.upgradeShown(s, u)) ? h('p', { class: 'd' }, 'More upgrades appear as your garage grows (after your first win and with more cars).') : null,
+          ...UPGRADES.filter((u) => !P.upgradeShown(s, u)).map((u) => h('div', { class: `row up-row locked up-${u.id}` },
+            h('span', { class: 'up-ico', 'aria-hidden': 'true' }, UPGRADE_LOOK[u.id].icon),
+            h('div', { class: 'grow' }, h('div', { class: 't' }, u.name), h('div', { class: 'kind' }, `${UPGRADE_LOOK[u.id].kind} · ${u.about}`),
+              h('div', { class: 'd' }, `First level $${fmt(u.levels[0].cost)}: ${u.levels[0].label}`)),
+            h('span', { class: 'lock-tag' }, `🔒 ${SHOWS_WHEN[u.shows ?? 'always']}`))),
           h('h3', {}, 'While you are away'),
           h('p', { class: 'd away-note' }, `While the game is closed your crew does side jobs: up to $${fmt(full.cash)} for ${hrs} h away (${OFFLINE_BUDGET_RACES[Math.min(s.upgrades.lockup ?? 0, OFFLINE_BUDGET_RACES.length - 1)]}× the $${fmt(yard.cash)} win purse of ${yard.event.name}, your best open race), building evenly — $${fmt(P.offlinePayout(s, 3600).cash)} for an hour. Time past ${hrs} h isn't counted, and owning more cars doesn't add to it. Races pay more.`),
         ];
       };
 
-      const style = () => [
-        h('p', { class: 'd' }, 'Paint colors, finishes and wheel sets change how your cars look — never how fast they are. They live in the Paint shop in the Showroom.'),
-        h('button', { class: 'btn wide primary', onclick: () => { close(); app.go('showroom'); } }, 'Open the Paint shop'),
-      ];
+      const style = () => {
+        const kinds: [string, string, string, 'body' | 'wheels'][] = [
+          ['paint', 'Colours', 'Bought once, fits every car', 'body'], ['livery', 'Liveries', 'Bought once, fits every car', 'body'],
+          ['material', 'Premium paint', `Per car · for the ${car.model}`, 'body'], ['wheel', 'Wheel sets', 'Bought once, fits every car', 'wheels'],
+        ];
+        const items = S.shopItems(s, s.activeCar);
+        return [
+          h('p', { class: 'd' }, 'Colours, premium paint, liveries and wheel sets change how your cars look — never how fast they are. Preview them on your car in the Mechanic Shop before you buy; they show in the Showroom and on track.'),
+          ...kinds.map(([kind, title, scope, area]) => {
+            const list = items.filter((i) => i.kind === kind);
+            const owned = list.filter((i) => S.owned(s, i, s.activeCar)).length;
+            const next = STYLE_ITEMS.filter((i) => i.kind === kind && s.owned.length < i.opens).sort((a, b) => a.opens - b.opens)[0];
+            const prices = list.filter((i) => !S.owned(s, i, s.activeCar)).map((i) => i.price);
+            return h('div', { class: 'row style-row' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, area === 'wheels' ? '◎' : '◆'),
+              h('div', { class: 'grow' }, h('div', { class: 't' }, title, h('span', { class: 'lvl' }, ` ${owned}/${list.length} owned`)),
+                h('div', { class: 'd' }, `${scope}${prices.length ? ` · $${fmt(Math.min(...prices))}${prices.length > 1 ? `–$${fmt(Math.max(...prices))}` : ''} cash` : ' · all owned'}${next ? ` · more with your ${['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'][next.opens] ?? `${next.opens}th`} car` : ''}`)),
+              h('button', { class: 'btn sm', onclick: () => { close(); openMechanic(app, { area, returnTo: () => openShop(app, undefined, 'style') }); } }, 'Preview'));
+          }),
+          h('button', { class: 'btn wide primary', onclick: () => { close(); openMechanic(app, { area: 'body', returnTo: () => openShop(app, undefined, 'style') }); } }, 'Open Body and Paint'),
+        ];
+      };
 
       const goalNote = g ? h('p', { class: 'goal-note' }, h('b', {}, `Next car · ${g.car.model}: `),
         [!g.keystoneDone ? `craft T${g.tier} ${FAMILIES[g.family].name}` : '', g.event && !g.eventDone ? 'a race win' : '', s.rep < g.repNeed ? `${fmt(g.repNeed - s.rep)} more Rep` : ''].filter(Boolean).join(' · ') || 'ready') : null;
@@ -290,8 +343,11 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
         h('p', { class: 'wallet' }, h('span', { class: 'chip cash' }, `$${fmt(s.cash)}`), h('span', { class: 'chip scrap' }, `${fmt(s.scrap)} scrap`)),
         ...(goalNote ? [goalNote] : []),
         ...(best ? [best] : []),
-        h('div', { class: 'segs', role: 'tablist', 'aria-label': 'Shop sections' }, tabBtn('parts', 'Parts'), tabBtn('scrap', 'Scrap'), tabBtn('garage', 'Garage'), tabBtn('style', 'Paint')),
-        ...(tab === 'parts' ? parts() : tab === 'scrap' ? scrapTab() : tab === 'garage' ? garage() : style()).filter((x): x is NonNullable<typeof x> => !!x),
+        h('button', { class: 'btn wide mech-entry', 'aria-label': `Mechanic Shop: fit parts, wheels and paint on your ${car.model}`, onclick: () => { close(); openMechanic(app, { returnTo: () => openShop(app, undefined, tab) }); } },
+          h('span', { class: 'ico', 'aria-hidden': 'true' }, '🔧'),
+          h('span', { class: 'stack' }, 'Mechanic Shop', h('small', {}, `Fit, upgrade and paint your ${car.model} — preview before you pay`))),
+        h('div', { class: 'segs five', role: 'tablist', 'aria-label': 'Shop sections' }, tabBtn('parts', 'Parts'), tabBtn('crates', 'Crates'), tabBtn('garage', 'Garage'), tabBtn('style', 'Style'), tabBtn('scrap', 'Scrap')),
+        ...(tab === 'parts' ? parts() : tab === 'crates' ? crates() : tab === 'scrap' ? scrapTab() : tab === 'garage' ? garage() : style()).filter((x): x is NonNullable<typeof x> => !!x),
       );
     };
     build();

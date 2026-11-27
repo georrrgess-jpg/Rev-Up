@@ -1,9 +1,13 @@
-import { SceneView, drawBackdrop, drawForeground, drawRoadDressing, hash, roadColors, sceneLights, signText } from '../render/scene';
+import { Look, SceneView, drawBackdrop, drawForeground, drawRoadDressing, hash, roadColors, sceneLights, sceneLook } from '../render/scene';
+import { RaceFx, drawCourseSigns } from '../render/raceFx';
 import { resultCard } from './results';
 import type { RaceView } from './raceMenu';
 import { carStyle } from '../core/style';
-import { EngineHum, resumeAudio, sfx, suspendAudio } from '../audio';
-import { DownshiftRecord, RaceOutcome, RaceSetup, RaceSim, ShiftRecord, speedMph } from '../core/race';
+import { resumeAudio, sfx, suspendAudio } from '../audio';
+import { music } from '../audio-api';
+import { RaceAudio } from '../audio-race';
+import { DownshiftRecord, GearEvent, RaceOutcome, RaceSetup, RaceSim, ShiftRecord, SimAudioState, speedMph } from '../core/race';
+import { drivetrainFor } from '../data/drivetrain';
 import { mph } from '../core/units';
 import { Gauge, ShiftCue } from './raceGauge';
 import type { LastResult } from '../core/state';
@@ -33,7 +37,20 @@ export function telemetryRows(o: RaceOutcome, windows: number): HTMLElement[] {
   return rows;
 }
 
-const sim0Launch = (sim: RaceSim) => sim.player.x < (sim.track.segments[0]?.length ?? 0) && sim.player.x > 0.5;
+
+/**
+ * Everything the race sound needs for one frame (RaceScreen.audioFrame()): the sim's engine/tyre/nitro snapshot of the
+ * player's car, the gear changes since the previous frame (up or down; clean / early / late / missed / assist /
+ * auto-down; `auto` when the box did it), and where the race is: staging (the countdown burnout, with its 0..1
+ * build-up), racing, or finished.
+ */
+export interface RaceAudioSnapshot extends SimAudioState {
+  events: GearEvent[];
+  phase: 'staging' | 'racing' | 'finished';
+  /** 0..1: the staging burnout's build-up (revs held against the brake), 0 once racing. */
+  burnout: number;
+  paused: boolean;
+}
 
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number }
 
@@ -58,7 +75,7 @@ export class RaceScreen {
   private pauseEl: HTMLElement | null = null;
   private finished = false;
   private particles: Particle[] = [];
-  private hum: EngineHum;
+  private hum: RaceAudio;
   private lastHud = 0;
   private cueDone = new Set<number>();
   private calloutTimer = 0;
@@ -68,7 +85,7 @@ export class RaceScreen {
   private reduced: boolean;
   private zoom = 0;
   private zoomTarget = 0;
-  private look = 0;
+  private lookT = 0;
   private ticker!: HTMLElement;
   private flash!: HTMLElement;
   private tickerTimer = 0;
@@ -93,15 +110,21 @@ export class RaceScreen {
   private outcome: RaceOutcome | null = null;
   private lastFrameDt = 0;
   private closed = false;
+  private look: Look;
+  private fx: RaceFx;
+  private gearSeq = 0;
+  private countdown0: number;
 
   constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
     // the live race takes the player's SHIFT input; Quick Race and the bots shift for themselves
     this.sim = new RaceSim({ ...setup, shift: 'manual' });
     if (import.meta.env.DEV) (window as unknown as { __race?: RaceScreen }).__race = this;
-    const rev = carById(setup.player.car).rev;
-    this.hum = new EngineHum(rev.base, rev.peak, setup.player.car);
+    this.hum = new RaceAudio(this.sim, app.game.state.installed?.[setup.player.car]); // engine voice with the fitted engine / turbo
     this.reduced = app.game.state.settings.reducedMotion;
     this.countdown = this.reduced ? 1.2 : 2.4;
+    this.countdown0 = this.countdown;
+    this.look = sceneLook(this.sim.track.theme, this.sim.track.id);
+    this.fx = new RaceFx(this.reduced, this.look);
     this.eventName = app.game.rivalRunName ?? eventById(setup.eventId).name;
     this.canvas = h('canvas', { class: 'track', 'aria-hidden': 'true' });
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
@@ -158,7 +181,7 @@ export class RaceScreen {
       this.last = performance.now();
       this.raf = requestAnimationFrame((t) => this.frame(t));
     });
-    this.hum.start();
+    this.hum.start(this.countdown);
     this.updateHud(true);
     this.showCallout('3', 'countdown');
     sfx.countdown(false);
@@ -211,6 +234,7 @@ export class RaceScreen {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.gradeTimer);
     this.hum.stop();
+    music.play('garage');
     document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('visibilitychange', this.onVis);
     window.removeEventListener('blur', this.onVis);
@@ -284,12 +308,26 @@ export class RaceScreen {
     // an automatic downshift is never silent: the new gear flashes ("↓3") while the cue waits for it to settle
     const ld = sim.lastDown;
     if (ld && ld !== this.downShown) { this.downShown = ld; this.showGrade(`↓${ld.into + 1} Braking downshift`, 'down'); }
-    this.gauge.draw(this.countdown > 0 ? 0.14 : att.f, p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt, att.band);
+    this.gauge.draw(this.countdown > 0 ? 0.14 : att.f, p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt, att.band, att.cue === 'hold');
     if (import.meta.env.DEV) {
       // dev-only frame trace for the shift cue (Playwright reads window.__shiftTrace when it exists)
       const tr = (window as unknown as { __shiftTrace?: unknown[] }).__shiftTrace;
       if (tr) tr.push({ t: Math.round(t), st: +sim.t.toFixed(3), gear: p.gear, f: +att.f.toFixed(4), id: att.id, acue: att.cue, needle: +(this.gauge as unknown as { needle: number }).needle.toFixed(4), band: (this.gauge as unknown as { band: number[] }).band.join('-'), cue, braking: p.braking, dt: +this.lastFrameDt.toFixed(4) });
     }
+  }
+
+  /** The race sound's per-frame snapshot (see RaceAudioSnapshot). Gear events are handed out once: each call returns
+   *  the changes since the previous call. */
+  audioFrame(): RaceAudioSnapshot {
+    const sim = this.sim;
+    const events = sim.gearEvents.filter((e) => e.seq > this.gearSeq);
+    if (events.length) this.gearSeq = events[events.length - 1].seq;
+    const staging = this.countdown > 0;
+    return {
+      ...sim.audioState(), events, phase: staging ? 'staging' : this.finished ? 'finished' : 'racing',
+      burnout: staging && !this.reduced ? Math.min(1, (this.countdown0 - this.countdown) / Math.max(0.1, this.countdown0 - 0.4)) : 0,
+      paused: this.paused,
+    };
   }
 
   private showCallout(text: string, cls: string, ms = 900) {
@@ -323,7 +361,7 @@ export class RaceScreen {
         const before = Math.ceil(this.countdown / (this.reduced ? 0.4 : 0.8));
         this.countdown -= dt;
         const after = Math.ceil(this.countdown / (this.reduced ? 0.4 : 0.8));
-        if (this.countdown <= 0) { this.showCallout('GO!', 'perfect', 600); sfx.countdown(true); if (!this.reduced) this.shake = 0.35; this.burst(24, '#c9c2b8'); }
+        if (this.countdown <= 0) { this.showCallout('GO!', 'perfect', 600); sfx.countdown(true); if (!this.reduced) this.shake = 0.35; }
         else if (after !== before) { this.showCallout(String(after), 'countdown'); sfx.countdown(false); }
       } else if (!this.finished) {
         this.acc += dt;
@@ -343,8 +381,8 @@ export class RaceScreen {
       }
       this.shake = Math.max(0, this.shake - dt);
       this.kick = Math.max(0, this.kick - dt);
-      if (!this.finished && this.countdown <= 0 && sim0Launch(this.sim) && !this.reduced && this.quality && Math.random() < 0.2) this.burst(1, '#bdb6ab');
       this.stepParticles(dt);
+      this.fx.update(dt, this.sim, Math.max(0, this.countdown), this.quality, (r) => carLengthM(r.car), (r) => this.laneOf(r));
     }
     this.draw();
     this.shiftHud(t);
@@ -401,12 +439,13 @@ export class RaceScreen {
     } else if (!active && next && canUse && eta < 2.0 && eta > 1.9) {
       this.showCallout('Boost zone ahead', 'window', 900);
     }
-    this.hum.set(this.sim.rpmFrac(p), p.nitroLeft > 0, p.cut > 0, p.limiterT > 0);
+    this.hum.frame();
   }
 
   private onPlayerFinish() {
     if (this.finished) return;
     this.finished = true;
+    this.hum.finish();
     this.nitroBtn.classList.remove('window');
     this.shiftBtn.classList.remove('soon', 'green', 'late');
     // Finish an off-screen copy for the real result, and commit now so closing the page cannot lose or
@@ -424,6 +463,7 @@ export class RaceScreen {
 
   private showResult(r: LastResult | null) {
     this.hum.stop();
+    music.play('results', { won: this.outcome?.place === 1 });
     if (!r) { this.close(); return; }
     const card = resultCard(this.app, r, { onClose: () => this.close(), onRetry: (id) => this.retry(id), extras: this.resultExtras() });
     const wrap = h('div', { class: 'result' }, card);
@@ -485,12 +525,18 @@ export class RaceScreen {
     this.particles = this.particles.filter((p) => p.life > 0);
   }
 
+  /** A racer's lane and depth (back lanes are smaller and further up the road). */
+  private laneOf(r: { id: string }) {
+    const lane = LANE_OF[this.sim.racers.findIndex((x) => x.id === r.id)] ?? 3;
+    return { lane, depth: 0.86 + lane * 0.06 };
+  }
+
   private draw() {
     const ctx = this.ctx;
     const W = this.canvas.width;
     const H = this.canvas.height;
     const sim = this.sim;
-    const theme = sim.track.theme;
+    const theme = this.look;
     const player = sim.player;
     // Camera frames the pack: zoom out when rivals spread, keep the player between 22% and 70% of the width.
     // Camera: frame the player with the nearest rival (or the whole pack if it fits); before a nitro window,
@@ -511,9 +557,11 @@ export class RaceScreen {
     const mid = (Math.max(...focus) + Math.min(...focus)) / 2;
     const ahead = sim.windowState().next;
     const lookGoal = ahead && player.v > 1 && (ahead.start - player.x) / player.v < 2.5 ? 0.12 : 0;
-    this.look += (lookGoal - this.look) * 0.05;
+    this.lookT += (lookGoal - this.lookT) * 0.05;
     // a boost kick lets the camera lag so the car surges forward on screen
-    const lookAhead = this.look - 0.05 * Math.min(1, this.kick);
+    // camera pull at speed: the faster the car, the more road it shows ahead (a felt sense of speed, no re-zoom)
+    const pace = Math.min(1, player.v / (drivetrainFor(player.car).gaugeMph / 2.23694 * 0.8));
+    const lookAhead = this.lookT - 0.05 * Math.min(1, this.kick) + (this.reduced ? 0 : 0.08 * pace * pace);
     let camX = mid - (W * (0.48 - lookAhead)) / ppm;
     camX = Math.min(camX, player.x - (W * 0.18) / ppm);
     camX = Math.max(camX, player.x - (W * (0.62 - lookAhead)) / ppm);
@@ -597,18 +645,11 @@ export class RaceScreen {
     };
     drawLine(0, false);
     drawLine(sim.length, true);
-    // signs for bends
-    for (let s0 = 0, i = 0; i < sim.track.segments.length; s0 += sim.track.segments[i].length, i++) {
-      const sg = sim.track.segments[i];
-      if (!sg.radius) continue;
-      const x = (s0 - 25 - camX) * ppm;
-      if (x < -60 || x > W + 60) continue;
-      ctx.fillStyle = '#555';
-      ctx.fillRect(x, roadTop - 46 * this.dpr, 3 * this.dpr, 42 * this.dpr);
-      ctx.fillStyle = '#f2a33a';
-      ctx.fillRect(x - 22 * this.dpr, roadTop - 64 * this.dpr, 48 * this.dpr, 20 * this.dpr);
-      signText(ctx, 'BEND ›', x - 22 * this.dpr, roadTop - 64 * this.dpr, 48 * this.dpr, 20 * this.dpr, 3 * this.dpr, '#1d1208', 13 * this.dpr, 800, 'Barlow, system-ui');
-    }
+    // course signs: braking boards, bend warnings with this car's speed for the bend, chevrons, straights
+    drawCourseSigns(ctx, sim, camX, ppm, roadTop, this.dpr, player.stats.grip);
+    // rubber laid by the launch wheelspin
+    const laneGeo = (lane: number) => ({ lane, depth: 0.86 + lane * 0.06, ground: roadTop + (lane + 0.85) * laneH });
+    this.fx.drawMarks(ctx, camX, ppm, this.dpr, (id) => { const r = sim.racers.find((x) => x.id === id); return r ? laneGeo(this.laneOf(r).lane) : null; });
 
     // cars by lane (back lanes first)
     const draws = sim.racers.map((r, i) => ({ r, lane: LANE_OF[i] })).sort((a, b) => a.lane - b.lane);
@@ -635,6 +676,9 @@ export class RaceScreen {
         ctx.fillText(label, tx + 2 * this.dpr, gy - 4 * this.dpr);
         continue;
       }
+      // smoke, gravel and pops of this lane sit behind its car; light trails stream from the tail
+      this.fx.drawParticles(ctx, camX, ppm, laneGeo, lane);
+      this.fx.drawTrail(ctx, r, sx, gy, len, this.dpr, this.countdown <= 0 && r.x < (sim.track.segments[0]?.length ?? 0));
       const livery = r.isPlayer ? this.app.game.state.paints[r.car] : null;
       const idx = sim.racers.indexOf(r);
       const braking = this.prevV[idx] !== undefined && r.v < this.prevV[idx] - 0.03 && r.finishTime === null;

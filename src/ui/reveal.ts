@@ -4,7 +4,7 @@ import { sfx, unlockAudio } from '../audio';
 import { signature } from '../audio-reveal';
 import { fullTop } from '../core/race';
 import { CarId, ENABLED_CARS, carById, finishStripe } from '../data/tables';
-import { FACTORY_LOOKS, carLengthM, drawCar, drawCarCover, drawHeadlightBeam, fitCanvas } from '../render/car';
+import { FACTORY_LOOKS, PLATFORM_CARS, carLengthM, drawCar, drawCarCover, drawHeadlightBeam, fitCanvas } from '../render/car';
 import type { App } from './app';
 import { h } from './dom';
 
@@ -22,6 +22,9 @@ const ROOMS: Record<string, { wall: [number, number, number]; spot: string; floo
   rally: { wall: [40, 80, 160], spot: '230,240,255', floor: '#05080f', rim: '#f5c518' },
   gt: { wall: [140, 40, 40], spot: '255,236,226', floor: '#0e0606', rim: '#ff3b2e' },
   proto: { wall: [20, 110, 120], spot: '200,255,245', floor: '#020a0b', rim: '#36f0d0' },
+  vireo: { wall: [150, 40, 30], spot: '255,236,228', floor: '#0e0505', rim: '#f4f1ea' },
+  mako: { wall: [40, 80, 50], spot: '236,255,200', floor: '#040805', rim: '#c7f23a' },
+  sovereign: { wall: [130, 105, 60], spot: '255,240,210', floor: '#0b0905', rim: '#c9a24a' },
 };
 
 /**
@@ -81,9 +84,9 @@ export class RevealOverlay {
     // the new cars use their art palette until the tables give them their own
     return c.paint === '#555' && f ? f : { paint: c.paint, trim: c.trim };
   }
+  /** The car as the player has finished it (paint, wheels, material, livery); a new car has the factory look. */
   private get paint() {
-    const p = this.app.game.state.paints[this.car];
-    return this.replay && p ? p : this.look.paint;
+    return this.app.game.state.paints[this.car] ?? this.look.paint;
   }
   private get room() { return ROOMS[this.car] ?? ROOMS.muscle; }
 
@@ -251,7 +254,8 @@ export class RevealOverlay {
     ctx.clearRect(0, 0, w, hh);
     // layout: the platform sits on the floor line; the car fills ~80% of its diameter
     const base = Math.min(w * 0.84, hh * 1.25, 720 * dpr);
-    const px = w / 2, py = hh * 0.66;
+    // the platform sits on the floor line, raised on short screens so the hero text below never covers the car
+    const px = w / 2, py = Math.max(hh * 0.42, Math.min(hh * 0.66, hh - 290 * dpr));
     const rx = Math.min(w * 0.49, base * 0.66), ry = rx * 0.2, th = ry * 0.42;
     this.stage(w, hh, px, py, rx, ry, th);
     ctx.globalAlpha = 0.12 + 0.88 * lit;
@@ -273,15 +277,15 @@ export class RevealOverlay {
     const k = cw / carLengthM(this.car);
     const depth = { x: 0.2 * 1.9 * k, y: 0.085 * 1.9 * k }; // the renderer's oblique depth, roughly, in px
     const bw = Math.round(base);
-    const ck = `${bw}|${this.paint}|${JSON.stringify(carStyle(this.app.game.state, this.car))}|${this.replay}`;
+    const ck = `${bw}|${this.paint}|${JSON.stringify(carStyle(this.app.game.state, this.car))}`;
     if (this.cacheKey !== ck) {
       this.cacheKey = ck;
-      const style = this.replay ? carStyle(this.app.game.state, this.car) : undefined;
+      const style = carStyle(this.app.game.state, this.car);
       for (const [cv, sil] of [[this.carCache, false], [this.silCache, true]] as const) {
         cv.width = Math.round(bw * 1.3);
         cv.height = Math.round(bw * 0.62);
         const cc = cv.getContext('2d')!;
-        drawCar(cc, this.car, bw * 0.08, bw * 0.55, bw, { paint: this.paint, trim: this.look.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true, style, shadow: false });
+        drawCar(cc, this.car, bw * 0.08, bw * 0.55, bw, { paint: this.paint, trim: this.look.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true, style, shadow: false, light: PLATFORM_CARS.includes(this.car) ? 0.7 : 0.35 });
       }
     }
     // the car's ground point: centred on the platform (its depth runs up and to the right)

@@ -11,11 +11,11 @@
 </style>
 </head>
 <body>
-<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?lit">Lit</a></nav>
+<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?lit">Lit</a></nav>
 <canvas id="c"></canvas>
 <script type="module">
   // Dev-only art sheet: every car at hero / card / race / thumbnail sizes, plus liveries, wheel sets, materials and race scenery.
-  import { drawCar, ART_CARS, FACTORY_LOOKS, LIVERIES } from '/src/render/car.ts';
+  import { drawCar, ART_CARS, FACTORY_LOOKS, LIVERIES, serviceZones } from '/src/render/car.ts';
   import { CARS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
   import { drawBackdrop, drawRoadDressing, drawForeground, roadColors, THEMES } from '/src/render/scene.ts';
   const q = new URLSearchParams(location.search);
@@ -37,7 +37,7 @@
       bg(ctx, y0, RH);
       ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.model} (${car.id})`, 10, y0 + 16);
       const hero = Math.min(W * 0.5, 560);
-      drawCar(ctx, car.id, 20, y0 + 270, hero * 0.9, { paint: car.paint, trim: car.trim, headlights: q.has('lit') ? 1 : 0, wheelAngle: 0.3 });
+      drawCar(ctx, car.id, 20, y0 + 270, hero * 0.9, { paint: car.paint, trim: car.trim, headlights: q.has('lit') ? 1 : 0, wheelAngle: 0.3, light: Number(q.get('light') ?? 0) });
       const sig = SIGNATURE_FINISHES[car.id];
       const x = hero + 60;
       drawCar(ctx, car.id, x, y0 + 110, 200, { paint: sig?.paint ?? car.paint, trim: car.trim, livery: sig?.stripe, style: sig ? undefined : { livery: 'number' } });
@@ -65,6 +65,34 @@
     bg(ctx, 0, 430);
     wheels.forEach((w, k) => { drawCar(ctx, 'gt', 10 + (k % 4) * (W / 4), 90 + Math.floor(k / 4) * 100, W / 4 - 40, { paint: '#d5dade', trim: '#d6202a', style: { wheel: w } }); ctx.fillStyle = '#dfe6ec'; ctx.fillText(w, 10 + (k % 4) * (W / 4), 100 + Math.floor(k / 4) * 100); });
     mats.forEach((m, k) => { drawCar(ctx, 'tourer', 10 + (k % 4) * (W / 4), 300 + Math.floor(k / 4) * 110, W / 4 - 40, { paint: '#b0242a', trim: '#e9d8b4', style: { material: m } }); ctx.fillStyle = '#dfe6ec'; ctx.fillText(m ?? 'gloss', 10 + (k % 4) * (W / 4), 312 + Math.floor(k / 4) * 110); });
+  } else if (sheet === 'service') {
+    // service bay: hood closed / half / open, focus areas and the serviceZones hit boxes
+    const RH = 250;
+    const ctx = size(cars.length * RH);
+    cars.forEach((car, i) => {
+      const y0 = i * RH; bg(ctx, y0, RH);
+      ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.model} (${car.id})`, 10, y0 + 16);
+      const cw = Math.min(W / 3 - 30, 420);
+      [[0, 'engine'], [0.45, null], [1, 'engine']].forEach(([hood, focus], k) => {
+        const x = 15 + k * (W / 3), y = y0 + RH - 40;
+        drawCar(ctx, car.id, x, y, cw, { paint: car.paint, trim: car.trim, hood, focus: k === 0 ? 'wheels' : focus, light: 0.6, detail: true });
+        if (k === 2) {
+          const z = serviceZones(car.id, x, y, cw, hood);
+          ctx.strokeStyle = '#ff4fd8'; ctx.lineWidth = 1;
+          for (const b of [z.engine, ...z.wheels, z.body]) ctx.strokeRect(b.x, b.y, b.w, b.h);
+        }
+      });
+    });
+  } else if (sheet === 'race') {
+    // race-size cached sprites on a dark road, with blur, nitro and brake lights
+    const RH = 70, cols = 3;
+    const ctx = size(Math.ceil(cars.length / cols) * RH + 20);
+    bg(ctx, 0, Math.ceil(cars.length / cols) * RH + 20);
+    cars.forEach((car, i) => {
+      const x = 80 + (i % cols) * (W / cols), y = 60 + Math.floor(i / cols) * RH;
+      drawCar(ctx, car.id, x, y, 4.6 * 22, { paint: car.paint, trim: car.trim, cache: true, detail: false, wheelAngle: i, blur: i % 2 ? 0.8 : 0.3, nitro: 1.2, brake: true, headlights: 0.4 });
+      ctx.fillStyle = '#dfe6ec'; ctx.fillText(car.id, x, y + 12);
+    });
   } else if (sheet === 'scenes') {
     // phone-size race frames for every theme (390x420 css each)
     const sw = 390, sh = 420, per = Math.max(1, Math.floor(W / sw));

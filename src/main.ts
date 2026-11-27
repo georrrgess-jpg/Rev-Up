@@ -66,8 +66,20 @@ async function start() {
   const ch = await claimTab();
   const game = new Game(storage(), scope, Date.now());
   devPreset(game);
+  // Title screen: lazy-loaded so it never weighs on first paint. Automated browsers (smoke, input and perf checks)
+  // go straight to the Garage unless the URL asks for the intro with ?intro.
+  const q = new URLSearchParams(location.search);
+  const wantIntro = (q.has('intro') || !navigator.webdriver) && !q.has('dev');
+  if (wantIntro) document.documentElement.classList.add('intro-pending');
   const app = new App(game, document.getElementById('app')!);
   (window as unknown as { revup?: unknown }).revup = import.meta.env.DEV ? { game, app } : undefined;
+  if (wantIntro) {
+    app.intro = true;
+    import('./ui/intro')
+      .then((m) => { document.documentElement.classList.remove('intro-pending'); return m.runIntro(app); })
+      .catch((err) => console.warn('Intro skipped', err))
+      .finally(() => { document.documentElement.classList.remove('intro-pending'); app.start(); });
+  } else app.start();
 
   const freeze = (msg: string) => {
     game.conflict = true;
@@ -102,7 +114,7 @@ async function start() {
     } else {
       game.resume();
       run();
-      if (!app.busy) maybeOfflineClaim(app);
+      if (!app.busy && !app.intro) maybeOfflineClaim(app);
       swReg?.update().catch(() => undefined);
     }
   });

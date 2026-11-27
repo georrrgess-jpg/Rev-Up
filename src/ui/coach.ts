@@ -127,13 +127,13 @@ export class Coach {
 const SEL = {
   goal: '[data-coach="goal"], .view.on .goal',
   fit: '[data-coach="fit"], .view.on .fitstrip, .view.on .equip',
-  fitNow: '.view.on .hint .fitnow',
+  fitNow: '.view.on .mycar.fitnow',
   race: '[data-coach="race"], .view.on .actions .race',
   shop: '[data-coach="shop"], .view.on .actions button[aria-label^="Shop"]',
   mergeAll: '[data-coach="merge-all"]',
   tray: '[data-coach="tray"], .view.on .tray',
   press: '[data-coach="scrap"], .view.on [data-press]',
-  nitro: '.topbar .chip.nitro',
+  nitro: '.view.on .actions .race .nitro-badge',
   raceLive: '.view.on [data-coach="race-live"]',
   raceFit: '.view.on [data-coach="race-fit"]',
   raceQuick: '.view.on [data-coach="race-quick"], .view.on .btn.quick:not(.off)',
@@ -223,7 +223,7 @@ export class GuideCoach {
   private cue(): CoachStep | null {
     const app = this.app;
     const s = app.game.state;
-    if (app.busy || s.tips.skipGuide) return null;
+    if (app.busy || app.intro || s.tips.skipGuide) return null;
     const step = tutorialStep(s);
     const one = (id: string, el: HTMLElement | null, text: string, ack = false): CoachStep | null => el ? { id, targets: [el], text, ack } : null;
     const sheet = this.topSheet();
@@ -307,7 +307,7 @@ export class GuideCoach {
         if (route === 'race') return one(this.find(SEL.raceFit), `A better part is on your bench. Fit it to your ${car.model} before you race.`, true);
         return route === 'garage' ? one(this.find(SEL.fitNow) ?? this.find(SEL.fit), `A better part is on your bench. Nothing fits itself — parts only help once fitted: tap here to fit it to your ${car.model}.`, true) : null;
       case 'nitroBank':
-        return sheet ? null : one(this.find(SEL.nitro), 'You banked nitro: three quick merges in a row add a charge. Banked charges add to your free crew nitro in live races.', true);
+        return sheet ? null : one(this.find(SEL.nitro), 'You banked nitro (shown on the Race button): three quick merges in a row add a charge. Banked charges add to your free crew nitro in live races.', true);
       case 'overflow':
         return sheet || route !== 'garage' ? null : one(this.find(SEL.tray), 'The spare rack holds parts when the bench is full. Drag them back onto the bench or onto a match any time.', true);
       case 'scrap':

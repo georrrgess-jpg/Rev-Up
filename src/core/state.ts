@@ -171,6 +171,8 @@ export interface GameState {
   builds?: Partial<Record<CarId, Partial<Record<Family, { pts: number; seal: number }>>>>;
   /** Fab bench: kits on the shelf, kits armed for the next live race, and the kits riding in the race in flight. */
   fab?: { kits: Record<string, number>; armed: string[]; inRace?: { id: number; kits: string[] } | null };
+  /** Concours restoration stage per car (0–3), paid in scrap (core/projects.restoreCar). Absent in older saves. */
+  concours?: Partial<Record<CarId, number>>;
   // ---- end Scrap & surplus
   settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean; /** 0..1, default 0.7 */ musicVol?: number; /** 0..1, default 1 */ sfxVol?: number; /** the intro has been seen once (repeat launches are quick) */ introSeen?: boolean };
   stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number>; earned?: number; spent?: number };

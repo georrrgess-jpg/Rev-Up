@@ -80,3 +80,9 @@
 .rr-result .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
 .rr-result .btns .btn { flex: 1 1 90px; }
 .result .rr-result .place { font-size: var(--fs-2xl, 1.75rem); }
+
+/* ---- Pit Setup: into the Mechanic Shop and back ---- */
+.pit .btn.pit-mech { width: 100%; min-height: 52px; margin: 6px 0 4px; justify-content: flex-start; text-align: left; border-color: var(--amber); }
+.pit .btn.pit-mech .stack { display: flex; flex-direction: column; min-width: 0; }
+.pit .btn.pit-mech small { font-weight: var(--w-strong); color: var(--muted); white-space: normal; overflow-wrap: anywhere; }
+.pit > .btn.close { margin-right: 0; }

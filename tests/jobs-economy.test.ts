@@ -7,7 +7,7 @@ import * as J from '../src/core/jobs';
 import { CarId, carById } from '../src/data/tables';
 import { PLAYERS, fmtMin, runBot } from './bot';
 
-const LADDER: CarId[] = ['beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto'];
+const LADDER: CarId[] = ['beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign'];
 
 function run(kind: 'clean' | 'weak', on: boolean) {
   J.jobsSwitch.off = !on;
@@ -16,7 +16,7 @@ function run(kind: 'clean' | 'weak', on: boolean) {
   const seen = new Map<number, { t: number; p: number }>();
   try {
     const L = runBot({
-      ...PLAYERS[kind], seed: 1, untilCar: 'proto', maxS: 3 * 3600,
+      ...PLAYERS[kind], seed: 1, untilCar: 'sovereign', maxS: 4 * 3600,
       onStep: (g, t) => {
         if (!on) return;
         if (!hooked) { hooked = true; g.subscribe((ev) => { for (const e of ev) if (e.type === 'job') cash += e.cash; }); }
@@ -44,14 +44,14 @@ describe('Job Board balance (simulation)', () => {
     for (const kind of ['clean', 'weak'] as const) {
       const off = run(kind, false);
       const on = run(kind, true);
-      lines.push(`\n== ${kind}: Halcyon ${fmtMin(off.L.milestones.proto)} → ${fmtMin(on.L.milestones.proto)} · jobs cleared ${on.jobs} (skipped ${on.skips}) · job cash ${'$'}${on.cash} · Garage Level ${on.level}`);
+      lines.push(`\n== ${kind}: Halcyon ${fmtMin(off.L.milestones.proto)} → ${fmtMin(on.L.milestones.proto)} · Sovereign ${fmtMin(off.L.milestones.sovereign)} → ${fmtMin(on.L.milestones.sovereign)} · jobs cleared ${on.jobs} (skipped ${on.skips}) · job cash ${'$'}${on.cash} · Garage Level ${on.level}`);
       lines.push('car'.padEnd(16) + 'min off → on    races off → on');
       for (const c of LADDER) {
         const a = off.L.milestones[c], b = on.L.milestones[c];
         lines.push(`${carById(c).model.padEnd(16)}${fmtMin(a).padStart(6)} → ${fmtMin(b).padEnd(7)}  ${String(off.L.racesAt[c] ?? '—').padStart(4)} → ${on.L.racesAt[c] ?? '—'}`);
       }
       console.log(lines.join('\n')); lines.length = 0; // print before asserting, so a failure shows the table
-      expect(on.L.milestones.proto).toBeGreaterThan(0);
+      expect(on.L.milestones.sovereign).toBeGreaterThan(0);
       expect(on.jobs).toBeGreaterThan(10); // the bot meets the board as it plays
       // the board is a bonus, not a shortcut. A clean player is unchanged (every car within 12%, the ladder within 8%);
       // a struggling player gets more from it (catch-up: deliveries and level rewards), bounded at 20% / 18%.
@@ -61,6 +61,7 @@ describe('Job Board balance (simulation)', () => {
         if (a && b && a > 600) expect(b / a).toBeGreaterThan(car);
       }
       expect(on.L.milestones.proto! / off.L.milestones.proto!).toBeGreaterThan(ladder);
+      expect(on.L.milestones.sovereign! / off.L.milestones.sovereign!).toBeGreaterThan(ladder);
     }
     console.log(lines.join('\n'));
   }, 300_000);

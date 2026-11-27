@@ -16,6 +16,12 @@ export interface Drivetrain {
   /** Seconds the green shift window stays open on every upshift (the window's low edge is set from how fast this
    *  car's needle climbs in that gear, so a quick first gear gets a wider arc and a slow top gear the plain band). */
   windowS?: number;
+  /** Seconds on the limiter before the box shifts itself when the player misses (default SHIFT.autoDelay). A quick
+   *  sequential box with short gears gives up sooner, so a car with many shifts never piles up misses. */
+  autoS?: number;
+  /** Engine pull below the power band as a share of peak (default 0.72): a turbo midrange keeps pulling when you
+   *  short-shift, a peaky engine bogs. */
+  lowPull?: number;
   /** Seconds of torque cut for a clean shift (a sequential box is quicker than a tired H-pattern). */
   shiftS: number;
   /** Speedometer full scale (mph). Grows with the car. */
@@ -57,12 +63,15 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Halcyon X: six-speed paddle box with the narrowest band in the game — the hardest car to master.
   proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.29, accelScale: 0.8, pullExp: 2.6 },
   // 1.8 supercars (placeholders; the progression and racing agents tune these).
-  // Vireo 9R: a light, high-revving V10 with a seven-speed box; quick shifts, wide band.
-  vireo: { gears: [0.27, 0.4, 0.52, 0.64, 0.76, 0.9, 1.3], idle: 1300, redline: 10500, band: [0.84, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.3, accelScale: 0.82, pullExp: 2.5 },
-  // Mako TT: twin-turbo V8 with a fat midrange; six speeds, a wide band, a shove out of every corner.
-  mako: { gears: [0.3, 0.47, 0.62, 0.77, 0.92, 1.3], idle: 900, redline: 8000, band: [0.76, 0.95], shiftS: 0.025, gaugeMph: 270, topScale: 1.32, accelScale: 0.84, pullExp: 2.3 },
-  // Sovereign: the flagship V12 hybrid; seven speeds, the highest top speed in the game.
-  sovereign: { gears: [0.26, 0.39, 0.51, 0.63, 0.75, 0.89, 1.3], idle: 1000, redline: 9500, band: [0.82, 0.96], shiftS: 0.018, gaugeMph: 290, topScale: 1.36, accelScale: 0.82, pullExp: 2.7 },
+  // Vireo 9R: a light, screaming V10 with short, close gears: the needle flies, the band sits high on the tach, shifts
+  // come thick and fast and the box is quick to cover a miss (short limiter grace) — rewards a sharp thumb.
+  vireo: { gears: [0.25, 0.37, 0.49, 0.61, 0.74, 0.88, 1.3], idle: 1400, redline: 11400, band: [0.86, 0.975], shiftS: 0.016, autoS: 0.3, lowPull: 0.82, gaugeMph: 260, topScale: 1.22, accelScale: 0.82, pullExp: 2.5 },
+  // Mako TT: twin-turbo V8 with a fat midrange: the widest band of the supercars and pull well below it, so a short
+  // shift barely hurts and it shoves hard out of every corner; a lower redline and wider-spaced gears.
+  mako: { gears: [0.31, 0.49, 0.65, 0.8, 0.94, 1.3], idle: 900, redline: 7800, band: [0.68, 0.95], shiftS: 0.025, lowPull: 0.9, gaugeMph: 270, topScale: 1.3, accelScale: 1.12, pullExp: 2.3 },
+  // Sovereign: the long-legged flagship V12 hybrid: six tall gears that each pull for a long time (fewer shifts, each
+  // one worth more), the highest top speed in the game and the biggest speedometer.
+  sovereign: { gears: [0.33, 0.5, 0.66, 0.81, 0.95, 1.3], idle: 900, redline: 8800, band: [0.8, 0.96], shiftS: 0.018, gaugeMph: 290, topScale: 1.34, accelScale: 0.95, pullExp: 2.7 },
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };

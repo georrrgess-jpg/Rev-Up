@@ -1,10 +1,12 @@
 import { kitById, type KitId } from '../data/fabrication';
-import { setMuted, sfx, unlockAudio } from '../audio';
+import { sfx, unlockAudio } from '../audio';
+import { applyAudioSettings, music } from '../audio-api';
 import type { GameEvent } from '../core/events';
 import type { Game } from '../core/game';
 import * as P from '../core/progression';
 import type { GameState } from '../core/state';
-import { EVENTS, FAMILIES, MAX_TIER, carById, eventById, nitroCapFor } from '../data/tables';
+import { CARS, EVENTS, FAMILIES, MAX_TIER, carById, eventById } from '../data/tables';
+import { progressSummary } from '../core/milestones';
 import { GuideCoach } from './coach';
 import { fmt, h } from './dom';
 import { openGoalSheet } from './goalCard';
@@ -32,6 +34,8 @@ export class App {
   route: Route = 'garage';
   views: Record<Route, View>;
   private chips: Record<string, HTMLElement> = {};
+  private lvEl!: HTMLElement;
+  private repBar!: HTMLElement;
   private navBtns: Record<Route, HTMLButtonElement>;
   private toastEl: HTMLElement | null = null;
   private toastTimer = 0;
@@ -44,7 +48,7 @@ export class App {
   constructor(public game: Game, mount: HTMLElement) {
     this.root = mount;
     const s = game.state;
-    setMuted(s.settings.muted);
+    applyAudioSettings(s.settings); // mute + music / effects volume
     document.documentElement.classList.toggle('reduced', s.settings.reducedMotion);
 
     const chip = (key: string, cls: string, glyph: string, word: string, label: string, onTap?: () => void) => {
@@ -57,11 +61,18 @@ export class App {
       this.chips[key] = el;
       return el;
     };
+    // Earned progress (Garage Level, Rep and its bar toward the next threshold) sits apart from the wallet
+    // (cash and scrap, spent in the Shop): one reads as "how far I've come", the other as "what I can buy".
+    this.lvEl = h('span', { class: 'lv num', 'aria-hidden': 'true' });
+    this.repBar = h('i');
+    const rep = chip('rep', 'rep earned', '★', '★', 'Rep: earned progress. Tap for details', () => this.explainRep());
+    rep.prepend(this.lvEl);
+    rep.append(h('span', { class: 'tb-bar', 'aria-hidden': 'true' }, this.repBar));
     const top = h('header', { class: 'topbar' },
-      chip('cash', 'cash', '$', '$', 'Cash: spending money. Tap for details', () => this.explainCash()),
-      chip('rep', 'rep', '★', 'Rep', 'Rep: earned progress. Tap for details', () => this.explainRep()),
-      chip('scrap', 'scrap', '♻', 'Scrap', 'Scrap'),
-      chip('nitro', 'nitro', '⚡', 'Nitro', 'Banked nitro charges'),
+      rep,
+      h('div', { class: 'wallet', role: 'group', 'aria-label': 'Wallet: spending money' },
+        chip('cash', 'cash', '$', '$', 'Cash: spending money. Tap for details', () => this.explainCash()),
+        chip('scrap', 'scrap', '♻', 'Scrap', 'Scrap: spend it in the Shop')),
       h('span', { class: 'spacer' }),
       h('button', { class: 'iconbtn', 'aria-label': 'How to play', title: 'How to play', onclick: () => openGuide(this) }, '?'),
       h('button', { class: 'iconbtn', 'aria-label': 'Settings', onclick: () => openSettings(this) }, '⚙'),
@@ -96,7 +107,21 @@ export class App {
 
     this.guide = new GuideCoach(this);
     this.fromHash(true);
-    if (game.load.problem) this.toast(game.load.problem, undefined, 6000);
+  }
+
+  /** True while the title screen is up: no reveal, away claim or coach marks start underneath it. */
+  intro = false;
+  private started = false;
+  /** Called once the title screen has gone (main.ts): load notices, a waiting reveal, the away claim, music. */
+  start() {
+    if (this.started) return;
+    this.started = true;
+    this.intro = false;
+    const s = this.game.state;
+    if (this.route === 'garage') music.play('garage');
+    this.views[this.route].show();
+    this.guide?.update();
+    if (this.game.load.problem) this.toast(this.game.load.problem, undefined, 6000);
     if (s.pendingReveal) setTimeout(() => this.openReveal(s.pendingReveal!), 300);
     else maybeOfflineClaim(this);
   }
@@ -119,6 +144,7 @@ export class App {
     }
     if (push && location.hash !== `#${r}`) history.replaceState(null, '', `#${r}`);
     this.views[r].show();
+    if (r === 'garage' && !this.intro) music.play('garage');
     this.maybeShowUpdate();
     this.guide?.update();
   }
@@ -157,13 +183,16 @@ export class App {
     const any = ev.length > 0;
     set('cash', fmt(s.cash), any);
     set('rep', fmt(s.rep), any);
-    const next = repMilestones(s)[0];
+    const pg = progressInfo(s);
     const of = this.chips.rep.querySelector('.of')!;
-    const ofText = next ? `/${fmt(next.rep)}` : '';
+    const ofText = pg.repNext ? `/${fmt(pg.repNext)}` : '';
     if (of.textContent !== ofText) of.textContent = ofText;
-    this.chips.rep.setAttribute('aria-label', `Rep ${s.rep}${next ? `, next at ${next.rep}: ${next.what}` : ''}. Tap for details`);
+    this.repBar.style.width = `${Math.round(pg.repFrac * 100)}%`;
+    const lv = pg.level ? `Lv ${pg.level}` : '';
+    if (this.lvEl.textContent !== lv) this.lvEl.textContent = lv;
+    this.lvEl.hidden = !lv;
+    this.chips.rep.setAttribute('aria-label', `${lv ? `Garage Level ${pg.level}. ` : ''}Rep ${s.rep}${pg.repNext ? `, next at ${pg.repNext}: ${pg.nextWhat}` : ''}. Earned progress, never spent. Tap for details`);
     set('scrap', fmt(s.scrap), any);
-    set('nitro', `${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`, any);
     this.fitTop();
     this.navBtns.showroom.querySelector('.badge')?.remove();
     if (s.pendingReveal) this.navBtns.showroom.append(h('span', { class: 'badge' }, '1'));
@@ -181,10 +210,11 @@ export class App {
     // read as progress, so it stays
     bar.classList.add('compact');
     if (!clipping()) return;
+    // then the Rep threshold ("/2,300"): the bar under the number still shows how far to the next one
+    bar.classList.add('no-of');
+    if (!clipping()) return;
     // enlarged text or very large balances: let the bar take a second row rather than cut numbers off
     bar.classList.add('wrap');
-    // last resort only: drop the threshold (the goal card and the Rep sheet show it too)
-    if (clipping()) bar.classList.add('no-of');
   }
 
   promptReveal() {
@@ -292,13 +322,27 @@ export class App {
   /** Offer a staged service-worker update only on a safe screen. */
   private updateOffered = false;
   maybeShowUpdate() {
-    if (!this.updateReady || this.busy || this.updateOffered) return;
+    if (!this.updateReady || this.busy || this.intro || this.updateOffered) return;
     this.updateOffered = true; // offered once; Settings keeps a Reload button afterwards
     const apply = this.updateReady;
     this.toast('An update is ready.', { label: 'Reload', run: () => { this.game.saveNow(); apply(); } }, 12000);
   }
 
   get topTier() { return MAX_TIER; }
+}
+
+/** Earned progress for the top bar and the Garage: Rep toward its next threshold, and the Garage Level once the
+ *  Job Board is open. The single adapter over progression (core/milestones progressSummary for the level). */
+export function progressInfo(s: GameState): { rep: number; repNext: number | null; repFrac: number; nextWhat: string; level: number | null; levelFrac: number } {
+  const ms = repMilestones(s);
+  const next = ms[0] ?? null;
+  // the bar fills from the last threshold passed, so each step reads as fresh progress
+  const passed = [0, ...EVENTS.map((e) => e.requires.rep ?? 0), ...CARS.map((c) => c.unlock?.rep ?? 0)].filter((r) => r <= s.rep);
+  const from = Math.max(...passed);
+  const repFrac = next ? Math.max(0, Math.min(1, (s.rep - from) / Math.max(1, next.rep - from))) : 1;
+  const gl = progressSummary(s).earned.garage;
+  const levelFrac = gl.xpNext > gl.xpLevel ? Math.max(0, Math.min(1, (gl.xp - gl.xpLevel) / (gl.xpNext - gl.xpLevel))) : 1;
+  return { rep: s.rep, repNext: next?.rep ?? null, repFrac, nextWhat: next?.what ?? '', level: gl.open ? gl.level : null, levelFrac };
 }
 
 /** Rep thresholds still ahead, nearest first: races that open at a Rep level and the next car's Rep. */

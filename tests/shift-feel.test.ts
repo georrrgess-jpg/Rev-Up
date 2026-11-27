@@ -78,9 +78,10 @@ describe('shifting feel', () => {
           expect(prev.braking, at).toBe(true); // really slowing for a bend (not held at its limit, not accelerating)
           expect(p.v, at).toBeLessThan(prev.v + 1e-9);
           expect(prev.nitro, at).toBe(false);
-          expect(prev.gear - p.gear, at).toBe(1);
+          // one rev-matched change per braking zone, straight into the gear the bend needs (no saw-tooth of single drops)
+          expect(prev.gear - p.gear, at).toBeLessThanOrEqual(SHIFT.downPerZone);
           expect(prev.t - lastChange, at).toBeGreaterThanOrEqual(SHIFT.downGapS - 1e-9);
-          expect(++zone, at).toBeLessThanOrEqual(SHIFT.downPerZone);
+          expect(++zone, at).toBe(1);
           // it lands below the new gear's window, so the next upshift gets its whole window (no instant green)
           expect(sim.attempt.f, at).toBeLessThan(sim.shiftWindow()[0]);
           // and the HUD gets a notice of it
@@ -120,7 +121,7 @@ describe('shifting feel', () => {
         sim.step();
         if (sim.shiftLog.length > before) {
           expect(sim.shiftLog[before].grade).toBe('missed');
-          expect(lateFor, car).toBeGreaterThanOrEqual(SHIFT.autoDelay); // late light plus the limiter grace
+          expect(lateFor, car).toBeGreaterThanOrEqual(DRIVETRAINS[car].autoS ?? SHIFT.autoDelay); // late light plus the limiter grace
           checked++;
           lateFor = 0;
         } else lateFor = late || sim.shiftCue() === 'late' ? lateFor + RACE.dt : 0;

@@ -186,36 +186,36 @@
 .reduced .cell.hover-ok, .reduced .fitstrip .eq.hover-ok { transform: none; }
 
 /* ---------------------------------------------------------------- fitting the Garage on small screens
-   The body is a grid whose board row takes whatever height the goal card, the slots, the hint and the spare
-   rack leave; the board's cells shrink to that height and to the width (down to a 36 px tap target; boards are always one
-   row taller than wide: 5×6 or 6×7). Only when even that cannot fit (enlarged text on a short phone) does the
-   body scroll; the hint, the spare rack and the scrap press then stay docked at its bottom, right above the
-   action bar, and the board scrolls under them. Nothing slides behind the action bar. */
+   The body is a grid whose board row takes whatever height the goal card, your car's row, the hint and the spare
+   rack leave; the board's cells grow to that height and to the width (boards are one row taller than wide: 5×6
+   or 6×7), with a 40 px floor. Only when even that cannot fit (enlarged text on a short phone) does the body
+   scroll; the hint, the spare rack and the scrap press then stay docked at its bottom, right above the action
+   bar, and the board scrolls under them. Nothing slides behind the action bar. */
 .garage .garage-body {
-  --cell-js: var(--cell); --board-min: calc(6 * 36px + 5 * var(--gap) + 14px);
+  --cell-js: var(--cell); --board-min: calc(6 * 40px + 5 * var(--gap) + 10px);
   display: grid; grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: max-content max-content max-content max-content minmax(var(--board-min), auto) max-content max-content;
-  padding-bottom: 0;
+  grid-template-rows: max-content max-content max-content minmax(var(--board-min), auto) max-content max-content;
+  padding: 2px 2px 0;
 }
-.garage .garage-body:has(.board > .cell:nth-child(31)) { --board-min: calc(7 * 36px + 6 * var(--gap) + 14px); }
-.garage .garage-body > .goal { grid-row: 1; }
-.garage .garage-body > .equip { grid-row: 2; }
+.garage .garage-body:has(.board > .cell:nth-child(31)) { --board-min: calc(7 * 40px + 6 * var(--gap) + 10px); }
+.garage .garage-body > .goal-row { grid-row: 1; }
+.garage .garage-body > .carrow { grid-row: 2; }
 .garage .garage-body > .capnote { grid-row: 3; }
-.garage .garage-body > .benchhead { grid-row: 4; }
-.garage .garage-body > .boardwrap { grid-row: 5; container-type: size; align-items: flex-start; }
-.garage .garage-body > .hint { grid-row: 6; }
-.garage .garage-body > .trayrow { grid-row: 7; }
+.garage .garage-body > .boardwrap { grid-row: 4; container-type: size; align-items: flex-start; }
+.garage .garage-body > .hint { grid-row: 5; }
+.garage .garage-body > .trayrow { grid-row: 6; }
 .garage .boardwrap .board {
   --cell: min(var(--cell-js),
-    calc((100cqw - 14px - var(--gap) * (var(--cols) - 1)) / var(--cols)),
-    max(36px, calc((100cqh - 14px - var(--gap) * var(--cols)) / (var(--cols) + 1)))); /* 36 px tap floor: below it the body scrolls */
+    calc((100cqw - 10px - var(--gap) * (var(--cols) - 1)) / var(--cols)),
+    max(40px, calc((100cqh - 10px - var(--gap) * var(--cols)) / (var(--cols) + 1)))); /* 40 px floor: below it the body scrolls */
+  padding: 4px;
 }
 .garage .garage-body > .trayrow {
-  position: sticky; bottom: 0; z-index: 2; margin-top: 0; padding: 4px 0 4px; background: var(--bg);
+  position: sticky; bottom: 0; z-index: 2; margin-top: 0; padding: 5px 0 5px; background: var(--bg);
   box-shadow: 0 0 0 1px var(--bg); /* no sub-pixel seam of board showing at fractional zoom */
 }
 .garage .garage-body > .hint {
-  position: sticky; bottom: calc(max(var(--cell) * .86 + 10px, 44px) + 8px); z-index: 2; margin: 0; padding-top: 4px; background: var(--bg); box-shadow: 0 0 0 1px var(--bg);
+  position: sticky; bottom: calc(max(var(--cell) * .8 + 10px, 44px) + 10px); z-index: 2; margin: 0; padding-top: 4px; background: var(--bg); box-shadow: 0 0 0 1px var(--bg);
 }
 .garage .garage-body > .hint:empty { padding: 0; }
 
@@ -245,8 +245,6 @@
 }
 
 /* ---- Pit Stop: Keep / Recycle sheet and the Workshop scrap tab ---- */
-.benchhead .bh-r { display: inline-flex; align-items: center; gap: 8px; }
-.benchhead .sort-spares { min-height: 32px; padding: 2px 10px; font-size: var(--fs-2xs); }
 .spares .wallet { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 8px; }
 .spares .wallet .d { flex-basis: 100%; font-size: var(--fs-2xs); color: var(--muted); }
 .spares .bulk { display: grid; gap: 4px; margin: 4px 0 6px; }
@@ -276,3 +274,95 @@
 .workshop .polish-row .d, .workshop .spares-row .d { overflow-wrap: anywhere; }
 .workshop .segs:has(> .seg:nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .workshop .segs .seg { padding-inline: 2px; overflow-wrap: anywhere; }
+
+/* ================================================================ Garage home (master update)
+   Brighter panels, one row for your car and its slots, a compact two-line goal, the bench header folded into
+   the spare-rack row, and bigger tiles. */
+.garage.view { padding-left: calc(var(--safe-l) + 8px); padding-right: calc(var(--safe-r) + 8px); background:
+  radial-gradient(120% 50% at 50% 0%, rgba(255,206,135,.05), transparent 70%); }
+@media (min-width: 420px) { .garage.view { padding-left: calc(var(--safe-l) + 12px); padding-right: calc(var(--safe-r) + 12px); } }
+.garage .board { background: linear-gradient(150deg, #3a4a5c, #27313d); border-color: #4d5b6c; box-shadow: inset 0 2px 8px rgba(0,0,0,.35), 0 6px 18px rgba(0,0,0,.25); }
+.garage .board .cell, .garage .tray .cell { background: #1a222d; border-color: #3f4c5c; }
+.garage .board .cell:empty { background: radial-gradient(70% 70% at 50% 40%, #222c38, #19202a); }
+
+/* ---- goal card: next car, requirement pills (at most two lines), progress bar */
+.garage .goal-row { margin-bottom: 6px; }
+.garage .goal { padding: 6px 10px; gap: 10px; background: linear-gradient(180deg, #2d3746, #212934); border-color: #4a5667; }
+.garage .goal .gt { font-size: var(--fs-2xs); letter-spacing: .05em; color: #d7dde5; }
+.garage .goal .gl { display: flex; flex-wrap: wrap; gap: 3px 4px; margin-top: 3px; max-height: 43px; overflow: hidden; font-size: var(--fs-2xs); }
+.garage .goal .gl span, .garage .goal .gl span + span { padding: 1px 6px; border-radius: 6px; background: rgba(0,0,0,.28); border: 1px solid #4a5667; color: var(--text); font-size: var(--fs-2xs); font-weight: var(--w-strong); line-height: 1.35; align-self: auto; }
+.garage .goal .gl span.met, .garage .goal .gl span.met + span.met { color: var(--green); border-color: #3e6a3a; background: rgba(60,110,55,.18); }
+.garage .goal .gl span.rep { color: #f6e3b4; border-color: #6d5a2e; }
+.garage .goal .gl span.rep.met { color: var(--green); border-color: #3e6a3a; }
+.garage .goal.ready .gl span { background: none; border: 0; padding: 0; font-size: var(--fs-sm); }
+.garage .goal .bar { margin-top: 4px; height: 5px; }
+
+/* ---- your car + its slots */
+.garage .carrow { display: flex; gap: 6px; align-items: stretch; margin-bottom: 6px; min-width: 0; }
+.garage .carrow > .equip.fitstrip { flex: 1; min-width: 0; margin: 0; }
+.garage .mycar { flex: none; width: 84px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0; padding: 2px 4px 3px;
+  border-radius: 10px; border: 1.5px solid #4d5b6c; background: linear-gradient(180deg, #2a3442, #1c232d); color: var(--text); }
+.garage .mycar canvas { width: 100%; height: 26px; flex: none; }
+.garage .mycar .mycar-n { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.6875rem; font-weight: var(--w-heavy); line-height: 1.2; color: var(--amber2); }
+@media (max-width: 359px) { .garage .mycar { width: 62px; } .garage .mycar canvas { height: 22px; } }
+
+/* ---- spare rack row: "Spares · 12 free" opens Keep / Recycle */
+.garage .trayrow .traycaption.sort-spares { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 2px 6px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: var(--fs-2xs); font-weight: var(--w-strong); line-height: 1.15; }
+.garage .trayrow .sort-spares .tc-t { color: var(--text); font-weight: var(--w-heavy); }
+.garage .trayrow .sort-spares.full { border-color: var(--amber); color: var(--amber2); }
+.garage .tray { grid-template-columns: repeat(4, calc(var(--cell) * .8)); }
+.garage .tray .cell { width: calc(var(--cell) * .8); height: calc(var(--cell) * .8); }
+.garage .press { height: calc(var(--cell) * .8 + 8px); }
+@media (max-width: 359px) { .garage .trayrow .traycaption.sort-spares { display: flex; min-width: 44px; padding: 2px 3px; } .garage .trayrow .sort-spares .tc-t { display: none; } }
+
+/* ---- action bar: secondary actions quiet, Race is the one clear call */
+.garage .actions { grid-template-columns: 1fr .8fr 1fr 1.45fr; gap: 6px; }
+.garage .actions .btn:not(.primary) { background: #222b37; border-color: #45525f; }
+.garage .actions .btn.race { font-size: var(--fs-lg); }
+.garage .actions .btn.race small { font-size: var(--fs-2xs); }
+.garage .actions .btn.race .nitro-badge { position: absolute; top: -9px; left: 6px; padding: 0 6px; border-radius: 9px; font-size: var(--fs-2xs); font-weight: var(--w-heavy); line-height: 1.3;
+  color: #cfe9fb; background: #16202b; border: 1px solid #3c5a72; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.garage .actions .btn.race .nitro-badge.on { color: #0c2333; background: var(--blue); border-color: #bfe6fd; }
+
+/* ---- short phones (320×568, 360×640): every row as thin as a 44 px target allows, so the board gets the height */
+@media (max-height: 700px) {
+  .garage .goal-row, .garage .carrow { margin-bottom: 4px; }
+  .garage .goal { padding: 4px 8px; }
+  .garage .goal .bar { margin-top: 3px; height: 4px; }
+  .garage .mycar { min-height: 44px; }
+  .garage .trayrow { padding-block: 4px; }
+}
+@media (max-height: 660px) {
+  .garage .goal canvas { width: 54px; height: 28px; }
+  .garage .carrow .fitstrip .eq { min-height: 44px; padding-block: 1px; }
+  .garage .mycar canvas { height: 22px; }
+  .garage .actions { padding: 3px 1px 2px; }
+}
+/* better parts wait on the bench: your car's tile becomes the one-tap fit */
+.garage .mycar.fitnow { border-color: var(--green); background: linear-gradient(180deg, #24402a, #1a2d1e); box-shadow: 0 0 0 2px rgba(164,219,155,.25); }
+.garage .mycar.fitnow .mycar-n { color: #d9f5d3; font-size: var(--fs-2xs); }
+.garage .mycar.fitnow::after { content: ''; position: absolute; inset: -2px; border-radius: 11px; box-shadow: 0 0 10px rgba(164,219,155,.45); animation: targetPulse 1.4s ease-in-out infinite; pointer-events: none; }
+.garage .mycar { position: relative; }
+.reduced .garage .mycar.fitnow::after { animation: none; }
+.garage .goal .gl span.gm { display: none; }
+@media (max-height: 700px) {
+  .garage .goal .gt { display: none; }
+  .garage .goal .gl { margin-top: 0; max-height: 20px; }
+  .garage .goal .gl span.gm { display: inline; padding: 1px 0; border: 0; background: none; color: var(--amber2); font-weight: var(--w-heavy); }
+  .garage .hint .recover { display: none; } /* the Crates button turns into the same recovery action */
+  .garage .carrow .fitstrip .eq { min-height: 44px; padding-block: 1px; }
+  .garage .carrow .fitstrip .eq .part.mini, .garage .carrow .fitstrip .eqempty { --cell: 32px; width: 32px; height: 32px; }
+}
+@media (max-height: 700px) {
+  /* narrow slots on short phones: the mini tile carries the tier; the label would add a row */
+  @container (max-width: 76px) { .fitstrip .eq .eqt { display: none; } }
+  .garage .hint:has(> .recover) { min-height: 0; padding: 0; }
+}
+@media (max-height: 660px) {
+  .garage .garage-body > .trayrow { padding-block: 2px; }
+  .garage .trayrow .traycaption.sort-spares { min-height: 40px; }
+}
+.garage .actions .btn.race small { display: block; -webkit-line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.garage .actions .btn.race .stack { min-width: 0; max-width: 100%; }
+@media (max-height: 700px) and (max-width: 359px) { .garage .goal canvas { display: none; } }

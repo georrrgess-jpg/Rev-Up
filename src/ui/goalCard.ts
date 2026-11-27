@@ -52,12 +52,17 @@ export class GoalCard {
       this.bar.style.width = '100%';
     } else if (g) {
       this.title.textContent = `Next car · ${g.car.model}`;
-      // Each requirement is its own chip: the craft (and any race win) apart from Rep, which builds from every race.
+      // Each requirement is its own pill: the craft (and any race win) apart from Rep, which builds from every race.
+      // Unmet ones first, so a one-line card on a short phone still shows what is left.
+      const reqs: [boolean, HTMLElement][] = [
+        [g.keystoneDone, h('span', { class: `req${g.keystoneDone ? ' met' : ''}` }, g.keystoneDone ? `✓ T${g.tier} ${FAMILIES[g.family].name}` : `Craft T${g.tier} ${FAMILIES[g.family].name}`)],
+        ...(g.event ? [[g.eventDone, h('span', { class: `req${g.eventDone ? ' met' : ''}` }, `${g.eventDone ? '✓' : 'Win'} ${eventById(g.event).name}`)] as [boolean, HTMLElement]] : []),
+        ...(g.car.unlock?.stars ? [[P.starsIn(s) >= g.car.unlock.stars, h('span', { class: `req${P.starsIn(s) >= g.car.unlock.stars ? ' met' : ''}` }, `★ ${Math.min(P.starsIn(s), g.car.unlock.stars)}/${g.car.unlock.stars}`)] as [boolean, HTMLElement]] : []),
+        [s.rep >= g.repNeed, h('span', { class: `req rep${s.rep >= g.repNeed ? ' met' : ''}` }, s.rep >= g.repNeed ? '✓ Rep' : `Rep ${fmt(s.rep)}/${fmt(g.repNeed)}`)],
+      ];
       this.line.replaceChildren(
-        h('span', { class: `req${g.keystoneDone ? ' met' : ''}` }, g.keystoneDone ? `✓ T${g.tier} ${FAMILIES[g.family].name}` : `Craft T${g.tier} ${FAMILIES[g.family].name}`),
-        ...(g.event ? [h('span', { class: `req${g.eventDone ? ' met' : ''}` }, `${g.eventDone ? '✓' : 'Win'} ${eventById(g.event).name}`)] : []),
-        ...(g.car.unlock?.stars ? [h('span', { class: `req${P.starsIn(s) >= g.car.unlock.stars ? ' met' : ''}` }, `★ ${Math.min(P.starsIn(s), g.car.unlock.stars)}/${g.car.unlock.stars}`)] : []),
-        h('span', { class: `req rep${s.rep >= g.repNeed ? ' met' : ''}` }, s.rep >= g.repNeed ? '✓ Rep' : `Rep ${fmt(s.rep)}/${fmt(g.repNeed)}`));
+        h('span', { class: 'gm' }, g.car.model), // the title's car name, shown in the line when short screens drop the title
+        ...reqs.filter(([met]) => !met).map(([, el]) => el), ...reqs.filter(([met]) => met).map(([, el]) => el));
       this.bar.style.width = `${Math.round(g.progress * 100)}%`;
       this.card.setAttribute('aria-label', `Next car: ${g.line}. Tap for details.`);
     } else {

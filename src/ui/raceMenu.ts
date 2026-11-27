@@ -18,6 +18,7 @@ import { RaceScreen } from './raceScreen';
 import { openPitSetup } from './pitSetup';
 import { rivalRunsSection } from './rivalRuns';
 import { jobBoardSection } from './jobs';
+import { jobsUnlocked, readJobs } from '../core/jobs';
 import type { CarId } from '../data/tables';
 
 /** Speed-trap thresholds and records are stored in km/h until the stage-2 tables move to mph: show them in mph. */
@@ -28,6 +29,8 @@ export class RaceView implements View {
   private headCanvas: HTMLCanvasElement;
   private fitBar: HTMLElement;
   private list: HTMLElement;
+  /** Jump links to each part of the menu (Top pick, Job Board, Rival Runs, All races): one tap, no long scroll. */
+  private jump: HTMLElement;
   private visible = false;
   private timer = 0;
   /** Pit Setup sent the player to the Garage to merge: reopen it for this event when the Race menu shows again. */
@@ -38,11 +41,40 @@ export class RaceView implements View {
     this.head = h('div', { class: 'stats' });
     this.fitBar = h('div', { class: 'fitbar' });
     this.list = h('div', { class: 'racelist scroll' });
+    this.jump = h('nav', { class: 'race-jump', 'aria-label': 'Race menu sections' });
     this.el = h('section', { class: 'view race-view', 'aria-label': 'Race' },
       h('div', { class: 'racehead' }, this.headCanvas, this.head, h('span', { style: 'flex:1' }),
         h('button', { class: 'btn sm', onclick: () => app.go('showroom') }, 'Change car')),
       this.fitBar,
+      this.jump,
       this.list);
+  }
+
+  /** Scroll the list so a section's top sits at the top of the list. */
+  private jumpTo(key: string) {
+    const el = this.list.querySelector<HTMLElement>(`[data-jump="${key}"]`);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top - this.list.getBoundingClientRect().top + this.list.scrollTop - 4;
+    this.list.scrollTo({ top, behavior: this.app.game.state.settings.reducedMotion ? 'auto' : 'smooth' });
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  }
+
+  private renderJump(s: GameState) {
+    const links: [string, string, string?][] = [['top', 'Top pick']];
+    const jobs = this.list.querySelector('[data-jump="jobs"]');
+    if (jobs) {
+      const J = jobsUnlocked(s) ? readJobs(s) : null;
+      const open = J ? J.slots.filter(Boolean).length : 0;
+      links.push(['jobs', 'Job Board', open ? String(open) : undefined]);
+    }
+    if (this.list.querySelector('[data-jump="runs"]')) links.push(['runs', 'Rival Runs']);
+    if (this.list.querySelector('[data-jump="all"]')) links.push(['all', 'All races']);
+    const key = links.map((l) => l.join(':')).join('|');
+    if (this.jump.dataset.k === key) return;
+    this.jump.dataset.k = key;
+    this.jump.hidden = links.length < 3;
+    this.jump.replaceChildren(...links.map(([k, label, badge]) => h('button', { class: `jump${k === 'jobs' ? ' jobs' : ''}`, 'data-coach': k === 'jobs' ? 'jobs-jump' : null, onclick: () => this.jumpTo(k) },
+      label, badge ? h('span', { class: 'jb-n num' }, badge) : null)));
   }
 
   show() {
@@ -136,7 +168,7 @@ export class RaceView implements View {
     const d = difficulty(s, shown, P.eventUnlocked(s, rec).switchCar ?? s.activeCar);
     const winRep = shown.payout.rep[0];
     const fact = (k: string, v: (string | HTMLElement)[] | string, cls = '') => h('div', { class: `fact ${cls}` }, h('small', {}, k), h('span', {}, ...(Array.isArray(v) ? v : [v])));
-    const featured = h('section', { class: 'featured', 'aria-label': 'Recommended race' },
+    const featured = h('section', { class: 'featured', 'aria-label': 'Recommended race', 'data-jump': 'top' },
       h('div', { class: 'feat-label' }, 'Recommended for you'),
       h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
       h('p', { class: 'reason' }, reasonFor(rec)),
@@ -164,9 +196,9 @@ export class RaceView implements View {
         h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
     const out: HTMLElement[] = altBox ? [featured, altBox] : [featured];
     const jobs = jobBoardSection(this.app); // Job Board: short jobs, right under the races they ask for
-    if (jobs) out.push(jobs);
+    if (jobs) { jobs.dataset.jump = 'jobs'; out.push(jobs); }
     const runs = rivalRunsSection(this.app, (id, car) => this.startRivalRun(id, car));
-    if (runs) out.push(runs);
+    if (runs) { runs.dataset.jump = 'runs'; out.push(runs); }
     if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));
 
     // Catalogue: districts you can race in first (open), locked districts after (closed, with what opens them).
@@ -231,11 +263,12 @@ export class RaceView implements View {
     }
     const openSecs = sections.filter((x) => !x.locked).map((x) => x.el);
     const lockedSecs = sections.filter((x) => x.locked).map((x) => x.el);
-    if (openSecs.length) out.push(h('div', { class: 'feat-label cat-label' }, 'All races'), ...openSecs);
-    if (lockedSecs.length) out.push(h('div', { class: 'feat-label cat-label' }, 'Still locked'), ...lockedSecs);
+    if (openSecs.length) out.push(h('div', { class: 'feat-label cat-label', 'data-jump': 'all' }, 'All races'), ...openSecs);
+    if (lockedSecs.length) out.push(h('div', { class: 'feat-label cat-label', ...(openSecs.length ? {} : { 'data-jump': 'all' }) }, 'Still locked'), ...lockedSecs);
     const scroll = this.list.scrollTop;
     this.list.replaceChildren(...out);
     this.list.scrollTop = scroll;
+    this.renderJump(s);
   }
 
   /** Pit Setup for an event: fit the car that will race it, then start (or come back here after a merge/order). */

@@ -6,7 +6,7 @@
 // screen size and scrolled with two drawImage calls each. Only small flat-colour shapes move live (clouds, birds,
 // boats, smoke, flags, blinking lights), so race frames stay cheap on phones. Reduced motion keeps the tiles and
 // drops the live motion.
-import type { Track } from '../data/tables';
+import { TRACKS, type Track } from '../data/tables';
 
 export interface SceneView {
   ctx: CanvasRenderingContext2D;
@@ -17,13 +17,25 @@ export interface SceneView {
   camX: number; ppm: number;
   /** Race clock (s) for gentle scenic motion. */
   t: number;
-  theme: Track['theme'];
+  /** The area look (a track theme, or a district look such as 'riviera' / 'neon': see sceneLook). */
+  theme: Track['theme'] | Look;
   trackId: Track['id'] | string;
   reduced: boolean;
 }
 
 type Theme = Track['theme'];
-export const THEMES: readonly Theme[] = ['scrap', 'suburb', 'foundry', 'coast', 'night', 'desert', 'summit'];
+/** District looks that reuse a track theme's physics but get their own scenery. */
+export type Look = Theme | 'riviera' | 'neon';
+export const THEMES: readonly Look[] = ['scrap', 'suburb', 'foundry', 'coast', 'night', 'desert', 'summit', 'riviera', 'neon'];
+
+/** The scenery for a track: its district's own look when it has one (the Azure Riviera's coast tracks, the Neon
+ *  Skyline), else the track theme. Unknown themes fall back to a daytime palette, so a new track always draws. */
+export function sceneLook(theme: string, trackId?: string): Look {
+  const district = trackId ? (TRACKS as Record<string, Track | undefined>)[trackId]?.district as string | undefined : undefined;
+  if (theme === 'riviera' || district === 'riviera') return 'riviera';
+  if (theme === 'neon' || district === 'neon') return 'neon';
+  return theme as Look;
+}
 
 interface Pal {
   sky: [string, string, string]; // top, middle, horizon
@@ -32,7 +44,7 @@ interface Pal {
 }
 
 /** Each area's palette: sky, stage light, ground, road and foreground — carried through the race scene. */
-export const PALETTES: Record<Theme, Pal> = {
+export const PALETTES: Record<Look, Pal> = {
   // Scrapyard Strip: a blazing violet-and-tangerine sunset over the yard
   scrap: { sky: ['#2a1640', '#a63d52', '#ffb04a'], sun: '#ffe08a', sunGlow: 'rgba(255,170,80,0.55)', sunY: 0.86, sunR: 0.075, cloud: 'rgba(255,150,120,0.35)', ground: '#5a3424', road: '#4a3f3a', highway: '#3d3f45', fore: '#24140e', post: '#3a2418', lights: 0.25 },
   // Maple Highway: a bright autumn afternoon
@@ -47,8 +59,12 @@ export const PALETTES: Record<Theme, Pal> = {
   desert: { sky: ['#1857b8', '#5fb4ea', '#ffd59a'], sun: '#fff7d6', sunGlow: 'rgba(255,236,180,0.6)', sunY: 0.32, sunR: 0.06, cloud: 'rgba(255,255,255,0.6)', ground: '#d98a4e', road: '#5a4a40', highway: '#4d4440', fore: '#7a3a1e', post: '#5b3a24', lights: 0.2 },
   // Summit Gala: alpine blue, snowy peaks, the grand-finale gantry
   summit: { sky: ['#0d2f78', '#4b97e0', '#dff0ff'], sun: '#ffffff', sunGlow: 'rgba(255,255,255,0.55)', sunY: 0.35, sunR: 0.045, cloud: 'rgba(255,255,255,0.9)', ground: '#e8f1f8', road: '#363b47', highway: '#30353f', fore: '#1d3346', post: '#2d3b4c', lights: 0.4 },
+  // Azure Riviera: a golden-hour Mediterranean — ultramarine sea, pastel villas, cypress and stone balustrades
+  riviera: { sky: ['#2b4fa8', '#7fb6ea', '#ffd2a8'], sun: '#fff1c9', sunGlow: 'rgba(255,200,150,0.6)', sunY: 0.62, sunR: 0.06, cloud: 'rgba(255,236,228,0.8)', ground: '#c9b48a', road: '#44424b', highway: '#3b3c46', fore: '#2d4a32', post: '#efe6d2', lights: 0.35 },
+  // Neon Skyline: a teal-to-magenta night above glass towers and holo billboards
+  neon: { sky: ['#03101f', '#0f2f52', '#a0237a'], sun: '#ffd6f5', sunGlow: 'rgba(255,80,200,0.35)', sunY: 0.5, sunR: 0.03, moon: true, stars: true, cloud: 'rgba(80,40,120,0.3)', ground: '#0b0b1c', road: '#191a26', highway: '#1d1f2c', fore: '#05050c', post: '#141428', lights: 1 },
 };
-const palOf = (theme: string): Pal => PALETTES[theme as Theme] ?? PALETTES.suburb;
+const palOf = (theme: string): Pal => PALETTES[theme as Look] ?? PALETTES.suburb;
 
 export function hash(n: number) {
   const x = Math.sin(n * 127.1) * 43758.5453;
@@ -432,6 +448,137 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
       c.fillStyle = '#8a5a34'; for (let x = 0; x < tw; x += 40 * u) c.fillRect(x, rt - 14 * u, 3 * u, 14 * u);
       c.fillRect(0, rt - 11 * u, tw, 1.5 * u);
     });
+  } else if (theme === 'riviera') {
+    // the sea fills the ground band, with sun glitter and far islands
+    add(0.02, hz - 40 * u, rt, (c, place) => {
+      const sea = c.createLinearGradient(0, hz, 0, rt);
+      sea.addColorStop(0, '#1d4fa0'); sea.addColorStop(1, '#1f7fb8');
+      c.fillStyle = sea; c.fillRect(0, hz - 2 * u, tw, rt - hz + 2 * u);
+      c.fillStyle = 'rgba(255,226,170,0.5)';
+      for (let k = 0; k < 70; k++) c.fillRect(hash(k * 1.7) * tw, hz + hash(k * 4.1) * span * 0.7, (6 + hash(k * 9) * 20) * u, 1.2 * u);
+      place(2, (x, r) => { c.fillStyle = '#6a7fb4'; c.beginPath(); c.ellipse(x, hz, (50 + r * 50) * u, (10 + r * 10) * u, 0, Math.PI, 0); c.fill(); }, 41);
+    });
+    add(0.13, hz - 130 * u, hz + span * 0.55, (c, place) => {
+      // the headland: a green hillside of stacked pastel villas with terracotta roofs and dark cypress
+      c.fillStyle = '#5d8a4e';
+      c.beginPath(); c.moveTo(0, hz + span * 0.55);
+      for (let x = 0; x <= tw; x += 20 * u) c.lineTo(x, hz - (34 + 24 * Math.sin((x / tw) * Math.PI * 4) + 10 * Math.sin((x / tw) * Math.PI * 10)) * u);
+      c.lineTo(tw, hz + span * 0.55); c.closePath(); c.fill();
+      const walls = ['#f6d8b8', '#f3e6c8', '#f2c3b0', '#e9d1e6', '#fbe9a8', '#d9e8f0'];
+      place(26, (x, r, k) => {
+        const y = hz - (4 + r * 30) * u, bw = (14 + hash(k * 3) * 12) * u, bh = (10 + hash(k * 5) * 8) * u;
+        c.fillStyle = walls[k % walls.length]; c.fillRect(x, y - bh, bw, bh);
+        c.fillStyle = '#c8603a'; c.fillRect(x - 1.5 * u, y - bh - 3 * u, bw + 3 * u, 3.5 * u);
+        c.fillStyle = 'rgba(60,70,90,0.55)'; c.fillRect(x + bw * 0.2, y - bh * 0.62, 2.5 * u, 3.5 * u); c.fillRect(x + bw * 0.62, y - bh * 0.62, 2.5 * u, 3.5 * u);
+      }, 42);
+      place(14, (x, r) => { const s2 = (0.8 + r * 0.6) * u, y = hz - r * 26 * u; c.fillStyle = '#20402a'; c.beginPath(); c.ellipse(x, y - 14 * s2, 3.2 * s2, 14 * s2, 0, 0, 7); c.fill(); }, 43);
+      // landmark per track: the corniche viaduct and tunnel, the harbour lighthouse, or the domed grand casino
+      if (trackId === 'corniche') {
+        place(1, (x) => {
+          c.fillStyle = '#d8c6a2'; c.fillRect(x - 120 * u, hz - 46 * u, 240 * u, 8 * u);
+          for (let i = 0; i < 6; i++) { const ax = x - 110 * u + i * 44 * u; c.fillRect(ax, hz - 38 * u, 8 * u, 44 * u); c.beginPath(); c.arc(ax + 26 * u, hz - 38 * u, 18 * u, 0, Math.PI); c.fill(); }
+          c.fillStyle = '#b8a27a'; c.beginPath(); c.arc(x + 150 * u, hz - 30 * u, 22 * u, Math.PI, 0); c.fill(); c.fillRect(x + 128 * u, hz - 30 * u, 44 * u, 34 * u);
+          c.fillStyle = '#20202a'; c.beginPath(); c.arc(x + 150 * u, hz - 22 * u, 14 * u, Math.PI, 0); c.fill(); c.fillRect(x + 136 * u, hz - 22 * u, 28 * u, 26 * u);
+        }, 44);
+      } else if (trackId === 'port') {
+        place(1, (x) => {
+          c.fillStyle = '#e8e2d4'; c.fillRect(x - 90 * u, hz - 4 * u, 180 * u, 8 * u);
+          poly(c, [x + 70 * u, hz - 4 * u, x + 84 * u, hz - 4 * u, x + 81 * u, hz - 74 * u, x + 73 * u, hz - 74 * u], '#f6f3ea');
+          c.fillStyle = '#2f7a4a'; c.fillRect(x + 70 * u, hz - 84 * u, 14 * u, 10 * u);
+          c.fillStyle = '#fff1a8'; c.fillRect(x + 73 * u, hz - 82 * u, 8 * u, 6 * u);
+          poly(c, [x + 70 * u, hz - 84 * u, x + 84 * u, hz - 84 * u, x + 77 * u, hz - 92 * u], '#2f7a4a');
+          // a superyacht at the quay
+          poly(c, [x - 80 * u, hz - 2 * u, x + 30 * u, hz - 2 * u, x + 44 * u, hz - 14 * u, x - 86 * u, hz - 14 * u], '#f4f6fa');
+          c.fillStyle = '#f4f6fa'; c.fillRect(x - 60 * u, hz - 24 * u, 70 * u, 10 * u); c.fillRect(x - 44 * u, hz - 32 * u, 40 * u, 8 * u);
+          c.fillStyle = '#26334a'; c.fillRect(x - 56 * u, hz - 21 * u, 62 * u, 3 * u); c.fillRect(x - 40 * u, hz - 29 * u, 32 * u, 2.5 * u);
+        }, 45);
+      } else {
+        place(1, (x) => {
+          // the Grand Casino: a cream palace with a green copper dome and flags
+          c.fillStyle = '#f1e4c8'; c.fillRect(x - 70 * u, hz - 54 * u, 140 * u, 54 * u);
+          c.fillStyle = '#e4d2ac'; c.fillRect(x - 76 * u, hz - 58 * u, 152 * u, 6 * u);
+          c.fillStyle = 'rgba(70,80,110,0.55)'; for (let i = 0; i < 8; i++) { c.fillRect(x - 62 * u + i * 16 * u, hz - 44 * u, 7 * u, 12 * u); c.fillRect(x - 62 * u + i * 16 * u, hz - 24 * u, 7 * u, 12 * u); }
+          c.fillStyle = '#f1e4c8'; c.fillRect(x - 24 * u, hz - 74 * u, 48 * u, 18 * u);
+          c.fillStyle = '#4f9a84'; c.beginPath(); c.arc(x, hz - 74 * u, 24 * u, Math.PI, 0); c.fill();
+          c.fillStyle = '#e0b84a'; c.fillRect(x - 1.5 * u, hz - 108 * u, 3 * u, 12 * u);
+          for (const fx of [-66, 66]) { c.fillStyle = '#6b5a44'; c.fillRect(x + fx * u, hz - 84 * u, 1.5 * u, 28 * u); c.fillStyle = fx < 0 ? '#d6202a' : '#ffffff'; c.fillRect(x + fx * u + 1.5 * u, hz - 84 * u, 12 * u, 7 * u); }
+        }, 46);
+      }
+    });
+    add(0.32, hz - 60 * u, rt, (c, place) => {
+      // the corniche: a stone balustrade on the sea side, lamp posts, umbrella pines and bougainvillea
+      if (trackId === 'port') {
+        c.fillStyle = '#1f6fa8'; c.fillRect(0, hz + span * 0.4, tw, rt - hz);
+        place(6, (x, r) => {
+          const y = rt - 14 * u, L2 = (40 + r * 30) * u;
+          poly(c, [x, y, x + L2, y, x + L2 + 8 * u, y - 8 * u, x - 4 * u, y - 8 * u], '#ffffff');
+          c.fillStyle = '#c9d6e6'; c.fillRect(x + L2 * 0.2, y - 14 * u, L2 * 0.5, 6 * u);
+          c.fillStyle = '#7a5a3a'; c.fillRect(x + L2 * 0.45, y - 50 * u, 1.5 * u, 42 * u);
+        }, 47);
+        c.fillStyle = '#d8cfbf'; c.fillRect(0, rt - 6 * u, tw, 6 * u);
+      } else {
+        c.fillStyle = pal.ground; c.fillRect(0, rt - 18 * u, tw, 18 * u);
+        place(6, (x, r) => {
+          const hgt = (40 + r * 18) * u;
+          c.fillStyle = '#6a4a32'; c.fillRect(x - 2 * u, rt - hgt, 4 * u, hgt);
+          c.fillStyle = '#2f5a34'; c.beginPath(); c.ellipse(x, rt - hgt, 26 * u, 9 * u, 0, 0, 7); c.fill();
+          c.fillStyle = '#3e7040'; c.beginPath(); c.ellipse(x - 6 * u, rt - hgt - 4 * u, 16 * u, 5 * u, 0, 0, 7); c.fill();
+        }, 48);
+        place(10, (x, r) => { c.fillStyle = r > 0.5 ? '#d23a8e' : '#e2589f'; disc(c, x, rt - 20 * u, (6 + r * 4) * u, c.fillStyle as string); disc(c, x + 8 * u, rt - 16 * u, 5 * u, '#f07ab8'); }, 49);
+        // balustrade
+        c.fillStyle = '#efe6d2'; c.fillRect(0, rt - 15 * u, tw, 3 * u); c.fillRect(0, rt - 4 * u, tw, 4 * u);
+        for (let x = 0; x < tw; x += 7 * u) { c.beginPath(); c.ellipse(x + 3.5 * u, rt - 8 * u, 2 * u, 4 * u, 0, 0, 7); c.fill(); }
+        place(5, (x) => { c.fillStyle = '#2c2f38'; c.fillRect(x, rt - 52 * u, 2.5 * u, 50 * u); c.fillRect(x - 6 * u, rt - 52 * u, 14 * u, 2.5 * u); disc(c, x - 6 * u, rt - 48 * u, 3 * u, '#ffe6a8'); disc(c, x + 8 * u, rt - 48 * u, 3 * u, '#ffe6a8'); }, 50);
+      }
+    });
+  } else if (theme === 'neon') {
+    add(0.04, hz - 190 * u, hz + 4, (c, place, emit) => {
+      // far glass towers with vertical neon strips
+      place(14, (x, r, k) => {
+        const bw = (30 + r * 34) * u, hh = (90 + hash(k * 7) * 100) * u;
+        c.fillStyle = '#0d1630'; c.fillRect(x, hz - hh, bw, hh + 4);
+        c.fillStyle = 'rgba(120,200,255,0.10)'; for (let yy = hz - hh + 6 * u; yy < hz; yy += 7 * u) c.fillRect(x + 3 * u, yy, bw - 6 * u, 2 * u);
+        const col = ['#ff2fb4', '#2ff3ff', '#b07bff', '#ffe14a'][k % 4];
+        c.fillStyle = col; c.fillRect(x + (k % 2 ? 2 : bw - 4 * u), hz - hh, 2 * u, hh);
+        if (r > 0.55 && x >= 0 && x < tw) emit.push({ x: x + bw / 2, y: hz - hh - 4 * u, k: 'beacon' });
+      }, 51);
+    });
+    add(0.12, hz - 150 * u, hz + span * 0.6, (c, place, emit) => {
+      // landmark: the Halo Tower with its glowing ring, and a monorail on stilts
+      place(1, (x) => {
+        poly(c, [x - 16 * u, hz + 4 * u, x + 16 * u, hz + 4 * u, x + 6 * u, hz - 140 * u, x - 6 * u, hz - 140 * u], '#151a3a');
+        c.strokeStyle = '#2ff3ff'; c.lineWidth = 3 * u; c.beginPath(); c.ellipse(x, hz - 110 * u, 26 * u, 7 * u, 0, 0, 7); c.stroke();
+        c.strokeStyle = '#ff2fb4'; c.lineWidth = 2 * u; c.beginPath(); c.ellipse(x, hz - 80 * u, 20 * u, 5 * u, 0, 0, 7); c.stroke();
+        if (x >= 0 && x < tw) emit.push({ x, y: hz - 144 * u, k: 'beacon' });
+      }, 52);
+      c.fillStyle = '#1b1f45'; c.fillRect(0, hz - 30 * u, tw, 4 * u);
+      for (let x = 0; x < tw; x += 60 * u) c.fillRect(x, hz - 26 * u, 4 * u, 30 * u);
+      // holo billboards
+      place(4, (x, r, k) => {
+        const col = ['#ff2fb4', '#2ff3ff', '#ffe14a', '#b07bff'][k % 4];
+        const y = hz - (60 + r * 40) * u;
+        c.fillStyle = '#0a0a18'; c.fillRect(x, y, 54 * u, 26 * u);
+        c.strokeStyle = col; c.lineWidth = 2 * u; c.strokeRect(x + 2 * u, y + 2 * u, 50 * u, 22 * u);
+        c.fillStyle = col; c.globalAlpha = 0.35; c.fillRect(x + 6 * u, y + 6 * u, 42 * u, 14 * u); c.globalAlpha = 1;
+        if (x >= 0 && x < tw) emit.push({ x: x + 6 * u, y: y + 12 * u, k: 'neon:' + col });
+      }, 53);
+    });
+    add(0.32, hz - 70 * u, rt, (c, place, emit) => {
+      c.fillStyle = pal.ground; c.fillRect(0, hz + span * 0.3, tw, rt - hz);
+      // a magenta grid on the plaza and lit shop fronts
+      c.strokeStyle = 'rgba(255,47,180,0.25)'; c.lineWidth = 1 * u;
+      for (let x = 0; x < tw; x += 24 * u) { c.beginPath(); c.moveTo(x, hz + span * 0.3); c.lineTo(x - 30 * u, rt); c.stroke(); }
+      const neon = ['#ff2fb4', '#2ff3ff', '#ffe14a', '#b07bff'];
+      place(7, (x, r, k) => {
+        const bw = 64 * u, bh = (34 + r * 26) * u, y = rt - 2 * u;
+        c.fillStyle = '#0c0c1e'; c.fillRect(x, y - bh, bw, bh);
+        c.fillStyle = 'rgba(47,243,255,0.18)'; c.fillRect(x + 5 * u, y - bh * 0.5, bw - 10 * u, bh * 0.42);
+        const col = neon[k % 4];
+        c.fillStyle = col; c.fillRect(x + 8 * u, y - bh + 8 * u, bw - 16 * u, 3 * u);
+        if (x >= 0 && x < tw) emit.push({ x: x + 8 * u, y: y - bh + 8 * u, k: 'neon:' + col });
+      }, 54);
+      c.fillStyle = '#2ff3ff'; c.fillRect(0, rt - 3 * u, tw, 1.5 * u);
+    });
   } else {
     // summit
     add(0.03, hz - 150 * u, hz + 2, (c) => {
@@ -493,6 +640,12 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         place(7, (x) => { c.fillStyle = '#e9e4d8'; c.fillRect(x, rb + 8 * u, 5 * u, 22 * u); });
       } else if (theme === 'night') {
         place(5, (x) => { c.fillStyle = pal.post; c.fillRect(x, rb + 8 * u, 5 * u, 50 * u); c.fillStyle = 'rgba(255,214,140,0.14)'; c.beginPath(); c.ellipse(x + 3 * u, rb + 4 * u, 40 * u, 8 * u, 0, 0, 7); c.fill(); });
+      } else if (theme === 'riviera') {
+        c.fillStyle = '#d9cdb2'; c.fillRect(0, rb + 6 * u, fw, 8 * u);
+        place(6, (x) => { c.fillStyle = '#b5552f'; c.fillRect(x - 7 * u, rb + 14 * u, 14 * u, 12 * u); disc(c, x, rb + 12 * u, 9 * u, '#3e7a3e'); disc(c, x - 3 * u, rb + 9 * u, 3 * u, '#e2589f'); });
+      } else if (theme === 'neon') {
+        c.fillStyle = '#ff2fb4'; c.fillRect(0, rb + 8 * u, fw, 2 * u);
+        place(6, (x) => { c.fillStyle = pal.post; c.fillRect(x, rb + 8 * u, 5 * u, 44 * u); c.fillStyle = '#2ff3ff'; c.fillRect(x, rb + 8 * u, 5 * u, 4 * u); });
       } else if (theme === 'desert') {
         place(8, (x, r) => { c.fillStyle = '#9a4a26'; c.beginPath(); c.ellipse(x, rb + 22 * u, (14 + r * 16) * u, (6 + r * 6) * u, 0, 0, 7); c.fill(); });
         place(5, (x) => { c.fillStyle = pal.post; c.fillRect(x, rb + 6 * u, 4 * u, 30 * u); c.fillStyle = '#e63b2e'; c.fillRect(x, rb + 6 * u, 4 * u, 6 * u); });
@@ -537,7 +690,7 @@ function motion(v: SceneView, b: Built, scroll: number) {
     ctx.beginPath(); ctx.ellipse(x - 14 * s, y - 5 * s, 18 * s, 8 * s, 0, 0, 7); ctx.fill();
   }
   // birds (or vultures) on the day themes
-  if (theme === 'suburb' || theme === 'coast' || theme === 'scrap' || theme === 'desert' || theme === 'summit') {
+  if (theme === 'suburb' || theme === 'coast' || theme === 'scrap' || theme === 'desert' || theme === 'summit' || theme === 'riviera') {
     ctx.strokeStyle = theme === 'desert' ? 'rgba(40,20,20,0.7)' : 'rgba(20,24,40,0.55)'; ctx.lineWidth = 1.5 * u;
     for (let k = 0; k < 3; k++) {
       const x = drift(W * 0.2 + k * 50 * u + t * 22 * u - scroll * 0.05, W * 1.4) - W * 0.2;
@@ -546,7 +699,7 @@ function motion(v: SceneView, b: Built, scroll: number) {
       ctx.beginPath(); ctx.moveTo(x - 6 * u, y - f); ctx.lineTo(x, y); ctx.lineTo(x + 6 * u, y - f); ctx.stroke();
     }
   }
-  if (theme === 'coast') {
+  if (theme === 'coast' || theme === 'riviera') {
     // sailboats crossing the bay
     for (let k = 0; k < 2; k++) {
       const x = drift(k * W * 0.7 + t * (6 + k * 4) * u - scroll * 0.02, W * 1.4) - W * 0.2;
@@ -629,11 +782,11 @@ export function drawBackdrop(v: SceneView) {
 export function drawRoadDressing(v: SceneView) {
   const { ctx, W, roadTop, roadBot, camX, ppm, theme, dpr: u, reduced } = v;
   const scroll = camX * ppm;
-  if (theme === 'night' && !reduced) {
+  if ((theme === 'night' || theme === 'neon') && !reduced) {
     // wet street: long smeared reflections of the neon signs, moving with the near layer
     for (let k = 0; k < 6; k++) {
       const x = drift(k * 233 * u - scroll * 0.32, W + 200 * u) - 100 * u;
-      ctx.fillStyle = ['rgba(255,63,164,0.12)', 'rgba(56,225,255,0.1)', 'rgba(255,210,63,0.09)'][k % 3];
+      ctx.fillStyle = theme === 'neon' ? ['rgba(255,47,180,0.16)', 'rgba(47,243,255,0.14)', 'rgba(176,123,255,0.12)'][k % 3] : ['rgba(255,63,164,0.12)', 'rgba(56,225,255,0.1)', 'rgba(255,210,63,0.09)'][k % 3];
       ctx.fillRect(x, roadTop + 4 * u, 14 * u, roadBot - roadTop - 8 * u);
     }
   } else if (theme === 'desert' || theme === 'summit' || theme === 'coast') {

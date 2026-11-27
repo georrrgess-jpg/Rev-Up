@@ -18,7 +18,7 @@ import { CarId, FAMILIES, Family, RaceEvent, TRACKS, carById, eventById } from '
 import type { App } from './app';
 import { h } from './dom';
 import { describeFitEvents } from './fit';
-import { openShop } from './shop';
+import { areaOf, openMechanic } from './mechanic';
 
 export interface PitOpts {
   /** Start the event (the Race menu's live start: it handles class-meet car switches). */
@@ -81,13 +81,15 @@ export function openPitSetup(app: App, eventId: string, o: PitOpts) {
         const src = sl.options[k].src;
         act(() => ('at' in src ? app.game.installPart(car, src.at) : app.game.movePartBetweenCars(src.car, sl.family, car)));
       };
+      /** The Mechanic Shop for this race's car; closing it comes back to this same race's Pit Setup. */
+      const toMechanic = (extra: { family?: Family; tier?: number } = {}) => {
+        close();
+        openMechanic(app, { car, ...extra, area: extra.family ? areaOf(extra.family) : undefined, returnTo: { label: 'Pit Setup', run: () => openPitSetup(app, eventId, o) } });
+      };
       const hintBtn = (hint: PitHint) => {
         if (hint.kind === 'merge') return h('button', { class: 'btn sm', onclick: () => { close(); o.onAwayToMerge(eventId); } }, 'Go merge');
         if (hint.kind === 'order') {
-          return h('button', { class: 'btn sm', onclick: () => {
-            close();
-            openShop(app, hint.family, { tier: hint.tier, onDone: () => openPitSetup(app, eventId, o) });
-          } }, 'Order');
+          return h('button', { class: 'btn sm', onclick: () => toMechanic({ family: hint.family, tier: hint.tier }) }, 'Order');
         }
         return null;
       };
@@ -116,6 +118,8 @@ export function openPitSetup(app: App, eventId: string, o: PitOpts) {
             h('div', { class: 'bar' }, h('i', { style: `width:${Math.round((d.share / Math.max(...demands.map((x) => x.share))) * 100)}%` })),
             h('small', { class: `pd-lv ${d.level.toLowerCase()}` }, d.level)))),
         h('div', { class: 'pit-stats' }, stat('Top speed', `${mph(lo.stats.top)} mph`), stat('Accel', lo.stats.accel.toFixed(1)), stat('Grip', lo.stats.grip.toFixed(2))),
+        h('button', { class: 'btn wide pit-mech', onclick: () => toMechanic(), 'aria-label': `Mechanic Shop for the ${cls.model}, then back to this race` },
+          h('span', { class: 'stack' }, 'Mechanic Shop', h('small', {}, `parts, wheels, paint and Tune-ups for the ${cls.model} · back here after`))),
         h('p', { class: `pit-note${noteBad ? ' bad' : ''}`, role: 'status' }, note),
         h('div', { class: 'pit-slots' }, ...slotEls),
         pitKits(app, demands.filter((d) => d.level === 'High').map((d) => d.key), build) ?? '', // Scrap & surplus

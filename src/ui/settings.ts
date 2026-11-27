@@ -1,4 +1,5 @@
-import { setMuted } from '../audio';
+import { setMuted, sfx } from '../audio';
+import { setMusicVolume, setSfxVolume } from '../audio-api';
 import { exportText, importText } from '../core/save';
 import { newGame } from '../core/state';
 import type { App } from './app';
@@ -20,6 +21,17 @@ export function openSettings(app: App) {
       b.addEventListener('click', () => { set(!get()); b.setAttribute('aria-checked', String(get())); });
       return h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, label), h('div', { class: 'd' }, desc)), b);
     };
+    /** A 0–10 step slider for one bus; applies live while dragging, saves on release. */
+    const volume = (label: string, desc: string, key: 'musicVol' | 'sfxVol', def: number, apply: (v: number) => void, sample?: () => void) => {
+      const cur = Math.round((game.state.settings[key] ?? def) * 10);
+      const out = h('span', { class: 'num', style: 'min-width:3ch;text-align:right' }, String(cur));
+      const r = h('input', { type: 'range', min: '0', max: '10', step: '1', value: String(cur), 'aria-label': `${label} volume`, style: 'width:130px;accent-color:var(--accent,#ffb000)' }) as HTMLInputElement;
+      const val = () => Number(r.value) / 10;
+      r.setAttribute('aria-valuetext', cur ? `${cur * 10}%` : 'off');
+      r.addEventListener('input', () => { out.textContent = r.value; r.setAttribute('aria-valuetext', Number(r.value) ? `${Number(r.value) * 10}%` : 'off'); apply(val()); });
+      r.addEventListener('change', () => { game.setSetting(key, val()); sample?.(); });
+      return h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, label), h('div', { class: 'd' }, desc)), r, out);
+    };
     const ta = h('textarea', { 'aria-label': 'Save code', placeholder: 'Paste a save code here to import it' });
     const offline = app.offlineReady
       ? '✓ Offline play is ready. Rev Up opens and plays without a connection.'
@@ -33,7 +45,9 @@ export function openSettings(app: App) {
     return h('div', {},
       h('button', { class: 'btn sm close', onclick: close }, 'Close'),
       h('h2', {}, 'Settings'),
-      toggle('Sound', 'Merge clicks, nitro, and engine revs', () => !game.state.settings.muted, (v) => { game.setSetting('muted', !v); setMuted(!v); }),
+      toggle('Sound', 'All sound: music, engines and effects', () => !game.state.settings.muted, (v) => { game.setSetting('muted', !v); setMuted(!v); }),
+      volume('Music', 'The Rev Up soundtrack', 'musicVol', 0.7, setMusicVolume),
+      volume('Effects', 'Engines, merges, nitro and timing cues', 'sfxVol', 1, setSfxVolume, () => sfx.cash()),
       toggle('Reduced motion', 'Shorter, calmer animations', () => game.state.settings.reducedMotion, (v) => { game.setSetting('reducedMotion', v); document.documentElement.classList.toggle('reduced', v); }),
       toggle('Boost zone cue', 'A beep when a boost zone opens', () => game.state.settings.nitroCue, (v) => game.setSetting('nitroCue', v)),
       h('h3', {}, 'Install'),

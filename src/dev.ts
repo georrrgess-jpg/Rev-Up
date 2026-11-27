@@ -69,6 +69,32 @@ export function applyPreset(game: Game, preset: string) {
         fill(s, [['engine', cap - 1], ['tires', cap - 1], ['turbo', cap - 2], ['turbo', cap - 2]]);
         break;
       }
+      // Azure Riviera (the supercars): 'riviera' the Summit Gala just won, the Vireo one race of Rep away;
+      // 'super1' the Vireo owned and active; 'super2' the Mako too; 'flagship' every car, the Sovereign on T10 parts.
+      case 'riviera':
+      case 'super1':
+      case 'super2':
+      case 'flagship': {
+        const ladder = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign'] as const;
+        const upTo = ({ riviera: 'proto', super1: 'vireo', super2: 'mako', flagship: 'sovereign' } as const)[preset as 'riviera'];
+        s.owned = ladder.slice(0, ladder.indexOf(upTo) + 1) as never;
+        s.activeCar = upTo; s.revealed = [...s.owned];
+        s.rep = ({ riviera: 14900, super1: 16500, super2: 20000, flagship: 24000 } as const)[preset as 'riviera'];
+        s.bosses = ['ray', 'vale', 'nova', 'sable', 'iver'];
+        s.blueprints = ['Ray’s Rust-Red', 'Crown Teal', 'Main Event Neon', 'Canyon Ochre', 'Summit Ice'];
+        s.badges = ['Scrapyard King', 'Coastal Crown', 'Main Event Champion', 'Canyon Rally Champion', 'Summit Champion'];
+        s.crafted = ['tires:3', 'turbo:4', 'engine:5', 'engine:6', 'tires:6', 'turbo:7', 'tires:8', 'engine:8', 'turbo:9', 'tires:9', 'engine:9', ...(preset === 'flagship' ? ['engine:10'] : [])];
+        s.cash = 60000; s.scrap = 4000; s.activeS = 4200; s.nitro = 3; s.stats.races = 220;
+        const won = { riviera: [], super1: [], super2: ['corniche'], flagship: ['corniche', 'port-sprint'] }[preset as 'riviera'] as string[];
+        for (const e of EVENTS) if (!e.heatOf && (e.district !== 'riviera' && e.id !== 'ta-corniche' && e.id !== 'riviera-night' || won.includes(e.id))) s.events[e.id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
+        s.stars = { 'neon-mile': 7, 'skyline-run': 7, 'stock-cup': 7 };
+        const fam: Family[] = ['engine', 'tires', 'turbo'];
+        // the newest car on its best parts (the Sovereign on a T10 engine), the Halcyon on its T9 build
+        const fit = (tiers: number[]) => Object.fromEntries(fam.map((f, i) => [f, { id: s.nextPartId++, f, t: tiers[i], q: 'std' as const }]));
+        s.installed = { proto: fit([9, 9, 9]), ...(upTo !== 'proto' ? { [upTo]: fit(upTo === 'sovereign' ? [10, 9, 9] : [9, 9, 9]) } : {}) };
+        fill(s, [['engine', 9], ['tires', 9], ['turbo', 8], ['turbo', 8], ['engine', 7]]);
+        break;
+      }
       case 'fullx':
       case 'full': {
         if (preset === 'fullx') expandBoard(s);
