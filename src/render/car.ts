@@ -224,6 +224,21 @@ export const PLATFORM_CARS: readonly string[] = ['vireo', 'mako', 'sovereign'];
 /** Real length of each class, so the race can show the Muscle longer than the Tapeback. */
 export const carLengthM = (id: CarId | string) => defFor(id).L;
 
+/** Tail lamp centre on the near side (metres from the tail, height) and its length along the body. */
+const TAILS: Record<string, { x: number; y: number; len: number }> = {
+  junker: { x: 0.06, y: 0.7, len: 0.1 }, beater: { x: 0.07, y: 0.7, len: 0.14 }, hothatch: { x: 0.04, y: 0.73, len: 0.08 },
+  muscle: { x: 0.06, y: 0.67, len: 0.12 }, tourer: { x: 0.07, y: 0.615, len: 0.14 }, tuner: { x: 0.05, y: 0.68, len: 0.1 },
+  super: { x: 0.04, y: 0.675, len: 0.08 }, rally: { x: 0.05, y: 0.78, len: 0.1 }, gt: { x: 0.03, y: 0.745, len: 0.06 },
+  proto: { x: 0.3, y: 0.787, len: 0.6 }, vireo: { x: 0.09, y: 0.68, len: 0.1 }, mako: { x: 0.1, y: 0.776, len: 0.2 },
+  sovereign: { x: 0.27, y: 0.72, len: 0.55 },
+};
+const tailOf = (id: string) => TAILS[id] ?? TAILS.muscle;
+/** Canvas position of the near-side tail lamp for a car drawn with drawCar(ctx, id, x, y, w, …), plus its length in px. */
+export function tailLampPoint(id: CarId | string, x: number, y: number, w: number): { x: number; y: number; len: number } {
+  const t = tailOf(id), k = w / defFor(id).L;
+  return { x: x + t.x * k, y: y - t.y * k, len: t.len * k };
+}
+
 /** Height of the headlamp centres on the front plane. */
 const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63, tuner: 0.62, super: 0.5, rally: 0.66, gt: 0.6, proto: 0.5, vireo: 0.44, mako: 0.53, sovereign: 0.42 } as Record<string, number>)[id] ?? 0.65;
 
@@ -473,7 +488,7 @@ function tireAt(ctx: CanvasRenderingContext2D, d: CarDef, cx: number, cy: number
   ctx.closePath(); ctx.fill();
 }
 
-function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number, rear: boolean, angle: number, detail: boolean, D: P, blur = 0) {
+function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number, rear: boolean, angle: number, detail: boolean, D: P, blur = 0, polish = 0) {
   const r = d.r;
   const cy = r;
   tireAt(ctx, d, wx, cy, D, rear ? d.rearTireW : d.tireW, false);
@@ -483,7 +498,7 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
   sw.addColorStop(1, d.wheel.tire);
   ctx.fillStyle = sw;
   ctx.beginPath(); ctx.arc(wx, cy, r, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.strokeStyle = polish >= 3 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.07)';
   ctx.lineWidth = r * 0.03;
   ctx.beginPath(); ctx.arc(wx, cy, r * 0.93, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
   const R = r * d.wheel.rim;
@@ -554,7 +569,7 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
       ctx.beginPath(); ctx.arc(0, 0, R * 0.84, Math.PI * 0.5, Math.PI * 1.0); ctx.arc(0, 0, R * 0.48, Math.PI * 1.0, Math.PI * 0.5, true); ctx.closePath(); ctx.fill();
       ctx.fillStyle = cal;
       ctx.beginPath(); ctx.arc(0, 0, R * 0.8, Math.PI * 0.52, Math.PI * 0.98); ctx.arc(0, 0, R * 0.52, Math.PI * 0.98, Math.PI * 0.52, true); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillStyle = `rgba(255,255,255,${polish >= 3 ? 0.6 : 0.3})`;
       ctx.beginPath(); ctx.arc(0, 0, R * 0.77, Math.PI * 0.6, Math.PI * 0.8); ctx.arc(0, 0, R * 0.72, Math.PI * 0.8, Math.PI * 0.6, true); ctx.closePath(); ctx.fill();
     } else if (d.wheel.caliper) {
       ctx.fillStyle = d.wheel.caliper;
@@ -761,6 +776,14 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
     ctx.fillStyle = k === 'dish' ? '#f2f4f5' : '#9aa1a8';
     for (let i = 0; i < 5; i++) { const a = (i * Math.PI * 2) / 5 + 0.63; ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.15, Math.sin(a) * R * 0.15, R * 0.03, 0, Math.PI * 2); ctx.fill(); }
   }
+  if (polish >= 3 && blur < 0.6) {
+    // concours: polished lip, dressed tyre wall and a bright sheen across the face
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = R * 0.035;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.985, Math.PI * 0.05, Math.PI * 0.95); ctx.stroke();
+    const sh = ctx.createLinearGradient(-R, R, R, -R);
+    sh.addColorStop(0.35, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, 'rgba(255,255,255,0.28)'); sh.addColorStop(0.65, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, R * 0.96, 0, Math.PI * 2); ctx.fill();
+  }
   if (blur > 0) {
     // spinning fast: spokes smear into a disc with soft concentric streaks
     ctx.globalAlpha = 0.75 * blur;
@@ -778,7 +801,7 @@ function wheel(ctx: CanvasRenderingContext2D, _id: string, d: CarDef, wx: number
 
 // ---------------------------------------------------------------- body layers
 
-interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; paint: string; trim: string; stripe: string | null; detail: boolean; mat?: PaintMaterial; restore: number; liv?: string; /** 0..1 extra key light */ lt?: number; /** 0..1 hood / engine cover opening */ hood?: number }
+interface Ctx { ctx: CanvasRenderingContext2D; id: string; d: CarDef; g: Geo; paint: string; trim: string; stripe: string | null; detail: boolean; mat?: PaintMaterial; restore: number; liv?: string; /** 0..1 extra key light */ lt?: number; /** 0..1 hood / engine cover opening */ hood?: number; /** Concours restoration stage 0..3 */ cc?: number }
 
 /** Ground shadow, far wheels, extruded planes, wheel wells, near panel and its details (everything behind the near wheels). */
 function backLayer(c: Ctx, shadow: boolean) {
@@ -913,6 +936,23 @@ function nearPanel(c: Ctx) {
   const spec = c.mat === 'matte' ? 0.03 : c.mat ? 0.22 : 0.14;
   ctx.fillStyle = `rgba(255,255,255,${spec + lt * (c.mat === 'matte' ? 0.04 : 0.16)})`;
   ctx.beginPath(); ctx.moveTo(d.L * 0.18, d.belt - 0.09); ctx.lineTo(d.L * 0.86, d.belt - 0.13); ctx.lineTo(d.L * 0.84, d.belt - 0.165); ctx.lineTo(d.L * 0.16, d.belt - 0.12); ctx.closePath(); ctx.fill();
+  const cc = c.cc ?? 0;
+  if (cc >= 1 && c.mat !== 'matte') {
+    // concours detail and polish: a deeper, richer colour and a crisp wet clearcoat line under the shoulder
+    ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.35; ctx.fillStyle = paint; ctx.fillRect(0, 0, d.L, 1.6); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.moveTo(d.L * 0.1, d.belt - 0.075); ctx.lineTo(d.L * 0.92, d.belt - 0.115); ctx.lineTo(d.L * 0.92, d.belt - 0.124); ctx.lineTo(d.L * 0.1, d.belt - 0.084); ctx.closePath(); ctx.fill();
+    const lower = ctx.createLinearGradient(0, d.sill + 0.25, 0, d.sill);
+    lower.addColorStop(0, 'rgba(255,255,255,0)'); lower.addColorStop(1, 'rgba(255,255,255,0.12)');
+    ctx.fillStyle = lower; ctx.fillRect(0, d.sill, d.L, 0.25);
+  }
+  if (cc >= 3) {
+    // concours finish: a show-shine sweep across the whole flank
+    const sw = ctx.createLinearGradient(d.L * 0.3, 1.4, d.L * 0.62, 0);
+    sw.addColorStop(0, 'rgba(255,255,255,0)'); sw.addColorStop(0.38, 'rgba(255,253,245,0.06)'); sw.addColorStop(0.5, 'rgba(255,253,245,0.5)');
+    sw.addColorStop(0.55, 'rgba(255,253,245,0.14)'); sw.addColorStop(0.62, 'rgba(255,253,245,0.34)'); sw.addColorStop(0.74, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sw; ctx.fillRect(0, 0, d.L, 1.6);
+  }
   if (lt > 0 && c.mat !== 'matte') {
     const band = ctx.createLinearGradient(0, d.belt + 0.02, 0, d.belt - 0.34);
     band.addColorStop(0, 'rgba(255,255,255,0)'); band.addColorStop(0.45, `rgba(255,252,244,${0.2 * lt})`); band.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1440,8 +1480,9 @@ function sideGlass(c: Ctx) {
     const front = wi === g.glass.length - 1;
     // window surround: chrome on the classics, black rubber elsewhere
     path(ctx, w);
-    ctx.strokeStyle = chrome ? '#cfd5da' : '#0d1013';
+    ctx.strokeStyle = chrome ? ((c.cc ?? 0) >= 2 ? '#f4f7f9' : '#cfd5da') : '#0d1013';
     ctx.lineWidth = 0.05; ctx.lineJoin = 'round'; ctx.stroke();
+    if ((c.cc ?? 0) >= 2) { ctx.strokeStyle = chrome ? 'rgba(255,255,255,0.9)' : 'rgba(225,232,238,0.55)'; ctx.lineWidth = 0.012; ctx.stroke(); }
     ctx.fillStyle = '#0b0f14'; ctx.fill();
     ctx.save();
     path(ctx, w); ctx.clip();
@@ -1947,9 +1988,11 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     }
   }
   if (brake) {
-    const bl = ctx.createRadialGradient(0.04, 0.68, 0, 0.04, 0.68, 0.22);
+    const t = tailOf(id);
+    const rx2 = Math.max(0.22, t.len * 0.6);
+    const bl = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, rx2);
     bl.addColorStop(0, 'rgba(255,60,40,0.8)'); bl.addColorStop(1, 'rgba(255,40,20,0)');
-    ctx.fillStyle = bl; ctx.beginPath(); ctx.arc(0.04, 0.68, 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = bl; ctx.beginPath(); ctx.ellipse(t.x, t.y, rx2, 0.22, 0, 0, Math.PI * 2); ctx.fill();
   }
 }
 
@@ -2063,6 +2106,14 @@ function engineBay(c: Ctx, amount: number) {
       const x = ea + ((eb - ea) * (k + 0.5)) / cyl, p = P3(x, u, 0.055);
       ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.03, 0.022, 0, 0, Math.PI * 2); ctx.fill();
     }
+  }
+  if ((c.cc ?? 0) >= 2) {
+    // concours engine bay: polished cam covers and braided stainless lines
+    for (const u of banks) strip(ea + 0.03, eb - 0.03, u - bw * 0.5, u + bw * 0.1, 0.052, 'rgba(255,255,255,0.45)');
+    ctx.strokeStyle = '#c9cfd4'; ctx.lineWidth = 0.016; ctx.setLineDash([0.02, 0.012]); ctx.lineCap = 'butt';
+    for (const u of [0.18, 0.84]) { const a = P3(ea, u, 0.02), b = P3((ea + eb) / 2, u + 0.04, -0.02), q = P3(eb, u - 0.02, 0.02); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(b.x, b.y, q.x, q.y); ctx.stroke(); }
+    ctx.setLineDash([]);
+    for (const u of [0.18, 0.84]) for (const x of [ea, eb]) { const p = P3(x, u + (x === eb ? -0.02 : 0), 0.02); ctx.fillStyle = '#2b7de0'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.02, 0.014, 0, 0, Math.PI * 2); ctx.fill(); }
   }
   if (e.turbo) {
     // turbochargers: heat-tinted housings at the hot end of the engine
@@ -2249,7 +2300,7 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
   ctx.save();
   setupCtx(ctx, x, y, w, id);
   const hood = Math.max(0, Math.min(1, o.hood ?? 0));
-  const c: Ctx = { ctx, id, d, g, paint, trim, stripe: o.livery ?? null, detail, mat: o.style?.material, restore: o.style?.restore ?? 0, liv: o.style?.livery, lt: Math.max(0, Math.min(1, o.light ?? 0)), hood };
+  const c: Ctx = { ctx, id, d, g, paint, trim, stripe: o.livery ?? null, detail, mat: o.style?.material, restore: o.style?.restore ?? 0, liv: o.style?.livery, lt: Math.max(0, Math.min(1, o.light ?? 0)), hood, cc: o.style?.concours ?? 0 };
   if (o.silhouette) {
     if (o.shadow !== false) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(d.L / 2, 0.02, d.L * 0.55, 0.12, 0, 0, Math.PI * 2); ctx.fill(); }
     hull(c, '#0f141b');
@@ -2260,7 +2311,7 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
   if (o.headlights) beam(c, o.headlights);
   if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0);
   backLayer(c, o.shadow !== false);
-  for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, detail, g.D);
+  for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, detail, g.D, 0, o.style?.concours ?? 0);
   frontLayer(c, o.headlights ?? 0, !!o.brake);
   if (hood > 0) engineBay(c, hood);
   if (o.focus) focusOverlay(c, o.focus);
@@ -2292,7 +2343,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
     const draw = (cv: HTMLCanvasElement, fn: (c: Ctx) => void) => {
       const cx = cv.getContext('2d')!;
       cx.save(); setupCtx(cx, pad, oy, W, id);
-      fn({ ctx: cx, id, d, g, paint, trim, stripe: o.livery ?? null, detail: false, mat: o.style?.material, restore: o.style?.restore ?? 0, liv: o.style?.livery });
+      fn({ ctx: cx, id, d, g, paint, trim, stripe: o.livery ?? null, detail: false, mat: o.style?.material, restore: o.style?.restore ?? 0, liv: o.style?.livery, cc: o.style?.concours ?? 0 });
       cx.restore();
     };
     draw(back, (c) => backLayer(c, o.shadow !== false));
@@ -2311,7 +2362,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
   }
   blit(s.back);
   ctx.save(); setupCtx(ctx, x, y, w, id);
-  for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, false, g.D, o.blur ?? 0);
+  for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, false, g.D, o.blur ?? 0, o.style?.concours ?? 0);
   ctx.restore();
   blit(s.front);
   if (o.headlights || o.brake) {
@@ -2332,7 +2383,11 @@ function frontLayerLightsOnly(c: Ctx, glow: number, brake: boolean) {
       ctx.beginPath(); ctx.arc(p.x, p.y, 0.09, 0, Math.PI * 2); ctx.fill();
     }
   }
-  if (brake) { ctx.fillStyle = 'rgba(255,60,40,0.85)'; ctx.beginPath(); ctx.arc(0.04, 0.68, 0.09, 0, Math.PI * 2); ctx.fill(); }
+  if (brake) {
+    const t = tailOf(id);
+    ctx.fillStyle = 'rgba(255,60,40,0.35)'; ctx.beginPath(); ctx.ellipse(t.x, t.y, Math.max(0.14, t.len * 0.62), 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,90,70,0.95)'; ctx.beginPath(); ctx.ellipse(t.x, t.y, Math.max(0.06, t.len * 0.5), 0.045, 0, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 export function drawCarCover(ctx: CanvasRenderingContext2D, id: CarId | string, x: number, y: number, w: number, amount: number) {

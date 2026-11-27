@@ -25,6 +25,17 @@ interface Ink { m: string; d: string; acc: string; t: number }
 
 const CARBON = '#24262c';
 const GLOW = '#8af6ff';
+/** T10 "Prism": an iridescent gradient (defined once per SVG in partSvg) instead of a flat metal. */
+// Each SVG gets its own gradient id: a url(#id) that resolves into a hidden SVG elsewhere would paint nothing.
+let prismN = 0;
+let PRISM = 'url(#rvPrism0)';
+const prismDefs = (id: string) => `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6fc0"/><stop offset=".28" stop-color="#ffd85a"/><stop offset=".52" stop-color="#7dffb8"/><stop offset=".76" stop-color="#6fd0ff"/><stop offset="1" stop-color="#b58cff"/></linearGradient></defs>`;
+/** T10 halo: a starburst of prism rays behind the part. */
+function prismHalo(): string {
+  let p = '';
+  for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; p += `M${(32 + Math.cos(a) * 14).toFixed(1)} ${(32 + Math.sin(a) * 14).toFixed(1)}L${(32 + Math.cos(a) * 31).toFixed(1)} ${(32 + Math.sin(a) * 31).toFixed(1)}`; }
+  return `<circle cx="32" cy="32" r="29" fill="${PRISM}" opacity=".16"/><path d="${p}" stroke="${PRISM}" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>`;
+}
 
 // ---------------------------------------------------------------- engines (wide block silhouette)
 
@@ -90,7 +101,7 @@ function engine({ m, d, acc, t }: Ink): string {
       out.push(`<path d="M34 12 l-5 6 h4 l-3 5 l7 -7 h-4 l3 -4z" fill="#ffd34d"/>`);
       break;
     default: { // T9+: prototype core — shark-fin intake and a glowing light blade
-      const glow = t >= 10 ? '#fff' : GLOW;
+      const glow = t >= 10 ? PRISM : GLOW;
       out.push(`<path d="M20 24 L28 4 L36 4 L44 24Z" fill="${CARBON}" stroke="${m}" stroke-width="2" stroke-linejoin="round"/>`);
       out.push(`<rect x="14" y="34" width="36" height="7" rx="3.5" fill="${glow}" opacity=".35"/>`);
       out.push(`<rect x="14" y="36" width="36" height="3" rx="1.5" fill="${glow}"/>`);
@@ -178,7 +189,7 @@ function tires({ m, d, acc, t }: Ink): string {
       out.push(`<circle cx="32" cy="32" r="4" fill="${m}"/>`);
       break;
     default: { // T9+: turbine wheel ringed with light
-      const glow = t >= 10 ? '#fff' : GLOW;
+      const glow = t >= 10 ? PRISM : GLOW;
       out.push(`<circle cx="32" cy="32" r="${rim + 1}" fill="none" stroke="${glow}" stroke-width="3" opacity=".9"/>`);
       out.push(`<circle cx="32" cy="32" r="${rim - 1}" fill="${CARBON}"/>`);
       for (let k = 0; k < 8; k++) {
@@ -255,7 +266,7 @@ function turbo({ m, d, acc, t }: Ink): string {
       out.push(`<path d="M9 24 C9 10 20 6 26 8" stroke="#ff8a1f" stroke-width="3" fill="none" stroke-linecap="round"/>`);
       break;
     default: { // T9+: twin electric turbos with plasma-lit inlets
-      const glow = t >= 10 ? '#fff' : GLOW;
+      const glow = t >= 10 ? PRISM : GLOW;
       out.push(`<circle cx="19" cy="44" r="14" fill="${glow}" opacity=".22"/><circle cx="37" cy="23" r="14" fill="${glow}" opacity=".22"/>`);
       out.push(scroll(19, 44, 12, m, d, 7, glow));
       out.push(scroll(37, 23, 12, m, d, 7, glow));
@@ -305,13 +316,24 @@ export interface PartSvgOpts {
 
 /** A part illustration. Signature kept stable for other screens: `partSvg(family, tier, quality)`. */
 export function partSvg(f: Family, t: number, q: Quality, opts: PartSvgOpts = {}): string {
-  const ink: Ink = { m: metalFor(t), d: metalDarkFor(t), acc: FAMILIES[f].color, t: tierIdx(t) };
-  const art = DRAW[f](ink);
+  const prism = tierIdx(t) >= 10;
+  const pid = `rvPrism${prismN = (prismN + 1) % 1e6}`;
+  if (prism) PRISM = `url(#${pid})`;
+  const ink: Ink = { m: prism ? PRISM : metalFor(t), d: metalDarkFor(t), acc: FAMILIES[f].color, t: tierIdx(t) };
+  const art = (prism ? prismDefs(pid) + prismHalo() : '') + DRAW[f](ink) + (prism ? prismCrown(f) : '');
   const glow = q === 'mint' ? `<circle cx="32" cy="32" r="30" fill="none" stroke="#ffd75e" stroke-width="2" opacity=".55"/>` : '';
   const badge = opts.badge
     ? `<rect x="0" y="0" width="${t >= 10 ? 26 : 18}" height="20" rx="5" fill="#0d1116" stroke="${metalFor(t)}" stroke-width="2"/><text x="${t >= 10 ? 13 : 9}" y="15.5" text-anchor="middle" font-size="16" font-weight="900" fill="#fff" font-family="system-ui,sans-serif">${t}</text>`
     : '';
   return `<svg viewBox="0 0 64 64" aria-hidden="true" class="part-art">${glow}${art}${qualityMark(q)}${badge}</svg>`;
+}
+
+/** T10 extra hardware on top of the T9 core, so T10 reads as a step beyond T9 and not only a recolour. */
+function prismCrown(f: Family): string {
+  if (f === 'engine') return `<path d="M10 48h44" stroke="${PRISM}" stroke-width="3" stroke-linecap="round"/><path d="M26 4l6-4 6 4" stroke="${PRISM}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (f === 'tires') return `<circle cx="32" cy="32" r="30" fill="none" stroke="${PRISM}" stroke-width="2" stroke-dasharray="4 3"/>`;
+  if (f === 'turbo') return `<circle cx="19" cy="44" r="15.5" fill="none" stroke="${PRISM}" stroke-width="1.8"/><circle cx="37" cy="23" r="15.5" fill="none" stroke="${PRISM}" stroke-width="1.8"/>`;
+  return '';
 }
 
 /** The family's look at a neutral mid tier (pickers, empty slots). */

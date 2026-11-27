@@ -11,11 +11,12 @@
 </style>
 </head>
 <body>
-<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?lit">Lit</a></nav>
+<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?sheet=concours">Concours</a><a href="?sheet=parts">Parts T7–T10</a><a href="?lit">Lit</a></nav>
 <canvas id="c"></canvas>
 <script type="module">
   // Dev-only art sheet: every car at hero / card / race / thumbnail sizes, plus liveries, wheel sets, materials and race scenery.
-  import { drawCar, ART_CARS, FACTORY_LOOKS, LIVERIES, serviceZones } from '/src/render/car.ts';
+  import { drawCar, ART_CARS, FACTORY_LOOKS, LIVERIES, serviceZones, tailLampPoint } from '/src/render/car.ts';
+  import { partSvg } from '/src/render/parts.ts';
   import { CARS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
   import { drawBackdrop, drawRoadDressing, drawForeground, roadColors, THEMES } from '/src/render/scene.ts';
   const q = new URLSearchParams(location.search);
@@ -93,6 +94,23 @@
       drawCar(ctx, car.id, x, y, 4.6 * 22, { paint: car.paint, trim: car.trim, cache: true, detail: false, wheelAngle: i, blur: i % 2 ? 0.8 : 0.3, nitro: 1.2, brake: true, headlights: 0.4 });
       ctx.fillStyle = '#dfe6ec'; ctx.fillText(car.id, x, y + 12);
     });
+  } else if (sheet === 'concours') {
+    // Concours restoration stages 0..3 (stage 2 opens the hood to show the detailed bay), brake lamps on each tail
+    const list = only ? cars : ['muscle', 'tourer', 'vireo', 'sovereign'].map(look);
+    const RH = 200;
+    const ctx = size(list.length * RH);
+    list.forEach((car, i) => {
+      const y0 = i * RH; bg(ctx, y0, RH);
+      const cw = W / 4 - 30;
+      [0, 1, 2, 3].forEach((cc) => {
+        const x = 12 + cc * (W / 4), y = y0 + RH - 30;
+        drawCar(ctx, car.id, x, y, cw, { paint: car.paint, trim: car.trim, style: { concours: cc }, hood: cc === 2 ? 0.9 : 0, detail: true, brake: cc === 0 });
+        if (cc === 0) { const t = tailLampPoint(car.id, x, y, cw); ctx.strokeStyle = '#0f0'; ctx.strokeRect(t.x - 3, t.y - 3, 6, 6); }
+        ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.id} · concours ${cc}`, x, y0 + 16);
+      });
+    });
+  } else if (sheet === 'parts') {
+    document.body.insertAdjacentHTML('beforeend', `<div style="display:grid;grid-template-columns:repeat(4,96px);gap:10px;padding:12px;background:#151a20">${['engine', 'tires', 'turbo'].map((f) => [7, 8, 9, 10].map((t) => `<div style="width:96px;height:96px;background:#222a33;border-radius:12px;padding:6px;box-sizing:border-box">${partSvg(f, t, 'std', { badge: true })}</div>`).join('')).join('')}</div>`);
   } else if (sheet === 'scenes') {
     // phone-size race frames for every theme (390x420 css each)
     const sw = 390, sh = 420, per = Math.max(1, Math.floor(W / sw));

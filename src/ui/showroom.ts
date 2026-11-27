@@ -84,6 +84,7 @@ function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined,
       ctx.beginPath(); ctx.ellipse(w / 2, gy - length * 0.03, length * 0.62, length * 0.085, 0, 0.1, Math.PI - 0.1); ctx.stroke();
     }
     drawCar(ctx, id, x0, gy, length, opts);
+    if (!locked && !covered && (style?.concours ?? 0) >= 3) rosette(ctx, w, height);
     return;
   }
   // ---- the supercar platform: a spotlight cone, a polished turning disc with rim lights, a reflection
@@ -150,6 +151,26 @@ function studio(canvas: HTMLCanvasElement, id: CarId, paint: string | undefined,
     ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.fillStyle = g;
     ctx.fillRect(hx - length * 0.12, gy - length * 0.36, length * 0.24, length * 0.36); ctx.restore();
   }
+  if ((style?.concours ?? 0) >= 3) rosette(ctx, w, height);
+}
+
+/** The Concours rosette: a gold award rosette with two ribbons in the stage's bottom-left corner. */
+function rosette(ctx: CanvasRenderingContext2D, w: number, height: number) {
+  const r = Math.max(9, Math.min(w, height) * 0.06);
+  const cx = r * 1.6, cy = height - r * 2.3;
+  ctx.save();
+  ctx.fillStyle = '#1f4fa8';
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(cx + s * r * 0.2, cy); ctx.lineTo(cx + s * r * 0.85, cy + r * 1.9); ctx.lineTo(cx + s * r * 0.5, cy + r * 1.65); ctx.lineTo(cx + s * r * 0.3, cy + r * 1.95); ctx.lineTo(cx - s * r * 0.15, cy + r * 0.2); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#e2b44a';
+  ctx.beginPath();
+  for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2, rr = i % 2 ? r : r * 0.82; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#fff3cf'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.58, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#8a6416'; ctx.font = `900 ${Math.round(r * 0.62)}px Barlow, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('1st', cx, cy + r * 0.04);
+  ctx.restore();
 }
 
 const ordinalWord = (n: number) => ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'][n] ?? `${n}th`;
