@@ -237,7 +237,7 @@ export const CIRCUIT_PACE: Record<string, number> = {
   'kestrel-chicane': 1.090,
   'corvo-airfield': 1.127,
   'esplanade-gp': 0.957,
-  'causeway-run': 0.904,
+  'causeway-run': 0.939,
   'circuit-crown': 1.006,
 };
 for (const e of CIRCUIT_EVENTS) {
