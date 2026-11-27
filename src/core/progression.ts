@@ -153,8 +153,9 @@ export function stageViews(s: GameState, c: CarClass): StageView[] {
 }
 
 function payStage(s: GameState, d: StageDef, events: GameEvent[]) {
-  (s.stagesPaid ??= []).push(d.key);
   const r = d.reward;
+  events.push({ type: 'stage', car: d.car, key: d.key, label: d.label, reward: stageRewardText(s, r) }); // text before paying (it may read the tune stage)
+  (s.stagesPaid ??= []).push(d.key);
   if (r.part) {
     // the bench, else the shelf when auto-shelving is on, else first in the crate queue: never lost
     s.crates.unshift({ kind: 'targeted', family: r.part.family, tier: r.part.tier, source: 'shop' });

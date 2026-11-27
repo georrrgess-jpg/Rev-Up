@@ -730,11 +730,11 @@ export class RaceSim {
       gapText = p.finishTime !== null ? `${p.finishTime.toFixed(2)} s` : '';
     } else if (place === 1) {
       const second = st[1];
-      if (p.finishTime !== null && second.finishTime !== null) gapText = `${(second.finishTime - p.finishTime).toFixed(second.finishTime - p.finishTime < 0.1 ? 2 : 1)} s ahead of ${second.name}`;
+      if (p.finishTime !== null && second.finishTime !== null) gapText = `${(second.finishTime - p.finishTime).toFixed(gapDigits(second.finishTime - p.finishTime))} s ahead of ${second.name}`;
       else gapText = `${Math.round(p.x - second.x)} m ahead of ${second.name}`;
     } else {
       const first = st[0];
-      if (p.finishTime !== null && first.finishTime !== null) gapText = `${(p.finishTime - first.finishTime).toFixed(p.finishTime - first.finishTime < 0.1 ? 2 : 1)} s behind first`;
+      if (p.finishTime !== null && first.finishTime !== null) gapText = `${(p.finishTime - first.finishTime).toFixed(gapDigits(p.finishTime - first.finishTime))} s behind first`;
       else gapText = `${Math.round(first.x - p.x)} m behind first`;
     }
     const counted = this.shiftLog.filter((s) => s.grade !== 'assist');
@@ -870,3 +870,6 @@ export function leanOutcome(o: RaceOutcome): LeanOutcome {
     standings: o.standings.map((r) => ({ name: r.name, time: r.finishTime, isPlayer: r.isPlayer })), advice: o.advice,
   };
 }
+
+/** Decimals for a finishing gap: a photo finish never reads "0.00 s". */
+const gapDigits = (g: number) => (g < 0.01 ? 3 : g < 0.1 ? 2 : 1);

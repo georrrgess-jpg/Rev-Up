@@ -329,7 +329,7 @@ type Zone = 'launch' | 'bends' | 'straights';
 const ZONE_FAMILY: Record<Zone, Family> = { launch: 'turbo', bends: 'tires', straights: 'engine' };
 const GEARS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
 const first = (name: string) => name.split(' ')[0];
-const sec = (x: number) => `${Math.abs(x).toFixed(Math.abs(x) < 0.1 ? 2 : 1)} s`;
+const sec = (x: number) => `${Math.abs(x).toFixed(Math.abs(x) < 0.01 ? 3 : Math.abs(x) < 0.1 ? 2 : 1)} s`;
 
 /**
  * Why a race ended the way it did, from the race's own data: the time lost or gained against the deciding rival on

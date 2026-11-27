@@ -183,13 +183,13 @@ export const CIRCUIT_EVENTS: RaceEvent[] = [
   {
     id: 'esplanade-gp', name: 'Esplanade Grand Prix', district: 'riviera', track: T('esplanade'), rivals: ['anouk2', 'pia', 'mika'],
     payout: pay([1600, 1100, 820, 620], [140, 98, 70, 52], [4, 3, 2, 1]), firstClear: { cash: 2000, crates: 5 },
-    requires: { car: 'ardent' }, goals: { par: 20.4 },
+    requires: { car: 'ardent' }, goals: { par: 20.0 },
     blurb: 'Two chicanes and a hairpin along the harbour wall. Mika Sorel’s Ardent is the lightest thing here; out-brake her or out-boost her.',
   },
   {
     id: 'causeway-run', name: 'Causeway Run', district: 'riviera', track: T('causeway'), rivals: ['teo2', 'aurelia2', 'lorne'],
     payout: pay([1800, 1250, 900, 680], [150, 105, 75, 56], [5, 3, 2, 1]), firstClear: { cash: 2200, crates: 5 },
-    requires: { car: 'meridian' }, goals: { par: 16.6 },
+    requires: { car: 'meridian' }, goals: { par: 14.3 },
     blurb: 'A kilometre of causeway over the lagoon and one fast kink. Lorne Halvard’s Meridian has the tallest gears in the field: shift clean and save a Perfect boost for the second straight.',
   },
   {
@@ -236,8 +236,8 @@ export const CIRCUIT_EVENTS: RaceEvent[] = [
 export const CIRCUIT_PACE: Record<string, number> = {
   'kestrel-chicane': 1.090,
   'corvo-airfield': 1.127,
-  'esplanade-gp': 0.957,
-  'causeway-run': 0.924,
+  'esplanade-gp': 0.990,
+  'causeway-run': 0.948,
   'circuit-crown': 1.006,
 };
 for (const e of CIRCUIT_EVENTS) {

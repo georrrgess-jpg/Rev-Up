@@ -363,7 +363,7 @@ export const CARS: CarClass[] = [
   // ---- 1.9 Circuit: the Ardent Spyder is a branch beside the Halcyon X (both open with the Strata GTR)
   {
     id: 'ardent', name: 'Track car', model: 'Ardent Spyder', district: 'summit', cap: 8,
-    base: { top: 47, accel: 7.6, grip: 1.5 }, unlock: { rep: 11000, family: 'turbo', tier: 8, event: 'glacier-pass', after: 'gt' }, enabled: true,
+    base: { top: 47, accel: 7.6, grip: 1.66 }, unlock: { rep: 11000, family: 'turbo', tier: 8, event: 'glacier-pass', after: 'gt' }, enabled: true,
     paint: '#f26a1b', trim: '#20242b', blurb: 'A featherweight open-top track car: carbon tub, roll hoops, no roof, no carpet. Every corner is a chance.',
     offlineRate: 14, rev: { base: 100, peak: 360 }, handling: 'The lightest car in the game: unbeatable through tight, technical bends; gives up top speed on long straights.',
   },

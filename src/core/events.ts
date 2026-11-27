@@ -8,6 +8,8 @@ export interface SlotRef {
 /** Resolved gameplay events. Animations and sounds follow these, never the other way round. */
 export type GameEvent =
   | { type: 'move'; from: SlotRef; to: SlotRef }
+  /** A car-unlock stage was paid (once): `reward` is the player-facing text. */
+  | { type: 'stage'; car: CarId; key: string; label: string; reward: string }
   | { type: 'fuse'; at: SlotRef; consumed: SlotRef; family: Family; fromTier: number; tier: number; q: Quality; chain: number; skipped: boolean }
   | { type: 'combo'; count: number }
   | { type: 'nitro'; total: number; source: 'combo' | 'mergeAll' }
