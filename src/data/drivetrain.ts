@@ -32,7 +32,7 @@ export interface Drivetrain {
 
 /** Display / reference values for the roster at full build (docs/CONTRACTS.md). */
 export const BENCHMARK_MPH: Partial<Record<CarId, number>> = {
-  junker: 85, beater: 105, hothatch: 130, muscle: 150, tourer: 165, tuner: 140, super: 205, rally: 150, gt: 190, proto: 225,
+  junker: 85, beater: 105, hothatch: 130, muscle: 150, tourer: 165, tuner: 140, super: 205, rally: 150, gt: 190, proto: 225, vireo: 230, mako: 240, sovereign: 255,
 };
 
 export const DRIVETRAINS: Record<CarId, Drivetrain> = {
@@ -56,6 +56,13 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   gt: { gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.2, accelScale: 0.8, pullExp: 2.5 },
   // Halcyon X: six-speed paddle box with the narrowest band in the game — the hardest car to master.
   proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.29, accelScale: 0.8, pullExp: 2.6 },
+  // 1.8 supercars (placeholders; the progression and racing agents tune these).
+  // Vireo 9R: a light, high-revving V10 with a seven-speed box; quick shifts, wide band.
+  vireo: { gears: [0.27, 0.4, 0.52, 0.64, 0.76, 0.9, 1.3], idle: 1300, redline: 10500, band: [0.84, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.3, accelScale: 0.82, pullExp: 2.5 },
+  // Mako TT: twin-turbo V8 with a fat midrange; six speeds, a wide band, a shove out of every corner.
+  mako: { gears: [0.3, 0.47, 0.62, 0.77, 0.92, 1.3], idle: 900, redline: 8000, band: [0.76, 0.95], shiftS: 0.025, gaugeMph: 270, topScale: 1.32, accelScale: 0.84, pullExp: 2.3 },
+  // Sovereign: the flagship V12 hybrid; seven speeds, the highest top speed in the game.
+  sovereign: { gears: [0.26, 0.39, 0.51, 0.63, 0.75, 0.89, 1.3], idle: 1000, redline: 9500, band: [0.82, 0.96], shiftS: 0.018, gaugeMph: 290, topScale: 1.36, accelScale: 0.82, pullExp: 2.7 },
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };

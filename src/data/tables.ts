@@ -5,6 +5,8 @@ export type Family = 'engine' | 'tires' | 'turbo' | 'transmission' | 'aero';
 export type Quality = 'std' | 'polished' | 'mint';
 export type CarId =
   | 'junker' | 'beater' | 'hothatch' | 'muscle' | 'tourer' | 'tuner' | 'super' | 'rally' | 'gt' | 'proto'
+  // 1.8 supercars (after the Halcyon X): nimble high-revver, punchy twin-turbo, flagship
+  | 'vireo' | 'mako' | 'sovereign'
   // Legacy placeholder id (never enabled; kept so old data still type-checks):
   | 'hyper';
 
@@ -301,6 +303,26 @@ export const CARS: CarClass[] = [
     base: { top: 54, accel: 7.4, grip: 1.36 }, unlock: { rep: 14000, family: 'turbo', tier: 9, event: 'summit-1000' }, enabled: true,
     paint: '#1d4e6b', trim: '#36f0d0', blurb: 'A closed-cockpit prototype with a shark fin and a light blade. The fastest thing in the game, and the hardest to drive well.',
     offlineRate: 16, rev: { base: 90, peak: 340 }, handling: 'The highest top speed (~225 mph on a long straight, fully built) and strong everywhere, with the narrowest shift light in the game: missed shifts cost it the most.',
+  },
+  // ---- 1.8 supercars, after the Halcyon X (placeholders: the progression agent sets unlocks, district and events;
+  // they stay disabled until then)
+  {
+    id: 'vireo', name: 'Supercar', model: 'Vireo 9R', district: 'riviera', cap: 9,
+    base: { top: 52, accel: 7.8, grip: 1.42 }, unlock: { rep: 18000, family: 'tires', tier: 9 }, enabled: false,
+    paint: '#e23c2e', trim: '#f4f1ea', blurb: 'A short, light mid-engine coupe with a screaming V10 and a glass engine cover. It wants the limiter.',
+    offlineRate: 16, rev: { base: 110, peak: 380 }, handling: 'Nimble and high-revving: the quickest change of direction in the game; wins the tight, technical courses.',
+  },
+  {
+    id: 'mako', name: 'Supercar', model: 'Mako TT', district: 'riviera', cap: 9,
+    base: { top: 55, accel: 8.2, grip: 1.3 }, unlock: { rep: 22000, family: 'turbo', tier: 9 }, enabled: false,
+    paint: '#1c2a24', trim: '#c7f23a', blurb: 'A wide, angry twin-turbo coupe with side gills and quad exits. All shove, all the time.',
+    offlineRate: 17, rev: { base: 70, peak: 280 }, handling: 'Twin-turbo punch: the hardest pull out of slow corners and short straights; heavier through long sweepers.',
+  },
+  {
+    id: 'sovereign', name: 'Flagship', model: 'Sovereign', district: 'riviera', cap: 10,
+    base: { top: 58, accel: 7.9, grip: 1.4 }, unlock: { rep: 28000, family: 'engine', tier: 10 }, enabled: false,
+    paint: '#f1ece2', trim: '#c9a24a', blurb: 'The flagship: a long, low V12 hybrid with a blade of light front and rear. The car the whole garage builds toward.',
+    offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The fastest car in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
   },
   { id: 'hyper', name: 'Hypercar', model: 'One-of-one', district: 'summit', cap: 10, base: { top: 64, accel: 8.5, grip: 1.15 }, unlock: { rep: 99999, family: 'engine', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: 'Legacy placeholder (never enabled).', offlineRate: 10, rev: { base: 60, peak: 200 } },
 ];
