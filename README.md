@@ -4,7 +4,15 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~130 KB JS + 17 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~143 KB JS + 19 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.7 · Builds, Jobs and steady shifting
+
+- **Shifting you can time.** Measured before: green windows as short as 100–200 ms in first gear on quick-revving cars (208 of 808 windows under 400 ms), and up to 5 automatic downshifts a race, some while just cruising a bend, none signalled. Now each upshift gets its own window sized to how fast the needle climbs in that gear — at least 0.45 s for every car and gear, 0.5 s for the first three cars. The box only shifts down under real braking (never while accelerating, cruising or boosting; at most twice per braking zone, 0.5 s apart), lands below the next window so the light always goes "soon" before green, and flashes "↓3 Braking downshift". Past the window the car sits on the limiter for 0.43 s before the automatic shift. A 200 ms-reaction tapper on a 4×-throttled phone went from 58/64 to 60/60 clean shifts.
+- **Build Sheets — a home for spare parts.** Every car has an Engine, Chassis and Intake build. Donate a spare part for points (2 one tier under the car's cap, 4 at it, 8–12 above; Polished ×1.5, Mint ×2); four stages per build (8/12/16/24 points), the third needs a Polished donor and the fourth a Mint one. A full build adds up to +3% top speed, +2% grip, +3% acceleration — about half a Tune-up, off in stock-class races. Keep / Recycle shows each part's build value next to its scrap value.
+- **Fab bench — something to spend scrap on.** One-race kits: Nitro canister (+1 charge), Soft compound (+2% grip), Launch kit (+6% acceleration), Race fuel (+5% top speed). One per race, armed in Pit Setup (kits that suit the track are highlighted); a kit is used only when a live race is committed. Priced at half the recycle value of a part of your best car's tier (15 scrap at the Ironhorse, 60 at the Lumen, 255 at the Halcyon), so it stays relevant to the end. Builds and kits open with the fourth car.
+- **The Job Board** (opens after your third race): three short jobs at a time — merge parts, deliver a specific spare part (sometimes Polished), win a race under a condition, land clean shifts or Perfect boosts, or take an older car to the podium. Jobs pay at once (about half a win purse), refill 4 minutes after a clear whether you play or not (one per slot, so nothing stacks), and build a **streak** (+10% pay per clear, up to +50%; it pauses while you're away and never takes anything back). Every job adds Garage XP toward a **Garage Level** with a named next reward: crates and scrap, a fourth job slot, a free livery, faster refills, Polished parts, wheel sets, badges. It shows as a pill beside the goal card, in the Race menu and on the result card.
+- **Balance** (simulation, time to the Halcyon X): clean player 64.0 min with or without the board; a weak player (missed shifts, no nitro) 110.8 → 94.3 min with the board (it works as catch-up); builds and kits move each car at most ~1.5% sooner against the same bot.
 
 ## Update 1.6 · Pit Stop
 
@@ -233,6 +241,12 @@ Source lives on the development branch; the compiled site is published to a dedi
 ## Verification results
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
+
+### 1.7 · Builds, Jobs and steady shifting
+
+- **Tests:** 229 passing, 3 probes skipped. New: `shift-feel` (window length for all 11 cars on 4 events with and without nitro; downshifts only under braking, spaced, flagged; limiter grace; a 250 ms tapper at 30 fps lands every shift clean), `surplus` (17: donation points and stages, seals, caps, no loops, double taps, kits used once and only on commit), `jobs` (19: unlock timing, seeded jobs, pay once across taps/reloads/tabs, refills and clock rollback, streak, level rewards, old saves) and `jobs-economy` (board on/off ladder times).
+- **Release checks:** smoke 22/22, input 24/24.
+- **Browser** (4× CPU slowdown, 390×844, 11 races on the late presets): 60/60 clean shifts tapping 200 ms after green; 18 downshifts, all under braking and all signalled. Late save: a Polished T4 Engine donated once (second tap ignored) and kept after reload; Race fuel raised the loaded race build's top speed by exactly 5% and was not used up by leaving the race; a delivery job paid $110 once. No page errors.
 
 ### 1.6 · Pit Stop
 
