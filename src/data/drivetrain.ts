@@ -38,7 +38,7 @@ export interface Drivetrain {
 
 /** Display / reference values for the roster at full build (docs/CONTRACTS.md). */
 export const BENCHMARK_MPH: Partial<Record<CarId, number>> = {
-  junker: 85, beater: 105, hothatch: 130, muscle: 150, tourer: 165, tuner: 140, super: 205, rally: 150, gt: 190, proto: 225, vireo: 230, mako: 240, sovereign: 255,
+  junker: 85, beater: 105, hothatch: 130, muscle: 150, tourer: 165, tuner: 140, super: 205, rally: 150, gt: 190, proto: 225, vireo: 230, mako: 240, sovereign: 255, ardent: 200, meridian: 250, tempest: 270,
 };
 
 export const DRIVETRAINS: Record<CarId, Drivetrain> = {
@@ -72,6 +72,13 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Sovereign: the long-legged flagship V12 hybrid: six tall gears that each pull for a long time (fewer shifts, each
   // one worth more), the highest top speed in the game and the biggest speedometer.
   sovereign: { gears: [0.33, 0.5, 0.66, 0.81, 0.95, 1.3], idle: 900, redline: 8800, band: [0.8, 0.96], shiftS: 0.018, gaugeMph: 290, topScale: 1.34, accelScale: 0.95, pullExp: 2.7 },
+  // 1.9 Circuit supercars (placeholders; the Racing agent tunes gearing, Progression tunes topScale/accelScale).
+  // Ardent Spyder: a featherweight open-top track car; short gears, a screaming four, the best grip-to-weight.
+  ardent: { gears: [0.34, 0.5, 0.65, 0.8, 0.94, 1.3], idle: 1200, redline: 9800, band: [0.84, 0.97], shiftS: 0.022, gaugeMph: 220, topScale: 1.12, accelScale: 1.0, pullExp: 2.4 },
+  // Meridian LT: a long-tail highway missile; tall gears, the best top end for its tier.
+  meridian: { gears: [0.3, 0.46, 0.61, 0.76, 0.9, 1.3], idle: 850, redline: 8200, band: [0.8, 0.96], shiftS: 0.02, gaugeMph: 280, topScale: 1.38, accelScale: 0.8, pullExp: 2.8 },
+  // Tempest E4: quad-motor electric flagship; a violent launch, a three-speed box (two shifts), silent top end.
+  tempest: { gears: [0.42, 0.72, 1.3], idle: 600, redline: 14000, band: [0.82, 0.97], shiftS: 0.015, gaugeMph: 300, topScale: 1.4, accelScale: 0.9, pullExp: 2.6 },
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };

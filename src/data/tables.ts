@@ -7,6 +7,8 @@ export type CarId =
   | 'junker' | 'beater' | 'hothatch' | 'muscle' | 'tourer' | 'tuner' | 'super' | 'rally' | 'gt' | 'proto'
   // 1.8 supercars (after the Halcyon X): nimble high-revver, punchy twin-turbo, flagship
   | 'vireo' | 'mako' | 'sovereign'
+  // 1.9 Circuit supercars: lightweight technical, fast highway, late-game flagship with a signature launch
+  | 'ardent' | 'meridian' | 'tempest'
   // Legacy placeholder id (never enabled; kept so old data still type-checks):
   | 'hyper';
 
@@ -326,6 +328,25 @@ export const CARS: CarClass[] = [
     base: { top: 58, accel: 8.4, grip: 1.36 }, unlock: { rep: 23000, family: 'engine', tier: 10, event: 'port-sprint' }, enabled: true,
     paint: '#f1ece2', trim: '#c9a24a', blurb: 'The flagship: a long, low V12 hybrid with a blade of light front and rear. The car the whole garage builds toward.',
     offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The only car that runs T10 parts: the fastest in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
+  },
+  // ---- 1.9 Circuit supercars (placeholders: the Progression agent places them on the ladder and enables them)
+  {
+    id: 'ardent', name: 'Track car', model: 'Ardent Spyder', district: 'summit', cap: 8,
+    base: { top: 47, accel: 7.6, grip: 1.5 }, unlock: { rep: 11000, family: 'tires', tier: 8 }, enabled: false,
+    paint: '#f26a1b', trim: '#20242b', blurb: 'A featherweight open-top track car: carbon tub, roll hoops, no roof, no carpet. Every corner is a chance.',
+    offlineRate: 14, rev: { base: 100, peak: 360 }, handling: 'The lightest car in the game: unbeatable through tight, technical bends; gives up top speed on long straights.',
+  },
+  {
+    id: 'meridian', name: 'Highway supercar', model: 'Meridian LT', district: 'riviera', cap: 9,
+    base: { top: 57, accel: 7.2, grip: 1.28 }, unlock: { rep: 16500, family: 'engine', tier: 9 }, enabled: false,
+    paint: '#2f6fe0', trim: '#e8edf3', blurb: 'A long-tail highway supercar with a glass canopy and a light bar the width of the car. Built for the longest straight you can find.',
+    offlineRate: 17, rev: { base: 75, peak: 300 }, handling: 'The fastest car of its tier on long, open roads; calm and stable at speed, slower to change direction.',
+  },
+  {
+    id: 'tempest', name: 'Electric flagship', model: 'Tempest E4', district: 'riviera', cap: 10,
+    base: { top: 59, accel: 9.0, grip: 1.42 }, unlock: { rep: 30000, family: 'turbo', tier: 10 }, enabled: false,
+    paint: '#101418', trim: '#5ef2ff', blurb: 'A four-motor electric flagship with a light-blade face and a launch that pins you to the seat. The last word in the garage.',
+    offlineRate: 19, rev: { base: 120, peak: 420 }, handling: 'The hardest launch in the game and a silent, endless pull; heavy, so it needs grip parts for tight bends.',
   },
   { id: 'hyper', name: 'Hypercar', model: 'One-of-one', district: 'summit', cap: 10, base: { top: 64, accel: 8.5, grip: 1.15 }, unlock: { rep: 99999, family: 'engine', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: 'Legacy placeholder (never enabled).', offlineRate: 10, rev: { base: 60, peak: 200 } },
 ];
