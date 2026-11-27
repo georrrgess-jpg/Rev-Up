@@ -172,7 +172,7 @@ export interface GameState {
   /** Fab bench: kits on the shelf, kits armed for the next live race, and the kits riding in the race in flight. */
   fab?: { kits: Record<string, number>; armed: string[]; inRace?: { id: number; kits: string[] } | null };
   // ---- end Scrap & surplus
-  settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean };
+  settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean; /** 0..1, default 0.7 */ musicVol?: number; /** 0..1, default 1 */ sfxVol?: number; /** the intro has been seen once (repeat launches are quick) */ introSeen?: boolean };
   stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number>; earned?: number; spent?: number };
   tips: Record<string, boolean>;
   pendingRace: { id: number; eventId: string; car: CarId; seed: number; startedAt: number } | null;

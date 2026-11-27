@@ -341,6 +341,12 @@ export interface CarDrawOpts {
   cache?: boolean;
   /** Cosmetic choices from the Paint shop: wheel set, paint material, restoration. */
   style?: CarStyle;
+  /** Mechanic Shop (master update): 0..1 hood/engine cover opening. */
+  hood?: number;
+  /** Mechanic Shop: highlight one service area on the car. */
+  focus?: 'engine' | 'wheels' | 'body' | null;
+  /** 0..1 extra key light for showroom / bay lighting (paint should respond). */
+  light?: number;
 }
 
 export type WheelSetId = 'steel' | 'turbine' | 'fivespoke' | 'dish' | 'wire' | 'aero' | 'gravel' | 'race';
