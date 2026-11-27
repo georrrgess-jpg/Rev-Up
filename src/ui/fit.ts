@@ -1,6 +1,8 @@
 // Fit Parts view: the car with a labelled slot per active part family. Install, swap or remove an exact part
 // (bench, spare rack, or another owned car), with a before/after stat comparison before confirming, and a
 // one-tap recommended fit. Every result says where each part went. Owned by the Garage systems workstream.
+import { openBuilds } from './projects'; // Scrap & surplus
+import * as PJ from '../core/projects'; // Scrap & surplus
 import { gsfx } from '../audio-garage';
 import { firstFree } from '../core/board';
 import type { GameEvent } from '../core/events';
@@ -254,6 +256,7 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
         h('h2', {}, `Fit parts · ${cls.model}`),
         h('p', { class: 'd fit-sub' }, `Fitted parts power this car and free their bench cells. Parts above T${cls.cap} run at T${cls.cap}.`),
         cars, stage, statRow,
+        buildRow(app, curCar, build), // Scrap & surplus
         h('p', { class: `fit-note${noteBad ? ' bad' : ''}`, role: 'status' }, note),
         slotHead, roomNote,
         h('h3', {}, `${FAMILIES[fam].plural} you can fit`),
@@ -265,6 +268,19 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
     return body;
   }, opts.onClose);
 }
+
+// ---- Scrap & surplus: the car's Build Sheet level, one tap to open it
+function buildRow(app: App, car: CarId, rebuild: () => void): HTMLElement | null {
+  const s = app.game.state;
+  if (!PJ.buildsOpen(s)) return null;
+  const lvl = PJ.buildLevel(s, car);
+  const m = PJ.buildMul(s, car);
+  const pct = (x: number) => `${Math.round((x - 1) * 1000) / 10}%`;
+  return h('div', { class: 'fit-build' },
+    h('div', { class: 'grow' }, h('b', {}, `Build Sheet ${lvl}/${PJ.BUILD_LEVEL_MAX}`), lvl ? ` · +${pct(m.top)} top, +${pct(m.accel)} accel, +${pct(m.grip)} grip` : ' · donate spare parts for a permanent edge'),
+    h('button', { class: 'btn sm', onclick: () => openBuilds(app, car, rebuild) }, 'Build'));
+}
+// ---- end Scrap & surplus
 
 /** Start on the slot that most needs attention: empty with a part ready, then improvable, then engine. */
 function defaultFamily(app: App, car: CarId): Family {

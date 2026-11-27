@@ -3,7 +3,7 @@ import { resultCard } from './results';
 import type { RaceView } from './raceMenu';
 import { carStyle } from '../core/style';
 import { EngineHum, resumeAudio, sfx, suspendAudio } from '../audio';
-import { RaceOutcome, RaceSetup, RaceSim, ShiftRecord, speedMph } from '../core/race';
+import { DownshiftRecord, RaceOutcome, RaceSetup, RaceSim, ShiftRecord, speedMph } from '../core/race';
 import { mph } from '../core/units';
 import { Gauge, ShiftCue } from './raceGauge';
 import type { LastResult } from '../core/state';
@@ -86,6 +86,7 @@ export class RaceScreen {
   private gauge: Gauge;
   private cue: ShiftCue = 'off';
   private shiftShown: ShiftRecord | null = null;
+  private downShown: DownshiftRecord | null = null;
   private gradeTimer = 0;
   private assistTold = false;
   private missTold = false;
@@ -280,6 +281,9 @@ export class RaceScreen {
     }
     const ls = sim.lastShift;
     if (ls && ls !== this.shiftShown) { this.shiftShown = ls; this.onShift(ls); }
+    // an automatic downshift is never silent: the new gear flashes ("↓3") while the cue waits for it to settle
+    const ld = sim.lastDown;
+    if (ld && ld !== this.downShown) { this.downShown = ld; this.showGrade(`↓${ld.into + 1} Braking downshift`, 'down'); }
     this.gauge.draw(this.countdown > 0 ? 0.14 : att.f, p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt, att.band);
     if (import.meta.env.DEV) {
       // dev-only frame trace for the shift cue (Playwright reads window.__shiftTrace when it exists)

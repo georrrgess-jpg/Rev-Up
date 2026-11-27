@@ -5,6 +5,8 @@ import { tutorialStep, TutorialStep } from '../core/tutorial';
 import { FAMILIES, carById, eventById } from '../data/tables';
 import type { App } from './app';
 import { h } from './dom';
+import { jobsUnlocked } from '../core/jobs';
+import { JOBS_CUE } from './jobs';
 
 /**
  * Coach marks: one short instruction anchored beside the control it is about. Steps are derived from game
@@ -234,6 +236,11 @@ export class GuideCoach {
     if (!sheet && app.route === 'race' && !s.tips.quickRace) {
       const q = this.find(SEL.raceQuick);
       if (q) return one('quickRace', q, 'Quick Race: your crew drives this event for you while you keep merging. It pays less than a live race and has no bonuses — race live to earn the most.', true);
+    }
+    // Job Board, once it opens (after the first few races): introduced on the pill (Garage) or the board (Race menu)
+    if (!sheet && !s.tips.jobs && jobsUnlocked(s)) {
+      const el = app.route === 'garage' ? this.find('.view.on [data-coach="jobs-pill"]') : app.route === 'race' ? this.find('.view.on [data-coach="jobs"] .feat-label') : null;
+      if (el) return { ...one('jobs', el, JOBS_CUE, true)!, prefer: 'below' };
     }
     return null;
   }

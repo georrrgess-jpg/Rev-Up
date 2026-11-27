@@ -12,6 +12,7 @@ import { openFitParts } from './fit';
 import * as RR from '../core/rivalRuns';
 import type { RaceView } from './raceMenu';
 import { openRivalBrief } from './rivalRuns';
+import { jobsResultBlock } from './jobs';
 
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
@@ -77,6 +78,7 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
     r.breakdown && r.breakdown.length > 1 ? h('div', { class: 'breakdown', 'aria-label': 'Cash breakdown' },
       ...r.breakdown.map((b) => h('div', { class: `bd ${b.kind}` }, h('span', {}, b.label), h('span', { class: 'num' }, `+$${b.cash}`)))) : null,
     repBlock,
+    jobsResultBlock(app, r.raceId),
     other.length ? h('div', { class: 'still-needed' }, h('small', {}, `Also needed for the ${g!.car.model}`), ...other.map((t) => h('div', {}, t))) : null,
     s.stats.races <= 2 ? h('p', { class: 'explain' }, 'Cash is spending money for the Shop. Rep is never spent: it builds up and opens new races and cars.') : null,
     finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
@@ -123,6 +125,7 @@ function rivalRunCard(app: App, r: LastResult, rr: RR.RivalRunResult, o: ResultO
       : rec.claimed ? h('p', { class: 'explain' }, `Prize already won (${RR.prizeText(run.prize)}). Replay for a better time.`)
       : h('p', { class: 'explain' }, `Prize waiting: ${RR.prizeText(run.prize)} — paid once, the first time you meet the objective.`),
     h('p', { class: 'explain rr-best' }, `Best ${rec.best !== null ? `${rec.best.toFixed(2)} s` : '—'}${rec.bestGap !== null ? ` · best margin ${rec.bestGap >= 0 ? '+' : '−'}${Math.abs(rec.bestGap).toFixed(2)} s` : ''} · ${rec.tries} ${rec.tries === 1 ? 'try' : 'tries'}`),
+    jobsResultBlock(app, r.raceId),
     rr.suggestion ? h('p', { class: 'race-coach rr-suggest' }, h('b', {}, 'Try · '), rr.suggestion) : null,
     o.extras?.length ? h('div', { class: 'extras' }, ...o.extras) : null,
     h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),

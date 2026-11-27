@@ -17,6 +17,7 @@ import { openFitParts } from './fit';
 import { RaceScreen } from './raceScreen';
 import { openPitSetup } from './pitSetup';
 import { rivalRunsSection } from './rivalRuns';
+import { jobBoardSection } from './jobs';
 import type { CarId } from '../data/tables';
 
 /** Speed-trap thresholds and records are stored in km/h until the stage-2 tables move to mph: show them in mph. */
@@ -162,6 +163,8 @@ export class RaceView implements View {
         h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'),
         h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
     const out: HTMLElement[] = altBox ? [featured, altBox] : [featured];
+    const jobs = jobBoardSection(this.app); // Job Board: short jobs, right under the races they ask for
+    if (jobs) out.push(jobs);
     const runs = rivalRunsSection(this.app, (id, car) => this.startRivalRun(id, car));
     if (runs) out.push(runs);
     if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));

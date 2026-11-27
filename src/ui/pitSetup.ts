@@ -4,6 +4,9 @@
 // points at the exact merge or Workshop order and brings you back to this same event afterwards.
 // Owned by the Pit Setup & Rival Runs workstream.
 import './css/pit.css';
+import * as F from '../core/fabrication'; // Scrap & surplus
+import { KITS } from '../data/fabrication'; // Scrap & surplus
+import { armedLine, fabBench } from './fabrication'; // Scrap & surplus
 import type { GameEvent } from '../core/events';
 import * as I from '../core/install';
 import { computeLoadout, loadoutWith } from '../core/loadout';
@@ -115,6 +118,7 @@ export function openPitSetup(app: App, eventId: string, o: PitOpts) {
         h('div', { class: 'pit-stats' }, stat('Top speed', `${mph(lo.stats.top)} mph`), stat('Accel', lo.stats.accel.toFixed(1)), stat('Grip', lo.stats.grip.toFixed(2))),
         h('p', { class: `pit-note${noteBad ? ' bad' : ''}`, role: 'status' }, note),
         h('div', { class: 'pit-slots' }, ...slotEls),
+        pitKits(app, demands.filter((d) => d.level === 'High').map((d) => d.key), build) ?? '', // Scrap & surplus
         recWords.length
           ? h('div', { class: 'pit-actions' },
             h('button', { class: 'btn', onclick: () => { close(); o.onStart(eventId); } }, h('span', { class: 'stack' }, 'Keep build', h('small', {}, 'start the race'))),
@@ -127,6 +131,20 @@ export function openPitSetup(app: App, eventId: string, o: PitOpts) {
     return body;
   });
 }
+
+// ---- Scrap & surplus: race-day kits for this race, folded so the sheet stays short
+function pitKits(app: App, high: ('launch' | 'straights' | 'corners')[], rebuild: () => void): HTMLElement | null {
+  const s = app.game.state;
+  if (!F.fabOpen(s)) return null;
+  const armed = armedLine(app);
+  const open = !!armed || KITS.some((k) => F.kitCount(s, k.id) > 0);
+  const d = h('details', { class: 'pit-fab' },
+    h('summary', {}, 'Race-day kits', h('small', {}, armed || (open ? 'tap to arm one for this race' : 'make one from scrap'))),
+    fabBench(app, rebuild, { highlight: [...high, 'boost'], title: false }));
+  if (open) d.setAttribute('open', '');
+  return d;
+}
+// ---- end Scrap & surplus
 
 /** Fit each useful recommended part (each one a swap, so nothing needs a free cell and nothing is duplicated). */
 function applyRecommended(app: App, car: CarId, useful: [Family, I.PartSource][]) {

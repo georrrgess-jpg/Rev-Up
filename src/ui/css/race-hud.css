@@ -29,6 +29,7 @@
 .shiftgrade.good { color: #5dff8a; }
 .shiftgrade.warn { color: var(--amber2); }
 .shiftgrade.bad { color: #ff7d6e; }
+.shiftgrade.down { color: #8fd3ff; }
 
 /* The teaching hint sits above the bar, centred, so it never covers either thumb control. */
 .racescreen > .racehint {

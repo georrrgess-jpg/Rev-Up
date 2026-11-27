@@ -29,6 +29,20 @@ export type GameEvent =
   | { type: 'styleBought'; item: string; car: CarId }
   | { type: 'install'; car: CarId; family: Family; partId: number; from: SlotRef; outgoingId: number | null }
   | { type: 'uninstall'; car: CarId; family: Family; partId: number; to: SlotRef }
-  | { type: 'move-fit'; fromCar: CarId; toCar: CarId; family: Family; partId: number; outgoingId: number | null };
+  | { type: 'move-fit'; fromCar: CarId; toCar: CarId; family: Family; partId: number; outgoingId: number | null }
+  // ---- Job Board (New mechanic; core/jobs.ts)
+  | { type: 'job'; id: number; title: string; cash: number; xp: number; streak: number }
+  | { type: 'jobNew'; count: number; first: boolean }
+  | { type: 'jobDeliver'; id: number; at: SlotRef; family: Family; tier: number }
+  | { type: 'jobSkip'; id: number }
+  | { type: 'jobStreak'; streak: number }
+  | { type: 'garageLevel'; level: number; reward: string }
+  // ---- end Job Board
+  // ---- Scrap & surplus: Build Sheet donations and Fab bench kits (core/projects.ts, core/fabrication.ts)
+  | { type: 'donate'; id: number; car: CarId; family: Family; tier: number; q: Quality; pts: number; stage: number; stageUp: boolean }
+  | { type: 'fabricate'; kit: string; cost: number }
+  | { type: 'armKit'; kit: string; on: boolean }
+  | { type: 'kitsUsed'; kits: string[] };
+  // ---- end Scrap & surplus
 
 export const sameRef = (a: SlotRef, b: SlotRef) => a.zone === b.zone && a.i === b.i;

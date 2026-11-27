@@ -8,6 +8,9 @@ import type { GameEvent, SlotRef } from './events';
 import { computeLoadout } from './loadout';
 import * as P from './progression';
 import * as RR from './rivalRuns';
+import * as F from './fabrication'; // Scrap & surplus
+import * as PJ from './projects'; // Scrap & surplus
+import * as J from './jobs'; // Job Board (New mechanic)
 import { settleTutorialForExistingSave } from './tutorial';
 import { RaceOutcome, RaceSetup, RaceSim, leanOutcome } from './race';
 import { KV, LoadResult, loadGame, writeGame } from './save';
@@ -35,6 +38,7 @@ export class Game {
     // A race in flight at reload is abandoned: no payout, no charges spent.
     this.state.pendingRace = null;
     P.accrueOffline(this.state, now);
+    J.settleJobs(this.state, now, []); // Job Board: refills due while away (one job per slot, clock clamped)
     settleTutorialForExistingSave(this.state);
     const ev: GameEvent[] = [];
     P.checkUnlocks(this.state, ev);
@@ -89,6 +93,7 @@ export class Game {
       const ev = B.moveOrFuse(d, from, to, now);
       if (ev.some((e) => e.type === 'fuse')) {
         if (!d.stats.milestones.firstMerge) d.stats.milestones.firstMerge = Math.max(1, Math.round(d.activeS));
+        J.onMerges(d, ev.filter((e) => e.type === 'fuse').length, now, ev); // Job Board
         ev.push(...B.openCrates(d));
       }
       return ev;
@@ -115,6 +120,7 @@ export class Game {
     if (!P.mergeAllUnlocked(this.state)) return [{ type: 'invalid', reason: 'Finish five races to unlock Merge All' } as GameEvent];
     return this.transact((d) => {
       const ev = B.mergeAll(d);
+      J.onMerges(d, ev.filter((e) => e.type === 'fuse').length, now, ev); // Job Board
       ev.push(...B.openCrates(d));
       return ev;
     }, now);
@@ -144,6 +150,54 @@ export class Game {
       return ev;
     }, now);
   }
+  // ---- Scrap & surplus: Build Sheets (core/projects.ts) and the Fab bench (core/fabrication.ts)
+  /** Donate a bench / rack part to a car's Build Sheet (gone for good; a repeat tap finds nothing). */
+  donatePart(id: number, car: CarId, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => {
+      const ev = PJ.donatePart(d, id, car);
+      if (ev.length === 1 && ev[0].type === 'invalid') return ev;
+      ev.push(...B.openCrates(d));
+      return ev;
+    }, now);
+  }
+  /** Donate several bench / rack parts, each to its best build (one transaction). */
+  donateBest(ids: number[], now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => {
+      const ev = PJ.donateBest(d, ids);
+      if (ev.length === 1 && ev[0].type === 'invalid') return ev;
+      ev.push(...B.openCrates(d));
+      return ev;
+    }, now);
+  }
+  /** Make one race-day kit for scrap. */
+  fabricate(kit: F.KitId, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => F.fabricate(d, kit), now);
+  }
+  /** Arm / disarm a kit for the next live race. */
+  armKit(kit: F.KitId, on: boolean, now = Date.now()) {
+    return this.transact((d) => F.armKit(d, kit, on), now);
+  }
+  // ---- end Scrap & surplus
+  // ---- Job Board (New mechanic; rules in core/jobs.ts)
+  /** Hand in a spare part for a delivery job; pays at once, exactly once (the slot must still hold this job). */
+  deliverJob(jobId: number, partId?: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => {
+      const ev = J.deliverJob(d, jobId, now, partId);
+      if (ev.length === 1 && ev[0].type === 'invalid') return ev;
+      ev.push(...B.openCrates(d));
+      return ev;
+    }, now);
+  }
+  /** Skip a job: its slot refills after a short wait; the streak stays. */
+  skipJob(jobId: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => J.skipJob(d, jobId, now), now);
+  }
+  // ---- end Job Board
   toggleFavorite(id: number, now = Date.now()) {
     return this.transact((d) => B.toggleFavorite(d, id), now);
   }
@@ -187,6 +241,7 @@ export class Game {
     // once, through the same bounded rule as a reload; a running tab keeps lastSeenAt current, so nothing else counts.
     if (now - draft.offline.lastSeenAt >= OFFLINE_MIN_S * 1000 && P.accrueOffline(draft, now)) ev.push({ type: 'offline', amount: draft.offline.pendingCash });
     P.tick(draft, dtS, now, this.lastInputAt, ev);
+    J.tickJobs(draft, dtS, now, this.lastInputAt, ev); // Job Board: refills and the streak
     if (ev.some((e) => e.type === "printer")) autoOpen(draft, ev);
     if (ev.length) {
       P.checkUnlocks(draft, ev);
@@ -217,6 +272,7 @@ export class Game {
         rivalShift: P.rivalShiftFor(raced), // tuned per event: clean rivals from the Coastal Highway on
         windowScale: d.stats.races === 0 ? 1.6 : 1, // the first race is practice: wider windows
       };
+      setup = F.applyKits(d, d.pendingRace!.id, setup!); // ---- Scrap & surplus: armed Fab bench kits ride in this race
       return [];
     }, now);
     return setup;
@@ -228,7 +284,11 @@ export class Game {
     let res: LastResult | null = null;
     this.transact((d) => {
       const ev: GameEvent[] = [];
+      const nitroBefore = d.nitro; // Scrap & surplus: canister charges never come out of the bank
+      const jobCar = d.pendingRace?.car ?? d.activeCar; // Job Board
       res = P.commitRace(d, { raceId, mode: 'live', outcome: leanOutcome(outcome) }, ev);
+      if (res) J.onRace(d, J.raceSummary(raceId, outcome, jobCar, (res as LastResult).eventId), now, ev); // Job Board: in the race's single-use commit
+      if (res) ev.push(...F.consumeKits(d, raceId, nitroBefore, outcome.nitroUsed ?? 0));
       return ev;
     }, now);
     return res;
@@ -294,6 +354,7 @@ export class Game {
     this.transact((d) => {
       const ev: GameEvent[] = [];
       const r = RR.commitRivalRun(d, raceId, run, outcome, ev);
+      if (r) J.onRace(d, J.raceSummary(raceId, outcome, r.result.car, r.last.eventId, true), now, ev); // Job Board: shifts and Perfects count
       if (r) { this.rivalRunResult = r.result; last = r.last; }
       return ev;
     }, now);
@@ -358,7 +419,7 @@ export class Game {
   /** Called when the page becomes visible again: accrue any away time as an offline claim. */
   resume(now = Date.now()) {
     if (this.conflict) return;
-    this.transact((d) => { P.accrueOffline(d, now); return []; }, now);
+    this.transact((d) => { P.accrueOffline(d, now); const ev: GameEvent[] = []; J.settleJobs(d, now, ev); return ev; }, now); // + Job Board refills
   }
 }
 

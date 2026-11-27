@@ -13,6 +13,9 @@ export interface Drivetrain {
   redline: number;
   /** Green shift band as fractions of the redline. Shifting inside it lands the next gear in the power. */
   band: [number, number];
+  /** Seconds the green shift window stays open on every upshift (the window's low edge is set from how fast this
+   *  car's needle climbs in that gear, so a quick first gear gets a wider arc and a slow top gear the plain band). */
+  windowS?: number;
   /** Seconds of torque cut for a clean shift (a sequential box is quicker than a tired H-pattern). */
   shiftS: number;
   /** Speedometer full scale (mph). Grows with the car. */
@@ -34,11 +37,11 @@ export const BENCHMARK_MPH: Partial<Record<CarId, number>> = {
 
 export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Tapeback 1.1: a tired four-speed. Slow shifts, narrow band, it bogs if you short-shift.
-  junker: { gears: [0.36, 0.58, 0.82, 1.3], idle: 850, redline: 6200, band: [0.8, 0.95], shiftS: 0.06, gaugeMph: 100, topScale: 0.925, accelScale: 1.225 },
+  junker: { windowS: 0.5, gears: [0.36, 0.58, 0.82, 1.3], idle: 850, redline: 6200, band: [0.8, 0.95], shiftS: 0.06, gaugeMph: 100, topScale: 0.925, accelScale: 1.225 },
   // Corsa Rojo: five-speed sedan box, honest and forgiving.
-  beater: { gears: [0.3, 0.48, 0.66, 0.86, 1.3], idle: 800, redline: 6500, band: [0.78, 0.95], shiftS: 0.055, gaugeMph: 120, topScale: 1.075, accelScale: 0.95 },
+  beater: { windowS: 0.5, gears: [0.3, 0.48, 0.66, 0.86, 1.3], idle: 800, redline: 6500, band: [0.78, 0.95], shiftS: 0.055, gaugeMph: 120, topScale: 1.075, accelScale: 0.95 },
   // Vexa GTi: short-geared five-speed that wants to live near the limiter.
-  hothatch: { gears: [0.29, 0.46, 0.63, 0.82, 1.3], idle: 900, redline: 7400, band: [0.82, 0.96], shiftS: 0.045, gaugeMph: 150, topScale: 1.225, accelScale: 0.875 },
+  hothatch: { windowS: 0.5, gears: [0.29, 0.46, 0.63, 0.82, 1.3], idle: 900, redline: 7400, band: [0.82, 0.96], shiftS: 0.045, gaugeMph: 150, topScale: 1.225, accelScale: 0.875 },
   // Ironhorse 455: big V8, long gears, low redline. Fewer shifts, each one matters.
   muscle: { gears: [0.33, 0.54, 0.77, 1.3], idle: 700, redline: 5800, band: [0.76, 0.94], shiftS: 0.06, gaugeMph: 170, topScale: 1.225, accelScale: 0.9 },
   // Altamar GT: long-legged five-speed grand tourer, tall top gear.

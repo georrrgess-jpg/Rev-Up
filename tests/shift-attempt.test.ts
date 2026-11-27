@@ -1,6 +1,7 @@
-// Downshift timing (Pit Stop fix 4): the HUD cue and the SHIFT tap are judged from one shift attempt, its window stays
-// fixed for the attempt, braking downshifts never flash a green the tap would undo, and large frame steps (a slow
-// phone) judge exactly what is on screen.
+// Downshift timing (Pit Stop fix 4, revised in the shifting-feel fix): the HUD cue and the SHIFT tap are judged from one
+// shift attempt, its window stays fixed for the attempt, braking never takes away a green the player was reacting to,
+// and large frame steps (a slow phone) judge exactly what is on screen. See tests/shift-feel.test.ts for the measured
+// window lengths and the rules for automatic gear changes.
 import { describe, expect, it } from 'vitest';
 import { RaceSetup, RaceSim, SHIFT, ShiftPolicy, runRace } from '../src/core/race';
 import { statsFor } from '../src/core/loadout';
@@ -54,8 +55,8 @@ describe('shift attempt: one state for the cue and the tap', () => {
       expect(taps.length, `${ev} ${car} ${fps}fps`).toBeGreaterThan(2);
       for (const t of taps) {
         expect(t.r, `${ev} ${car} ${fps}fps`).toBe('clean');
-        // the judged engine speed is inside the window the HUD showed
-        expect(t.f).toBeGreaterThanOrEqual(t.band[0]);
+        // the judged engine speed is inside the window the HUD showed (or braking caught that green: its grace)
+        if (!t.braking) expect(t.f).toBeGreaterThanOrEqual(t.band[0]);
         expect(t.f).toBeLessThanOrEqual(t.band[1]);
         expect(t.gearAfter).toBe(t.gearBefore + 1);
       }
@@ -63,20 +64,25 @@ describe('shift attempt: one state for the cue and the tap', () => {
     }
   });
 
-  it('braking for a bend holds the cue: no green while braking, so a tap can never be undone by the next downshift', () => {
-    let doubles = 0;
+  it('braking for a bend holds the cue, except a green it caught, which stays green (and clean) for a short grace', () => {
+    let graces = 0;
     for (const [ev, car] of BENDY) for (const fps of [60, 8]) {
-      const { frames } = drive(ev, car, fps, firstGreen);
+      const { frames } = drive(ev, car, fps, () => false);
       // (top gear has nothing to shift into: its cue is simply off)
-      for (const f of frames) if (f.braking) expect(['hold', 'off'], `${ev} ${car} t=${f.t.toFixed(2)}`).toContain(f.cue);
-      // count braking zones with two downshifts (the consecutive-downshift case is exercised)
-      let downs = 0;
+      let brakeStart = -1;
+      let greenAtBrake = false;
       for (let i = 1; i < frames.length; i++) {
-        if (!frames[i].braking) { if (downs >= 2) doubles++; downs = 0; continue; }
-        if (frames[i].gear < frames[i - 1].gear) downs++;
+        const f = frames[i];
+        if (f.braking && !frames[i - 1].braking) { brakeStart = f.t; greenAtBrake = frames[i - 1].cue === 'green'; }
+        if (!f.braking || f.cue !== 'green') continue;
+        // a green while braking is only ever the grace of a green the braking caught
+        expect(greenAtBrake, `${ev} ${car} ${fps}fps t=${f.t.toFixed(2)}`).toBe(true);
+        const [lo, hi] = f.band.split('-').map(Number);
+        if (f.f < lo || f.f > hi) expect(f.t - brakeStart).toBeLessThanOrEqual(SHIFT.brakeGraceS + 2 / fps + 1e-6);
+        graces++;
       }
     }
-    expect(doubles).toBeGreaterThan(0);
+    expect(graces).toBeGreaterThan(0);
   });
 
   it('the window is fixed for each attempt; a new attempt opens for the next gear after a downshift', () => {

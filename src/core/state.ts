@@ -1,4 +1,5 @@
 import { installLegacyLoadout } from './install';
+import { sanitizeSurplus } from './projects'; // Scrap & surplus
 import {
   ACTIVE_FAMILIES, BOARD_BASE, CarId, Family, NITRO_CAP, Quality, STARTER_CRATES, TRAY_SLOTS,
 } from '../data/tables';
@@ -162,6 +163,15 @@ export interface GameState {
   favorites?: number[];
   // ---- Rival Runs (Pit Stop): per-run record; absent in older saves (read via core/rivalRuns.runRecord)
   rivalRuns?: Record<string, RivalRunRecord>;
+  // ---- Job Board (New mechanic): optional, absent in older saves (read via core/jobs.readJobs, which repairs it)
+  jobs?: import('./jobs').JobsState;
+  // ---- end Job Board
+  // ---- Scrap & surplus (core/projects.ts, core/fabrication.ts): optional, absent in older saves
+  /** Build Sheet points and best donor quality (1 Polished, 2 Mint) per car and family. */
+  builds?: Partial<Record<CarId, Partial<Record<Family, { pts: number; seal: number }>>>>;
+  /** Fab bench: kits on the shelf, kits armed for the next live race, and the kits riding in the race in flight. */
+  fab?: { kits: Record<string, number>; armed: string[]; inRace?: { id: number; kits: string[] } | null };
+  // ---- end Scrap & surplus
   settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean };
   stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number>; earned?: number; spent?: number };
   tips: Record<string, boolean>;
@@ -316,6 +326,9 @@ export function migrate(raw: unknown): GameState | null {
   // ---- Rival Runs: keep a well-formed record map, drop anything else (an older save simply has none)
   if (g.rivalRuns && typeof g.rivalRuns === 'object' && !Array.isArray(g.rivalRuns)) merged.rivalRuns = { ...g.rivalRuns };
   else delete merged.rivalRuns;
+  // ---- Job Board: keep an object (core/jobs.readJobs repairs each field), drop anything else
+  if (!g.jobs || typeof g.jobs !== 'object' || Array.isArray(g.jobs)) delete merged.jobs;
+  sanitizeSurplus(merged); // ---- Scrap & surplus: well-formed builds and kits, or none
   if (fromV1) { merged.v = SAVE_VERSION; installLegacyLoadout(merged); }
   return validateState(merged).length === 0 ? merged : null;
 }

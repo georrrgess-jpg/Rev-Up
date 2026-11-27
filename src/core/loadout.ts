@@ -2,6 +2,7 @@ import {
   ACTIVE_FAMILIES, CarId, Family, QUALITY_BONUS, STAT_SCALE, TIER_STAT, TUNE_STEP, carById,
 } from '../data/tables';
 import type { GameState, Part } from './state';
+import { buildMul } from './projects'; // Scrap & surplus
 
 export const contribution = (p: Part) => TIER_STAT[p.t] * (p.q === 'std' ? 1 : QUALITY_BONUS);
 
@@ -45,7 +46,9 @@ function build(s: GameState, car: CarId, equipped: Loadout['equipped'], partCap?
   // a Tune-up multiplies the car's stats; a stock-class race (partCap) runs untuned
   const st = statsFor(car, equipped, cap);
   const k = 1 + (partCap ? 0 : (s.tune?.[car] ?? 0)) * TUNE_STEP;
-  return { car, equipped, blocked, stats: { top: st.top * k, accel: st.accel * k, grip: st.grip * k } };
+  // ---- Scrap & surplus: a car's Build Sheet (capped, at most +3% / +3% / +2%); not in stock-class races, like Tune-ups
+  const bm = partCap ? { top: 1, accel: 1, grip: 1 } : buildMul(s, car);
+  return { car, equipped, blocked, stats: { top: st.top * k * bm.top, accel: st.accel * k * bm.accel, grip: st.grip * k * bm.grip } };
 }
 
 export function statsFor(car: CarId, equipped: Partial<Record<Family, Part>>, cap = carById(car).cap) {

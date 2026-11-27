@@ -8,9 +8,14 @@ import type { App } from './app';
 import { repRaces } from './coach';
 import { fmt, h } from './dom';
 import { openShop } from './shop';
+import { JobsPill, initJobsFeedback } from './jobs';
 
 export class GoalCard {
-  el: HTMLButtonElement;
+  /** The row the Garage mounts: the goal card, and the Job Board pill beside it once the board is open. */
+  el: HTMLElement;
+  /** The goal card itself. */
+  card: HTMLButtonElement;
+  readonly jobs: JobsPill;
   private canvas: HTMLCanvasElement;
   private title: HTMLElement;
   private line: HTMLElement;
@@ -22,23 +27,27 @@ export class GoalCard {
     this.title = h('div', { class: 'gt' });
     this.line = h('div', { class: 'gl' });
     this.bar = h('i');
-    this.el = h('button', { class: 'goal', 'data-coach': 'goal', onclick: () => this.onTap() }, this.canvas,
+    this.card = h('button', { class: 'goal', 'data-coach': 'goal', onclick: () => this.onTap() }, this.canvas,
       h('div', { class: 'gtxt' }, this.title, this.line, h('div', { class: 'bar' }, this.bar)));
+    this.jobs = new JobsPill(app);
+    this.el = h('div', { class: 'goal-row' }, this.card, this.jobs.el);
+    initJobsFeedback(app, this.jobs);
   }
 
   private get s() { return this.app.game.state; }
 
   /** The next car's part was just crafted: pulse the card. */
-  pulse() { this.el.classList.remove('keystone-hit'); void this.el.offsetWidth; this.el.classList.add('keystone-hit'); }
+  pulse() { this.card.classList.remove('keystone-hit'); void this.card.offsetWidth; this.card.classList.add('keystone-hit'); }
 
   render() {
     const s = this.s;
     const g = P.goalStatus(s);
-    this.el.classList.toggle('ready', !!s.pendingReveal);
+    this.jobs.render();
+    this.card.classList.toggle('ready', !!s.pendingReveal);
     if (s.pendingReveal) {
       const c = carById(s.pendingReveal);
       this.title.textContent = 'Car ready';
-      this.el.setAttribute('aria-label', `Reveal the ${c.model}`);
+      this.card.setAttribute('aria-label', `Reveal the ${c.model}`);
       this.line.replaceChildren(h('span', {}, 'Unveil the ', h('b', {}, c.model)));
       this.bar.style.width = '100%';
     } else if (g) {
@@ -50,12 +59,12 @@ export class GoalCard {
         ...(g.car.unlock?.stars ? [h('span', { class: `req${P.starsIn(s) >= g.car.unlock.stars ? ' met' : ''}` }, `★ ${Math.min(P.starsIn(s), g.car.unlock.stars)}/${g.car.unlock.stars}`)] : []),
         h('span', { class: `req rep${s.rep >= g.repNeed ? ' met' : ''}` }, s.rep >= g.repNeed ? '✓ Rep' : `Rep ${fmt(s.rep)}/${fmt(g.repNeed)}`));
       this.bar.style.width = `${Math.round(g.progress * 100)}%`;
-      this.el.setAttribute('aria-label', `Next car: ${g.line}. Tap for details.`);
+      this.card.setAttribute('aria-label', `Next car: ${g.line}. Tap for details.`);
     } else {
       // every car owned: the card follows the long collection instead of claiming it is complete
       const c = P.collection(s);
       this.title.textContent = `Collection · ${Math.round((c.have / c.total) * 100)}%`;
-      this.el.setAttribute('aria-label', `Collection ${c.have} of ${c.total}. Next: ${c.next}`);
+      this.card.setAttribute('aria-label', `Collection ${c.have} of ${c.total}. Next: ${c.next}`);
       this.line.textContent = c.next;
       this.bar.style.width = `${Math.round((c.have / c.total) * 100)}%`;
     }

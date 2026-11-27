@@ -1,0 +1,60 @@
+/* Scrap & surplus: Build Sheets, the Fab bench and the donate controls in Keep / Recycle. Owned by the Scrap & surplus
+   workstream; loaded after style.css (imported by src/ui/projects.ts and src/ui/fabrication.ts). */
+
+/* ---- Fab bench (Shop Scrap tab, Pit Setup) ---- */
+.fab .fab-note { margin: 0 0 6px; font-size: var(--fs-2xs); color: var(--muted); }
+.fab .kits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fab .kit { border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--bg2, var(--panel)); min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fab .kit.hot { border-color: var(--amber); }
+.fab .kit.armed { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+.fab .kit-top { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.fab .kit-top .grow { flex: 1; min-width: 0; }
+.fab .kit-top .t { font-weight: var(--w-heavy); font-size: var(--fs-sm); line-height: 1.15; overflow-wrap: anywhere; }
+.fab .kit-top .d { font-size: var(--fs-2xs); color: var(--muted); overflow-wrap: anywhere; }
+.fab .kit-ico { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--panel2); border: 1px solid var(--line); color: var(--amber2); font-size: var(--fs-md); }
+.fab .kit-n { font-weight: var(--w-heavy); color: var(--text); font-size: var(--fs-sm); }
+.fab .kit-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: auto; }
+.fab .kit-btns .btn { min-height: 44px; padding: 4px 6px; min-width: 0; }
+.fab .kit-btns .btn small { font-size: var(--fs-2xs); }
+.fab.locked .d { font-size: var(--fs-xs); }
+.pit .pit-fab { margin-top: 10px; }
+.pit .pit-fab summary { cursor: pointer; font-weight: var(--w-heavy); min-height: 44px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pit .pit-fab summary small { color: var(--green); font-weight: var(--w-strong); font-size: var(--fs-2xs); overflow-wrap: anywhere; }
+
+/* ---- Build Sheet ---- */
+.builds .tracks { display: grid; gap: 6px; margin: 6px 0; }
+.builds .track { border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; background: var(--panel); }
+.builds .track.max { border-color: var(--gold, #e8c25a); }
+.builds .tr-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.builds .tr-head b { font-size: var(--fs-sm); }
+.builds .tr-stage { font-size: var(--fs-2xs); color: var(--amber2); font-weight: var(--w-heavy); text-transform: uppercase; letter-spacing: .04em; }
+.builds .pips { display: flex; gap: 3px; margin-left: auto; }
+.builds .pip { width: 14px; height: 8px; border-radius: 2px; background: rgba(255,255,255,.1); border: 1px solid var(--line); }
+.builds .pip.pol { border-color: #9fd8ff; }
+.builds .pip.mint { border-color: var(--gold, #e8c25a); }
+.builds .pip.done { background: var(--amber2); }
+.builds .pip.mint.done { background: var(--gold, #e8c25a); }
+.builds .tr-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); margin: 5px 0 3px; overflow: hidden; }
+.builds .tr-bar i { display: block; height: 100%; background: var(--amber); border-radius: 3px; }
+.builds .track .d, .builds .rules { font-size: var(--fs-2xs); color: var(--muted); overflow-wrap: anywhere; }
+.builds .build-note { color: var(--green); font-size: var(--fs-xs); margin: 2px 0; }
+.builds .build-note:empty { display: none; }
+.builds .fit-cars { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 4px; }
+.builds .fit-cars .chipbtn { flex: none; min-height: 44px; }
+.spare-row .d.up, .spare-row .use-donate { color: var(--green); }
+.spare-row .d.warn { color: var(--amber2); }
+.spare-row .spare-btns { display: flex; gap: 4px; flex: none; }
+.spare-row .spare-btns .btn { min-height: 44px; min-width: 52px; padding: 4px 8px; }
+.spares .bulk .btn.donate-all { background: #1f3a2a; border-color: var(--green); }
+
+/* ---- Shop: Scrap tab header and Fit Parts entry ---- */
+.workshop .uses-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 4px 0 8px; }
+.workshop .uses-strip .btn { min-height: 52px; text-align: left; justify-content: flex-start; }
+.fit .fit-build { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; }
+.fit .fit-build .grow { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--muted); }
+.fit .fit-build .grow b { color: var(--text); }
+
+@media (max-width: 340px) {
+  .fab .kits { grid-template-columns: 1fr; }
+  .workshop .uses-strip { grid-template-columns: 1fr; }
+}

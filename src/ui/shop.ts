@@ -17,6 +17,9 @@ import type { App } from './app';
 import { bestBuy, ingredients } from '../core/tutorial';
 import { partGain, statDelta } from './benefit';
 import { openSpares } from './spares';
+import { openBuilds } from './projects'; // Scrap & surplus
+import { fabBench } from './fabrication'; // Scrap & surplus
+import * as PJ from '../core/projects'; // Scrap & surplus
 import { fmt, h } from './dom';
 
 export type ShopTab = 'parts' | 'garage' | 'style' | 'scrap';
@@ -149,7 +152,7 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
               h('div', { class: 'd' }, stage < TUNE_STAGES ? `${tuneGain(s)}. This car only; now +${stage * 2}%.` : `+${stage * 2}% speed, acceleration and grip`)),
             stage < TUNE_STAGES ? buyBtn(tPrice, `$${fmt(tPrice)}`, () => { game.buyTune(s.activeCar); app.toast(`${car.model} tuned to stage ${stage + 1}`); }, `Tune-up stage ${stage + 1} for $${tPrice}`) : h('span', { class: 'd done' }, '✓')),
           h('div', { class: 'row scrap-link' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '♻'),
-            h('div', { class: 'grow' }, h('div', { class: 't' }, `Scrap · ${fmt(s.scrap)}`), h('div', { class: 'd' }, 'Order a chosen part or polish one with scrap, and sort your spares.')),
+            h('div', { class: 'grow' }, h('div', { class: 't' }, `Scrap · ${fmt(s.scrap)}`), h('div', { class: 'd' }, 'Race-day kits, Build Sheets, a chosen part or a polish — and sort your spares.')),
             h('button', { class: 'btn sm', onclick: () => { tab = 'scrap'; build(); } }, 'Scrap tab')),
         ];
       };
@@ -211,10 +214,12 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
         const toRecycle = spares.filter((u) => u.verdict === 'recycle');
         return [
           h('p', { class: 'd' }, `Scrap comes from recycling spare parts (you have ${fmt(s.scrap)}). It never turns into cash.`),
-          h('div', { class: 'row spares-row' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '♻'),
-            h('div', { class: 'grow' }, h('div', { class: 't' }, 'Keep / Recycle'),
-              h('div', { class: 'd' }, spares.length ? `${spares.length} spare${spares.length > 1 ? 's' : ''} · ${toRecycle.length ? `${toRecycle.length} unused (+${toRecycle.reduce((a, u) => a + u.scrap, 0)} scrap)` : 'every one has a use'}` : 'No spare parts on the bench or rack')),
-            h('button', { class: 'btn sm', onclick: () => openSpares(app, build) }, 'Sort spares')),
+          // ---- Scrap & surplus: Build Sheets (spare parts → permanent car builds) and the Fab bench (scrap → race kits)
+          h('div', { class: 'uses-strip' },
+            h('button', { class: 'btn', onclick: () => openBuilds(app, s.activeCar, build) }, h('span', { class: 'stack' }, `Build Sheet · ${PJ.buildLevel(s, s.activeCar)}/${PJ.BUILD_LEVEL_MAX}`, h('small', {}, PJ.buildsOpen(s) ? 'Donate spares for good' : 'Opens with the Ironhorse 455'))),
+            h('button', { class: 'btn', onclick: () => openSpares(app, build) }, h('span', { class: 'stack' }, 'Keep / Recycle', h('small', {}, spares.length ? `${spares.length} spare${spares.length > 1 ? 's' : ''}${toRecycle.length ? ` · ${toRecycle.length} unused` : ''}` : 'No spares')))),
+          fabBench(app, build),
+          // ---- end Scrap & surplus
           h('h3', {}, 'Order for scrap'),
           h('p', { class: 'd' }, `Pick the family and tier; the price is exact. Sold up to T${maxT}, like the cash counter — the next car's own part must still be merged.`),
           h('div', { class: 'fams' }, ...ACTIVE_FAMILIES.map(famBtn)),

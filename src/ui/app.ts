@@ -1,3 +1,4 @@
+import { kitById, type KitId } from '../data/fabrication';
 import { setMuted, sfx, unlockAudio } from '../audio';
 import type { GameEvent } from '../core/events';
 import type { Game } from '../core/game';
@@ -128,6 +129,7 @@ export class App {
     for (const e of ev) {
       if (e.type === 'unlock' && !this.reveal) setTimeout(() => this.promptReveal(), 450);
       // a tab that slept while visible: the gap became one bounded away claim (Game.tick); offer it when safe
+      if (e.type === 'kitsUsed') setTimeout(() => this.toast(`Race kit used: ${e.kits.map((k) => kitById(k as KitId)?.name ?? k).join(', ')}`), 600);
       if (e.type === 'offline' && !this.busy) setTimeout(() => maybeOfflineClaim(this), 0);
       // fitting a part by hand is the lesson the 'fit' beat teaches: once done, it never shows again
       if ((e.type === 'install' || e.type === 'move-fit') && !this.game.state.tips.fit) setTimeout(() => this.game.markTip('fit'), 0);

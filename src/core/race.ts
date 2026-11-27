@@ -55,15 +55,26 @@ export interface Racer {
   policy: ShiftPolicy;
   /** Fastest speed before the line (m/s). */
   peak: number;
-  /** Braking for a bend or held at its grip limit this step (the box may blip down a gear). */
+  /** Braking for a bend this step: actually slowing (not cruising at a bend's limit). Only this can drop a gear. */
   braking: boolean;
+  /** Sim time of the last gear change, up or down (no automatic downshift soon after one). */
+  gearT: number;
+  /** Sim time this racer last braked; a braking zone ends after SHIFT.zoneGapS without braking. */
+  brakeT: number;
+  /** Gears dropped in this braking zone (at most SHIFT.downPerZone). */
+  zoneDown: number;
 }
+
+/** An automatic downshift of the player's (the HUD flashes it: "↓3"). A new object each time. */
+export interface DownshiftRecord { t: number; from: number; into: number }
 
 /**
  * One shift attempt: the single state both the HUD cue and the SHIFT tap are judged from. It is refreshed once per
  * sim step (never by the renderer), so the screen and the judgment always see the same numbers, and its window stays
- * fixed for as long as the attempt lasts. A new attempt (new `id`) opens after every gear change and after braking.
- * - `hold`: braking for (or held at the limit of) a bend, the box blipping down: no cue, and a tap is not a shift.
+ * fixed for as long as the attempt lasts. A new attempt (new `id`) opens after every gear change, after braking, and
+ * when nitro fires before the window opened (the needle will climb faster, so the window is re-measured).
+ * - `hold`: braking for a bend (with no green showing), or just after an automatic downshift: no cue, and a tap is
+ *   not a shift. A green that braking catches stays green, and clean to tap, for SHIFT.brakeGraceS.
  */
 export interface ShiftAttempt {
   id: number;
@@ -74,6 +85,10 @@ export interface ShiftAttempt {
   /** Engine speed at the last sim step (what the tach shows and what a tap is judged on). */
   f: number;
   cue: 'off' | 'hold' | 'soon' | 'green' | 'late';
+  /** While braking: sim time until which a green caught by the braking stays green (-1: none). */
+  graceUntil: number;
+  /** The window was measured for a possible Perfect boost (a fresh boost zone was close). */
+  boost: boolean;
 }
 
 export interface ShiftRecord { t: number; into: number; grade: ShiftGrade; rpm: number; cost: number }
@@ -146,21 +161,38 @@ export function fullTop(car: CarId): number {
 /** Shift tuning (race workstream). */
 export const SHIFT = {
   /** Extra torque-cut seconds by grade, on top of the car's clean shift time. */
-  cutExtra: { clean: 0, early: 0.16, late: 0.18, missed: 0.3, assist: 0 } as Record<ShiftGrade, number>,
-  /** Seconds on the limiter before the box shifts itself (the forgiving fallback). */
-  autoDelay: 0.28,
+  cutExtra: { clean: 0, early: 0.16, late: 0.18, missed: 0.13, assist: 0 } as Record<ShiftGrade, number>,
+  /** Seconds on the limiter (no pull, needle red) before the box shifts itself: the forgiving fallback, slow on purpose. */
+  autoDelay: 0.43,
   /** `ordinary` shifting: this long on the limiter, then a late shift. */
-  ordinaryDelay: 0.05,
+  ordinaryDelay: 0.09,
   /** Taps below this fraction of the redline are ignored (too early to mean a shift). */
   minTap: 0.45,
   /** No second shift within this many seconds. */
   debounce: 0.25,
-  /** After a braking downshift, the next gear's cue waits this long once the car is pulling again. */
-  settleS: 0.12,
+  /** After an automatic downshift the cue stays off this long (the "↓3" notice shows), then the new gear's attempt. */
+  settleS: 0.25,
   /** Practice race: the green band opens this much lower. */
   practiceWiden: 0.08,
-  /** Auto downshift (rev-matched, free) while braking for a bend drags the revs below this. */
-  downshiftBelow: 0.62,
+  /** Auto downshift (rev-matched, free): only while actually braking for a bend, once the revs fall below this... */
+  downshiftBelow: 0.6,
+  /** ...and only when the lower gear lands at least this far below its green window (so the window opens in full,
+   *  and the next upshift is a real one, never an instant green). */
+  downLand: 0.02,
+  /** No automatic downshift within this long of any gear change (no flicker, never a quick double)... */
+  downGapS: 0.5,
+  /** ...and at most this many in one braking zone (each one flashed on the HUD). */
+  downPerZone: 2,
+  /** A braking zone ends after this long without braking. */
+  zoneGapS: 0.3,
+  /** A green window that braking catches stays green (and a tap clean) this long. */
+  brakeGraceS: 0.4,
+  /** The judged window reaches this share of the way from the band top to the limiter. */
+  topLift: 0.5,
+  /** Seconds the green window stays open when the car sets none (drivetrain `windowS`). */
+  windowS: 0.45,
+  /** The window never opens below this fraction of the redline. */
+  floorLo: 0.55,
 };
 
 /** Engine pull at a fraction of the redline: lugs low, full in the power band, nothing on the limiter. */
@@ -196,7 +228,11 @@ export class RaceSim {
   private lastDownT = -1;
   private attemptSeq = 0;
   /** The current shift attempt (see ShiftAttempt). */
-  attempt: ShiftAttempt = { id: 0, gear: 0, band: [0, 0], f: 0, cue: 'off' };
+  attempt: ShiftAttempt = { id: 0, gear: 0, band: [0, 0], f: 0, cue: 'off', graceUntil: -1, boost: false };
+  /** The player's most recent automatic downshift (for the HUD notice); a new object each time. */
+  lastDown: DownshiftRecord | null = null;
+  /** Automatic downshifts of the player's this race (gear changes the player did not tap for). */
+  autoDowns = 0;
   private nitroStart: number;
 
   constructor(readonly setup: RaceSetup) {
@@ -211,6 +247,7 @@ export class RaceSim {
     const rng = makeRng(setup.seed);
     const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean, policy: ShiftPolicy): Racer => ({
       id, name, car, paint, isPlayer, stats, x: 0, v: 0, finishTime: null, nitroLeft: 0, nitroMul: 1, splits: [], gear: 0, cut: 0, limiterT: 0, policy, peak: 0, braking: false,
+      gearT: -9, brakeT: -9, zoneDown: 0,
     });
     this.racers = [mk('player', setup.player.name, setup.player.car, setup.player.paint, { ...setup.player.stats }, true, setup.shift ?? 'ordinary')];
     for (const rid of ev.rivals) {
@@ -243,6 +280,7 @@ export class RaceSim {
     c.shiftLog = this.shiftLog.map((s) => ({ ...s }));
     c.nitroTaps = [...this.nitroTaps];
     c.attempt = { ...this.attempt, band: [...this.attempt.band] as [number, number] };
+    c.lastDown = this.lastDown ? { ...this.lastDown } : null;
     return c;
   }
 
@@ -277,6 +315,37 @@ export class RaceSim {
     return this.practice && r.isPlayer ? [b[0] - SHIFT.practiceWiden, b[1]] : b;
   }
 
+  /** Acceleration (m/s²) the engine could give at speed v with full pull (an upper bound: the window is measured
+   *  against the fastest the needle can climb here, so it is never shorter than promised). */
+  private maxAccel(r: Racer, v: number): number {
+    const d = drivetrainFor(r.car);
+    const st = r.stats;
+    let top = this.vTop(r) * RACE.highwayTopMul;
+    let accel = st.accel * d.accelScale;
+    // boosting, or a fresh boost zone close enough that a Perfect boost could fire inside this window
+    const mul = r.nitroLeft > 0 ? r.nitroMul : r.isPlayer && this.boostLikely() ? this.perfectMul : 0;
+    if (mul > 0) { accel += RACE.nitroAccel * mul; top *= 1 + RACE.nitroTopMul * mul; }
+    const normal = accel * Math.max(0, 1 - (v / top) ** (d.pullExp ?? 2));
+    if (segmentAt(this.track, r.x).seg.type !== 'launch') return normal;
+    const raw = accel * RACE.launchTurboMul;
+    const traction = st.grip * RACE.tractionG * d.accelScale;
+    return Math.max(normal, (raw > traction ? traction + (raw - traction) * RACE.wheelspinKeep : raw) * Math.max(0, 1 - (v / top) ** 4));
+  }
+
+  /** The player's green window for an upshift out of the current gear: from the band's low edge (or lower, when the
+   *  needle climbs fast in this gear) to just short of the limiter, so it stays open at least the car's windowS. */
+  shiftWindow(r: Racer = this.player, gear = r.gear): [number, number] {
+    const d = drivetrainFor(r.car);
+    const b = this.band(r);
+    const hi = b[1] + (1 - b[1]) * SHIFT.topLift;
+    const T = d.windowS ?? SHIFT.windowS;
+    const vr = this.gearTop(r) * d.gears[gear];
+    const rate = (fr: number) => this.maxAccel(r, fr * vr) / vr; // needle speed, fractions of the redline per second
+    let lo = hi;
+    for (let k = 0; k < 4; k++) lo = hi - T * Math.max(rate(lo), rate(hi));
+    return [Math.max(SHIFT.floorLo, Math.min(b[0], lo)), hi];
+  }
+
   topGear(r: Racer = this.player) { return r.gear >= drivetrainFor(r.car).gears.length - 1; }
 
   /** Upcoming or current nitro window relative to the player. */
@@ -289,6 +358,15 @@ export class RaceSim {
       else if (x < w.start && !next) next = w;
     }
     return { active, next };
+  }
+
+  /** The player could fire nitro within the next ~1.5 s: a charge left, and a fresh boost zone here or about to start. */
+  private boostLikely(): boolean {
+    const p = this.player;
+    if (this.charges <= 0 || p.nitroLeft > 0) return false;
+    const { active, next } = this.windowState();
+    if (active && !this.usedWindows.has(active.segIndex)) return true;
+    return !!next && !this.usedWindows.has(next.segIndex) && (next.start - p.x) / Math.max(1, p.v) < 1.5;
   }
 
   /** Practice race: a fresh boost zone is here or under ~1.4 s away, so shift cues stay out of its way. */
@@ -313,18 +391,33 @@ export class RaceSim {
     const a = this.attempt;
     const f = this.rpmFrac(p);
     const settling = this.lastDownT >= 0 && this.t - this.lastDownT < SHIFT.settleS;
-    const hold = !this.topGear(p) && p.finishTime === null && (p.braking || settling);
-    if (p.gear !== a.gear || (a.cue === 'hold' && !hold) || a.id === 0) {
-      this.attemptSeq++;
-      a.id = this.attemptSeq;
-      a.gear = p.gear;
-      a.band = this.band(p);
-    }
+    const live = !this.topGear(p) && p.finishTime === null;
+    // braking that catches a green leaves it green (and clean to tap) for a short grace — the full grace even if the
+    // braking ends first — and for as long after as the revs stay inside the window; then it holds
+    if (p.braking && a.cue === 'green' && a.graceUntil < 0 && p.gear === a.gear) a.graceUntil = this.t + SHIFT.brakeGraceS;
+    if (!p.braking && a.graceUntil >= 0 && this.t > a.graceUntil) a.graceUntil = -1;
+    const grace = live && a.graceUntil >= 0 && p.gear === a.gear && p.cut <= 0 && f >= SHIFT.minTap
+      && (this.t <= a.graceUntil || (f >= a.band[0] && f <= a.band[1]));
+    const hold = live && !grace && (p.braking || settling);
+    // (a boost zone coming up before the window opened: measure it again for the faster needle)
+    const remeasure = (a.cue === 'off' || a.cue === 'soon') && !hold && a.boost !== this.boostLikely();
+    if (p.gear !== a.gear || (a.cue === 'hold' && !hold) || a.id === 0 || remeasure) this.openAttempt();
     a.f = f;
     const [lo, hi] = a.band;
-    if (hold) a.cue = 'hold';
+    if (grace) a.cue = 'green';
+    else if (hold) a.cue = 'hold';
     else if (this.topGear(p) || p.cut > 0 || p.finishTime !== null || p.v < 2 || this.boostZoneNear()) a.cue = 'off';
     else a.cue = f > hi ? 'late' : f >= lo ? 'green' : f >= lo - 0.12 ? 'soon' : 'off';
+  }
+
+  private openAttempt() {
+    const a = this.attempt;
+    this.attemptSeq++;
+    a.id = this.attemptSeq;
+    a.gear = this.player.gear;
+    a.band = this.shiftWindow(this.player);
+    a.graceUntil = -1;
+    a.boost = this.boostLikely();
   }
 
   tapNitro(): 'perfect' | 'boost' | 'empty' | 'busy' {
@@ -341,6 +434,8 @@ export class RaceSim {
     p.nitroLeft = RACE.nitroDurationS;
     p.nitroMul = perfect ? this.perfectMul : 1;
     if (perfect) this.perfects++;
+    // the needle will climb faster: a window that has not opened yet is measured again (a new attempt)
+    if (this.attempt.cue === 'off' || this.attempt.cue === 'soon') { this.openAttempt(); this.refreshAttempt(); }
     this.boostStart = { gap: p.x - this.ghost.x, perfect };
     this.lastBoostGain = null;
     return perfect ? 'perfect' : 'boost';
@@ -358,7 +453,8 @@ export class RaceSim {
     const f = a.f;
     if (f < SHIFT.minTap) return 'wait';
     const [lo, hi] = a.band;
-    const grade: ShiftGrade = f < lo ? 'early' : f <= hi ? 'clean' : 'late';
+    // the green the player sees is clean to tap (including a green caught by braking, inside its grace)
+    const grade: ShiftGrade = a.cue === 'green' || (f >= lo && f <= hi) ? 'clean' : f < lo ? 'early' : 'late';
     this.upshift(p, grade);
     return grade;
   }
@@ -369,6 +465,7 @@ export class RaceSim {
     r.gear = Math.min(d.gears.length - 1, r.gear + 1);
     r.cut = d.shiftS + SHIFT.cutExtra[grade];
     r.limiterT = 0;
+    r.gearT = this.t;
     if (!r.isPlayer) return;
     this.lastShiftT = this.t;
     const rec: ShiftRecord = { t: this.t, into: r.gear, grade, rpm: f, cost: this.pendingCost + r.cut - d.shiftS };
@@ -382,10 +479,16 @@ export class RaceSim {
     if (r.cut > 0 || this.topGear(r)) return;
     const d = drivetrainFor(r.car);
     const f = this.rpmFrac(r);
-    // a bend dragged the revs down: the box blips down a gear for free
-    if (r.gear > 0 && f < SHIFT.downshiftBelow && r.braking && r.v / (this.gearTop(r) * d.gears[r.gear - 1]) < 0.9) {
+    // braking hard for a bend dragged the revs down: the box blips down one gear for free. Only while actually braking
+    // (never accelerating, cruising a bend or boosting), at most downPerZone per braking zone, never within downGapS of
+    // another gear change, and only when the lower gear lands below its green window, so the next upshift gets its
+    // whole window (the HUD flashes each one).
+    if (r.gear > 0 && r.braking && r.zoneDown < SHIFT.downPerZone && r.nitroLeft <= 0 && f < SHIFT.downshiftBelow && this.t - r.gearT >= SHIFT.downGapS
+      && r.v / (this.gearTop(r) * d.gears[r.gear - 1]) <= this.shiftWindow(r, r.gear - 1)[0] - SHIFT.downLand) {
       r.gear--;
-      if (r.isPlayer) this.lastDownT = this.t;
+      r.gearT = this.t;
+      r.zoneDown++;
+      if (r.isPlayer) { this.lastDownT = this.t; this.autoDowns++; this.lastDown = { t: this.t, from: r.gear + 1, into: r.gear }; }
       return;
     }
     const [lo, hi] = this.band(r);
@@ -450,7 +553,9 @@ export class RaceSim {
       const vc = bendCap(st.grip, nextSeg.radius);
       cap = Math.min(cap, Math.sqrt(vc * vc + 2 * brake * Math.max(0, dd)));
     }
-    r.braking = r.v >= cap - 1e-6; // braking for, or held at, a bend's limit
+    r.braking = r.v > cap + 1e-9; // slowing for a bend (cruising at a bend's limit is not braking)
+    if (r.braking) r.brakeT = this.t;
+    else if (r.zoneDown && this.t - r.brakeT > SHIFT.zoneGapS) r.zoneDown = 0;
     if (r.v > cap) r.v = Math.max(cap, r.v - brake * dt);
     else r.v = Math.min(cap, r.v + a * dt);
     const prevX = r.x;
