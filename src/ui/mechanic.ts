@@ -14,6 +14,7 @@ import * as F from '../core/fabrication';
 import * as I from '../core/install';
 import { computeLoadout, contributionOn, loadoutWith } from '../core/loadout';
 import * as PJ from '../core/projects';
+import { purchaseInfo } from '../core/purchases';
 import type { GameState, Part } from '../core/state';
 import * as S from '../core/style';
 import { mph } from '../core/units';
@@ -127,7 +128,8 @@ type Pending =
   | { k: 'style'; item: StyleItem }
   | { k: 'finish'; name: string; paint: string | null }
   | { k: 'factory'; kind: 'wheel' | 'material' | 'livery'; name: string }
-  | { k: 'tune' };
+  | { k: 'tune' }
+  | { k: 'restore' };
 
 /** Open the Mechanic Shop. Returns a function that closes it. */
 export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
@@ -423,7 +425,7 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       const list = chips.filter((c): c is HTMLElement => !!c);
       return list.length ? h('div', { class: 'mech-group' }, h('h3', {}, title), h('p', { class: 'd' }, about), h('div', { class: 'mech-chips' }, ...list)) : null;
     };
-    const lockText = (it: StyleItem) => `Opens with your ${ordinalWord(it.opens)} car`;
+    const lockText = (it: StyleItem) => purchaseInfo(game.state, `style:${it.id}:${car}`)?.locked ?? `Opens with your ${ordinalWord(it.opens)} car`;
     const kindItems = (s: GameState, kind: StyleItem['kind']) => {
       const open = S.shopItems(s, car).filter((i) => i.kind === kind);
       const locked = STYLE_ITEMS.filter((i) => i.kind === kind && s.owned.length < i.opens && !S.owned(s, i, car) && (kind !== 'restore' || car === 'junker'));
@@ -457,14 +459,37 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
         group('Colours', 'Bought once, fits every car.', kindItems(s, 'paint')),
         group('Premium paint', `For the ${cls.model} only. Looks only — no performance.`, [factoryChip(s, 'material', 'Gloss'), ...kindItems(s, 'material')]),
         group('Liveries', 'Stripes, numbers and graphics in a colour that suits the paint. Bought once, fits every car.', [factoryChip(s, 'livery', 'Clean'), ...kindItems(s, 'livery')]),
-        car === 'junker' ? group('Restoration', 'Staged jobs on the Tapeback, in order. Permanent.', kindItems(s, 'restore')) : null,
+        car === 'junker' ? group('Tapeback restoration', 'Staged jobs on the Tapeback, in order. Permanent. Paid in cash.', kindItems(s, 'restore')) : null,
+        concours(s),
         h('p', { class: 'd' }, 'Your choice shows in the Showroom and on track.'),
       ];
     };
 
+    /** Concours restoration: three scrap-paid stages per car, a Showroom badge at the end. Looks only. */
+    const concours = (s: GameState): HTMLElement => {
+      const r = PJ.restoreInfo(s, car);
+      const pi = purchaseInfo(s, `restore:${car}`);
+      const on = pending?.k === 'restore';
+      const pips = h('span', { class: 'pips', 'aria-label': `Stage ${r.stage} of ${r.of}` }, ...Array.from({ length: r.of }, (_, i) => h('i', { class: i < r.stage ? 'done' : '' })));
+      const row = r.locked
+        ? h('div', { class: 'mech-fitted locked' }, h('span', { class: 'tile ico', 'aria-hidden': 'true' }, '🔒'),
+          h('div', { class: 'grow' }, h('div', { class: 't' }, 'Concours restoration'), h('div', { class: 'd' }, `${r.locked}. Three stages paid in scrap; the last adds a Concours badge to your Showroom. Looks only.`)))
+        : r.maxed
+          ? h('div', { class: 'mech-fitted' }, h('span', { class: 'tile ico', 'aria-hidden': 'true' }, '★'),
+            h('div', { class: 'grow' }, h('div', { class: 't' }, 'Concours car ', pips), h('div', { class: 'd' }, r.benefit)))
+          : h('button', {
+            class: `mech-opt${on ? ' on' : ''}`, 'aria-selected': String(on),
+            onclick: () => { pending = on ? null : { k: 'restore' }; note = ''; build(); },
+          }, h('span', { class: 'tile ico', 'aria-hidden': 'true' }, '✦'),
+          h('span', { class: 'grow' }, h('span', { class: 't' }, `${r.name} `, pips), h('span', { class: 'd' }, pi?.benefit ?? r.benefit)),
+          h('span', { class: 'num price' }, `${fmt(pi?.price ?? r.cost)} scrap`));
+      return h('div', { class: 'mech-group concours' }, h('h3', {}, 'Concours restoration'), row);
+    };
+
     const tuningPanel = (s: GameState): (HTMLElement | null)[] => {
       const stage = s.tune?.[car] ?? 0;
-      const price = tunePrice(car, stage);
+      const tpi = purchaseInfo(s, `tune:${car}`);
+      const price = tpi?.price ?? tunePrice(car, stage);
       const on = pending?.k === 'tune';
       const lvl = PJ.buildLevel(s, car);
       const m = PJ.buildMul(s, car);
@@ -551,6 +576,14 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       if (p?.k === 'factory') {
         const kind = p.kind;
         return bar(primary(`Apply ${p.name}`, 'Free', true, () => { game.applyStyle(null, car, kind); sfx.place(); pending = null; note = `${p.name} on your ${cls.model}.`; noteBad = false; build(); draw(); }));
+      }
+      if (p?.k === 'restore') {
+        const r = PJ.restoreInfo(s, car);
+        const short = r.cost - s.scrap;
+        return bar(primary(`Restore: ${r.name} · ${fmt(r.cost)} scrap`, short > 0 ? `${fmt(short)} more scrap needed` : `Scrap · stage ${r.stage + 1} of ${r.of} · looks only`, short <= 0 && !r.locked && !r.maxed, () => {
+          if (short > 0) { note = `Need ${fmt(short)} more scrap for ${r.name}.`; noteBad = true; gsfx.invalid(); build(); return; }
+          act(() => game.transact((d) => PJ.restoreCar(d, car)), () => sfx.polished(), `${cls.model}: ${r.name} done · −${fmt(r.cost)} scrap.${r.stage + 1 >= r.of ? ' Concours badge added to your Showroom.' : ''}`);
+        }));
       }
       if (p?.k === 'tune') {
         const stage = s.tune?.[car] ?? 0;

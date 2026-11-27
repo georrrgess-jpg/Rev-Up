@@ -2,6 +2,7 @@
 // yields. Star a part to protect it; the bulk button recycles only parts nothing needs and never touches fitted or
 // starred parts (the rule lives in core: board.recycleParts). Owned by the Workshop & offline workstream.
 import { sfx } from '../audio';
+import { recyclePreview } from '../core/board';
 import * as P from '../core/progression';
 import { FAMILIES } from '../data/tables';
 import { partTileHtml } from '../render/parts';
@@ -24,7 +25,11 @@ export function openSpares(app: App, onChange?: () => void): () => void {
       const list = P.spareParts(s);
       const unused = list.filter((u) => u.verdict === 'recycle');
       const keep = list.filter((u) => u.verdict === 'keep');
-      const bulkScrap = unused.reduce((a, u) => a + u.scrap, 0);
+      // what the bulk button will do, from the same rule that runs it: starred and fitted parts are never pressed
+      const prev = recyclePreview(s, unused.map((u) => u.part.id));
+      const starredAll = list.filter((u) => u.starred).length;
+      const fittedAll = Object.values(s.installed ?? {}).reduce((a, sl) => a + Object.keys(sl ?? {}).length, 0);
+      const bulkScrap = prev.scrap;
       // Scrap & surplus: the best build each spare could go into, and the kit price its scrap counts toward
       const don = new Map(list.map((u) => [u.part.id, PJ.bestDonation(s, u.part)] as const));
       const toDonate = unused.filter((u) => !u.starred && don.get(u.part.id));
@@ -88,7 +93,7 @@ export function openSpares(app: App, onChange?: () => void): () => void {
           h('button', { class: 'btn sm', onclick: () => openBuilds(app, game.state.activeCar, after) }, 'Open Build Sheets')) : null,
         unused.length ? h('div', { class: 'bulk' },
           h('button', {
-            class: 'btn primary wide', 'aria-label': `Recycle ${unused.length} unused parts for ${bulkScrap} scrap`,
+            class: `btn primary wide${prev.count ? '' : ' off'}`, 'aria-label': `Recycle ${prev.count} unused parts for ${bulkScrap} scrap`,
             onclick: () => {
               const ids = P.spareParts(game.state).filter((u) => u.verdict === 'recycle').map((u) => u.part.id);
               const ev = game.recycleParts(ids);
@@ -96,8 +101,8 @@ export function openSpares(app: App, onChange?: () => void): () => void {
               if (got) { sfx.scrap(); app.toast(`Recycled ${ev.filter((e) => e.type === 'scrap').length} parts · +${got} scrap`); }
               after();
             },
-          }, `Recycle ${unused.length} unused · +${bulkScrap} scrap`),
-          h('small', { class: 'd' }, 'Starred and useful parts stay. Spend scrap in the Shop’s Scrap tab: race-day kits, a chosen part or a polish.')) : null,
+          }, `Recycle ${prev.count} unused · +${bulkScrap} scrap`),
+          h('small', { class: 'd recycle-preview' }, `Before you press: ${prev.count} part${prev.count === 1 ? '' : 's'} → +${bulkScrap} scrap (you'll have ${fmt(s.scrap + bulkScrap)}). Protected: ${starredAll} starred, ${fittedAll} fitted${prev.starred ? ` (${prev.starred} starred in this batch skipped)` : ''}, and every part with a use. Spend scrap in the Shop’s Scrap tab.`)) : null,
         unused.length ? h('h3', {}, `Surplus · ${unused.length}`) : null,
         ...unused.map(row),
         keep.length ? h('h3', {}, `Worth keeping · ${keep.length}`) : null,

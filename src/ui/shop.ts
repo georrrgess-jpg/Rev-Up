@@ -19,6 +19,8 @@ import { MATERIAL, familyIcon, metalFor } from '../render/parts';
 import * as S from '../core/style';
 import { STYLE_ITEMS } from '../data/tables';
 import { openMechanic } from './mechanic';
+import { purchaseInfo } from '../core/purchases';
+import { restoreInfo } from '../core/projects';
 import type { App } from './app';
 import { bestBuy, ingredients } from '../core/tutorial';
 import { partGain, statDelta } from './benefit';
@@ -142,7 +144,7 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
           onclick: () => { tier = t; build(); },
         }, h('b', {}, `T${t}`), h('small', { class: 'mat' }, MATERIAL[t]), h('small', { class: 'num' }, `$${fmt(PART_ORDER_PRICE[t])}`));
         const stage = s.tune?.[s.activeCar] ?? 0;
-        const tPrice = tunePrice(s.activeCar, stage);
+        const tPrice = purchaseInfo(s, `tune:${s.activeCar}`)?.price ?? tunePrice(s.activeCar, stage);
         return [
           h('h3', {}, 'Order a part'),
           h('p', { class: 'd' }, `A part you choose, delivered to your bench. Fit it to a car or merge it. Sold up to T${maxT}; the next car's own part must be crafted.`),
@@ -232,6 +234,13 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
             h('button', { class: 'btn', onclick: () => openBuilds(app, s.activeCar, build) }, h('span', { class: 'stack' }, `Build Sheet · ${PJ.buildLevel(s, s.activeCar)}/${PJ.BUILD_LEVEL_MAX}`, h('small', {}, PJ.buildsOpen(s) ? 'Donate spares for good' : 'Opens with the Ironhorse 455'))),
             h('button', { class: 'btn', onclick: () => openSpares(app, build) }, h('span', { class: 'stack' }, 'Keep / Recycle', h('small', {}, spares.length ? `${spares.length} spare${spares.length > 1 ? 's' : ''}${toRecycle.length ? ` · ${toRecycle.length} unused` : ''}` : 'No spares')))),
           fabBench(app, build),
+          (() => {
+            const r = restoreInfo(s, s.activeCar);
+            return h('div', { class: 'row concours-row' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '✦'),
+              h('div', { class: 'grow' }, h('div', { class: 't' }, `Concours restoration · ${car.model}`, h('span', { class: 'lvl' }, ` ${r.stage}/${r.of}`)),
+                h('div', { class: 'd' }, r.locked ? `🔒 ${r.locked}` : r.maxed ? r.benefit : `${r.name}: ${fmt(r.cost)} scrap · ${r.benefit}`)),
+              r.locked ? null : h('button', { class: 'btn sm', onclick: () => { close(); openMechanic(app, { area: 'body', returnTo: () => openShop(app, undefined, 'scrap') }); } }, r.maxed ? 'View' : 'Preview'));
+          })(),
           // ---- end Scrap & surplus
           h('h3', {}, 'Order for scrap'),
           h('p', { class: 'd' }, `Pick the family and tier; the price is exact. Sold up to T${maxT}, like the cash counter — the next car's own part must still be merged.`),
@@ -272,13 +281,13 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
           }, h('span', { html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, h('small', {}, f === goalFam ? 'Goal' : FAMILIES[f].statLabel)))),
           h('div', { class: 'row' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '?'),
             h('div', { class: 'grow' }, h('div', { class: 't' }, 'Mystery crate'), h('div', { class: 'd' }, 'One random part, any family · paid in scrap')),
-            crateBtn(CRATE_SCRAP_COST, 'scrap', () => game.buyCrate('std'), `Mystery crate for ${CRATE_SCRAP_COST} scrap`)),
+            crateBtn(purchaseInfo(s, 'crate:std')?.price ?? CRATE_SCRAP_COST, 'scrap', () => game.buyCrate('std'), `Mystery crate for ${purchaseInfo(s, 'crate:std')?.price ?? CRATE_SCRAP_COST} scrap`)),
           h('div', { class: 'row' }, h('span', { class: 'up-ico', html: familyIcon(fam!), 'aria-hidden': 'true' }),
             h('div', { class: 'grow' }, h('div', { class: 't' }, `${FAMILIES[fam!].name} crate`), h('div', { class: 'd' }, `A random-tier ${FAMILIES[fam!].name.toLowerCase()} part · paid in scrap`)),
-            crateBtn(TARGETED_CRATE_SCRAP_COST, 'scrap', () => game.buyCrate('targeted', fam!), `${FAMILIES[fam!].name} crate for ${TARGETED_CRATE_SCRAP_COST} scrap`)),
+            crateBtn(purchaseInfo(s, `crate:targeted:${fam}`)?.price ?? TARGETED_CRATE_SCRAP_COST, 'scrap', () => game.buyCrate('targeted', fam!), `${FAMILIES[fam!].name} crate for ${TARGETED_CRATE_SCRAP_COST} scrap`)),
           h('div', { class: 'row' }, h('span', { class: 'up-ico', html: familyIcon(fam!), 'aria-hidden': 'true' }),
             h('div', { class: 'grow' }, h('div', { class: 't' }, `${FAMILIES[fam!].name} crate · cash`), h('div', { class: 'd' }, `The same random-tier ${FAMILIES[fam!].name.toLowerCase()} part, paid in cash`)),
-            crateBtn(TARGETED_CRATE_CASH_COST, 'cash', () => game.buyCrate('cash', fam!), `${FAMILIES[fam!].name} crate for $${TARGETED_CRATE_CASH_COST}`)),
+            crateBtn(purchaseInfo(s, `crate:cash:${fam}`)?.price ?? TARGETED_CRATE_CASH_COST, 'cash', () => game.buyCrate('cash', fam!), `${FAMILIES[fam!].name} crate for $${TARGETED_CRATE_CASH_COST}`)),
         ];
       };
 
@@ -300,7 +309,7 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
                 h('div', { class: 't' }, u.name, u.levels.length > 1 ? h('span', { class: 'lvl' }, ` ${lvl}/${u.levels.length}`) : null),
                 h('div', { class: 'kind' }, `${look.kind} · ${u.about}`),
                 h('div', { class: 'd' }, next ? h('span', {}, 'Now: ', fx.now, h('span', { class: 'arrow', 'aria-hidden': 'true' }, ' → '), h('b', {}, fx.next)) : h('span', {}, `${fx.now} · fully upgraded`))),
-              next ? buyBtn(next.cost, `$${fmt(next.cost)}`, () => game.buyUpgrade(u.id), `${u.name}: ${next.label}, $${next.cost}`) : h('span', { class: 'd done' }, '✓'));
+              next ? (() => { const price = purchaseInfo(s, `upgrade:${u.id}`)?.price ?? next.cost; return buyBtn(price, `$${fmt(price)}`, () => game.buyUpgrade(u.id), `${u.name}: ${next.label}, $${price}`); })() : h('span', { class: 'd done' }, '✓'));
           }),
           ...UPGRADES.filter((u) => !P.upgradeShown(s, u)).map((u) => h('div', { class: `row up-row locked up-${u.id}` },
             h('span', { class: 'up-ico', 'aria-hidden': 'true' }, UPGRADE_LOOK[u.id].icon),

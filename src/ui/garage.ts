@@ -18,6 +18,7 @@ import { h } from './dom';
 import { openShop } from './shop';
 import { openSpares } from './spares';
 import { openFitParts } from './fit';
+import { openMechanic } from './mechanic';
 import { GoalCard } from './goalCard';
 
 const PRESS: SlotRef = { zone: 'tray', i: -1 }; // sentinel for the scrap press
@@ -82,10 +83,10 @@ export class GarageView implements View {
     const shopBtn = h('button', { class: 'btn', 'aria-label': 'Shop: parts, crates and upgrades', onclick: () => openShop(this.app) }, 'Shop');
     this.shopBtn = shopBtn;
 
-    // Your car: the active car beside its fitted slots (tap it to pick another car in the Showroom).
+    // Your car: the active car beside its fitted slots (tap it to open the Mechanic Shop; cars are picked in the Showroom).
     this.carCanvas = h('canvas', { 'aria-hidden': 'true' });
     this.carName = h('span', { class: 'mycar-n' });
-    this.carBtn = h('button', { class: 'mycar', 'data-coach': 'fit-now', onclick: () => { if (this.carBtn.classList.contains('fitnow')) this.fitBenchUpgrades(); else this.app.go('showroom'); } }, this.carCanvas, this.carName);
+    this.carBtn = h('button', { class: 'mycar', 'data-coach': 'fit-now', onclick: () => { if (this.carBtn.classList.contains('fitnow')) this.fitBenchUpgrades(); else openMechanic(this.app); } }, this.carCanvas, this.carName);
     // The bench header folded into the spare-rack row: free slots and Keep / Recycle sit beside the rack they sort.
     const sortBtn = h('button', { class: 'traycaption sort-spares', 'aria-label': 'Keep or recycle spare parts', onclick: () => openSpares(this.app) },
       h('span', { class: 'tc-t' }, 'Spares'), this.benchStatus);
@@ -156,7 +157,7 @@ export class GarageView implements View {
     const s = this.s;
     const c = carById(s.activeCar);
     if (this.carName.textContent !== c.model) this.carName.textContent = c.model;
-    this.carBtn.setAttribute('aria-label', `Your car: ${c.model}, ${mph(computeLoadout(s).stats.top)} mph. Tap to choose a car in the Showroom`);
+    this.carBtn.setAttribute('aria-label', `Your car: ${c.model}, ${mph(computeLoadout(s).stats.top)} mph. Tap to service it in the Mechanic Shop`);
     const { w, h: hh } = fitCanvas(this.carCanvas, 2);
     const key = [w, hh, s.activeCar, s.paints[s.activeCar] ?? ''].join('|');
     if (key === this.carKey || w < 8) return;
