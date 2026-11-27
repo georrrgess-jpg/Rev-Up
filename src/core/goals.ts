@@ -183,9 +183,12 @@ function challengeGoal(s: GameState): Goal | null {
   const ev = EVENTS.find((e) => !e.heatOf && eventUnlocked(s, e).ok && ((e.trophy && !s.badges.includes(e.trophy)) || ((e.timeAttack || e.speedTrap) && (s.medals?.[e.id] ?? 0) < 3)))
     ?? EVENTS.find((e) => !e.heatOf && eventUnlocked(s, e).ok && e.goals && (s.stars?.[e.id] ?? 0) !== 7);
   if (!ev) return null;
-  const action: GoalAction = { kind: 'race', eventId: ev.id, label: c.next };
-  return { key: `challenge:${ev.id}`, kind: 'challenge', title: ev.name, why: ev.blurb, reward: 'Collection: trophies, medals and goal stars (each pays once)', missing: c.next,
-    progress: c.total ? c.have / c.total : 0, stages: [{ label: c.next, done: false, reward: 'Cash and crates, once' }], sessionMilestone: c.next, action, recommended: false };
+  const m = s.medals?.[ev.id] ?? 0;
+  const what = ev.trophy && !s.badges.includes(ev.trophy) ? `Win the ${ev.trophy} trophy at ${ev.name}`
+    : ev.timeAttack || ev.speedTrap ? `${['Bronze', 'Silver', 'Gold'][Math.min(2, m)]} at ${ev.name}` : `Goals left on ${ev.name}`;
+  const action: GoalAction = { kind: 'race', eventId: ev.id, label: what };
+  return { key: `challenge:${ev.id}`, kind: 'challenge', title: ev.name, why: ev.blurb, reward: 'Collection: trophies, medals and goal stars (each pays once)', missing: what,
+    progress: c.total ? c.have / c.total : 0, stages: [{ label: what, done: false, reward: 'Cash and crates, once' }], sessionMilestone: what, action, recommended: false };
 }
 
 /** Every sensible target now: each car you can chase (two at a branch), and one challenge. */

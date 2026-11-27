@@ -53,6 +53,12 @@ const AREAS: { id: MechArea; label: string; short: string; icon: string }[] = [
   { id: 'tuning', label: 'Tuning', short: 'Tuning', icon: '≋' },
 ];
 
+const AREA_FAMS: Record<MechArea, Family[]> = { engine: ['engine', 'turbo'], wheels: ['tires'], body: [], tuning: [] };
+export const areaOf = (f: Family): MechArea => (f === 'tires' || f === 'aero' ? 'wheels' : 'engine');
+/** Bay lighting per area: key light on the paint, hood opening. */
+const LOOK: Record<MechArea, { hood: number; light: number }> = {
+  engine: { hood: 1, light: 0.35 }, wheels: { hood: 0, light: 0.55 }, body: { hood: 0, light: 1 }, tuning: { hood: 0.35, light: 0.25 },
+};
 /** Bay lamp brightness per area: the Art bay (src/render/bay.ts) lights the room for the area being serviced. */
 const BAY_LIGHT: Record<MechArea, number> = { engine: 0.9, wheels: 0.85, body: 1, tuning: 0.8 };
 
@@ -199,14 +205,6 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       const t = reduced() ? 0 : performance.now() / 1000;
       drawServiceBay(ctx, w, hh, { area, light: BAY_LIGHT[area], t });
       const len0 = Math.min(w * 0.72, hh * 2.3);
-      // floor spot follows the area: warm over the engine, cool over the wheels, white on the body
-      const spot = area === 'engine' ? 'rgba(236,159,76,.22)' : area === 'wheels' ? 'rgba(142,211,250,.2)' : area === 'body' ? 'rgba(255,255,255,.2)' : 'rgba(164,219,155,.16)';
-      const cx = area === 'engine' ? w * 0.68 : area === 'wheels' ? w * 0.3 : w / 2;
-      const glow = ctx.createRadialGradient(cx, hh * 0.88, 0, cx, hh * 0.88, w * 0.55);
-      glow.addColorStop(0, spot);
-      glow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, w, hh);
       const cls = carById(car);
       const { paint, style } = shownLook();
       const len = len0;

@@ -914,3 +914,5 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 @media (min-width: 900px) { .show-hero { min-height: 0; } .show-hero > canvas { border-radius: 18px; } .show-hero::after { border-radius: 18px; } }
 .result .btns { margin-bottom: 12px; }
 .result .next { margin-bottom: 8px; }
+.result .next-act { overflow: hidden; }
+.result .next-act .stack { max-width: 100%; min-width: 0; }

@@ -11,7 +11,7 @@ import './css/intro.css';
 import { ignitionCue, music } from '../audio-api';
 import { carStyle } from '../core/style';
 import { carById, type CarId } from '../data/tables';
-import { carBodyPath, drawCar } from '../render/car';
+import { ART_CARS, carAnchors, drawHeroCar } from '../render/car';
 import type { App } from './app';
 import { fmt, h } from './dom';
 
@@ -32,7 +32,9 @@ export function runIntro(app: App): Promise<void> {
     const first = !s.settings.introSeen;
     const reduced = s.settings.reducedMotion || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     // The hero: the flagship the whole garage builds toward on a first launch; the player's own car afterwards.
-    let hero: CarId = first ? ('sovereign' as CarId) : s.activeCar;
+    // the Tempest E4 (the electric flagship, cyan light-blade face) when its art exists, else the Sovereign
+    const flagship = ((ART_CARS as readonly string[]).includes('tempest') ? 'tempest' : 'sovereign') as CarId;
+    let hero: CarId = first ? flagship : s.activeCar;
     try { carById(hero); } catch { hero = s.activeCar; }
     const car = carById(hero);
     const owned = s.owned.includes(hero);
@@ -45,7 +47,7 @@ export function runIntro(app: App): Promise<void> {
     const skip = h('button', { class: 'intro-skip', 'aria-label': 'Skip intro' }, 'Skip');
     const level = s.owned.length;
     const meta = first
-      ? h('p', { class: 'intro-tag' }, 'Merge parts · win races · earn the Sovereign')
+      ? h('p', { class: 'intro-tag' }, `Merge parts · win races · earn the ${car.model.split(' ')[0]}`)
       : h('p', { class: 'intro-tag own' }, h('b', {}, carById(s.activeCar).model), h('span', { class: 'dot', 'aria-hidden': 'true' }, '·'),
         `${level} car${level === 1 ? '' : 's'}`, h('span', { class: 'dot', 'aria-hidden': 'true' }, '·'), `${fmt(s.rep)} Rep`);
     const el = h('div', { class: `intro${first ? ' first' : ' quick'}${reduced ? ' still' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Rev Up' },
@@ -66,9 +68,9 @@ export function runIntro(app: App): Promise<void> {
 
     /** Composition: the car's resting length and where its rear wheel sits on the floor line. */
     const frame = () => {
-      const carW = Math.min(W * 0.9, H * 1.05, 900 * dpr);
+      const carW = Math.min(W * 0.8, H * 0.95, 860 * dpr);
       const floorY = Math.round(H * (H > W ? 0.46 : 0.54));
-      return { carW, floorY, x: (W - carW) / 2 };
+      return { carW, floorY, x: (W - carW) / 2 - carW * 0.04 };
     };
 
     /** Render the hero once at the film's largest scale: lit, and lit with headlights. */
@@ -79,22 +81,16 @@ export function runIntro(app: App): Promise<void> {
       const rear = Math.round(carW * 0.06), ground = Math.round(sh * 0.86);
       const mk = () => { const c = document.createElement('canvas'); c.width = sw; c.height = sh; return c; };
       const lit = mk(), lamps = mk(), fx = mk();
-      const o = { paint, trim: car.trim, detail: true, light: 1, style, shadow: true };
+      // Art's hero render: the detailed car with an extra key light and a rim light along the roof
+      const rim = hero === 'tempest' ? '#9fe6ff' : 0.55;
+      const o = { paint, trim: car.trim, detail: true, light: 1, style, shadow: true, rimLight: rim };
       try {
-        drawCar(lit.getContext('2d')!, hero, rear, ground, carW, { ...o, headlights: 0 });
-        drawCar(lamps.getContext('2d')!, hero, rear, ground, carW, { ...o, headlights: 1 });
+        drawHeroCar(lit.getContext('2d')!, hero, rear, ground, carW, { ...o, headlights: 0 });
+        drawHeroCar(lamps.getContext('2d')!, hero, rear, ground, carW, { ...o, headlights: 1 });
       } catch { return null; }
-      // the leading headlamp: the body's front edge, a little above the wheel centres
-      const probe = lit.getContext('2d')!;
-      carBodyPath(probe, hero, rear, ground, carW);
-      let top = ground, front = rear;
-      for (const u of [0.3, 0.45, 0.6, 0.75]) {
-        const px = rear + carW * u;
-        for (let y = 0; y < ground; y += 2) if (probe.isPointInPath(px, y)) { top = Math.min(top, y); break; }
-      }
-      const ly = Math.round(ground - (ground - top) * 0.42);
-      for (let x = rear + Math.round(carW * 1.05); x > rear; x -= 2) if (probe.isPointInPath(x, ly)) { front = x; break; }
-      return { lit, lamps, fx, rear, ground, carW, lamp: { x: front - carW * 0.025, y: ly } };
+      // the near headlamp, for the lens flare
+      const a = carAnchors(hero, rear, ground, carW);
+      return { lit, lamps, fx, rear, ground, carW, lamp: a.lamp };
     };
 
     const resize = () => {
@@ -163,7 +159,7 @@ export function runIntro(app: App): Promise<void> {
       if (!sp) return;
       // ---- the car: lit sprite, headlights cross-faded in, darkened by the rising key light, a sweep of light on top
       const lightsOn = reduced ? 1 : easeOut(span(t, BEAT.lights, BEAT.lights + 0.25));
-      const dark = reduced ? 0.08 : lerp(0.82, 0.08, ease(span(t, BEAT.keyFrom, BEAT.keyTo)));
+      const dark = reduced ? 0 : lerp(0.82, 0, ease(span(t, BEAT.keyFrom, BEAT.keyTo)));
       const fx = sp.fx.getContext('2d')!;
       fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1;
       fx.clearRect(0, 0, sp.fx.width, sp.fx.height);

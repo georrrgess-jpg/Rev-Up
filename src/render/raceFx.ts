@@ -294,16 +294,20 @@ export function drawTrackside(ctx: CanvasRenderingContext2D, sim: RaceSim, camX:
     const c0 = Math.max(0, Math.floor(-x0 / step)), c1 = Math.min(per, Math.ceil((W - x0) / step));
     const stride = quality ? 1 : 2;
     const cheer = sim.player.finishTime !== null || countdown > 0 ? 1.6 : 1; // louder at the start and the finish
-    for (let col = c0; col < c1; col += stride) for (let row = 0; row < rows; row++) {
+    for (let col = c0; col < c1; col += stride) {
+      const hc = Math.sin((col + seed) * 12.9898) * 43758.5453;
+      const rc = hc - Math.floor(hc);
+      const colBob = still * Math.max(0, Math.sin(t * (6 + rc * 5) * cheer + rc * 20)) * 2.5 * u * cheer; // one bounce per column
+      for (let row = 0; row < rows; row++) {
       const i = col * rows + row;
-      const hsh = Math.sin((i + seed) * 12.9898) * 43758.5453;
-      const r = hsh - Math.floor(hsh);
-      const bob = still * Math.max(0, Math.sin(t * (6 + r * 5) * cheer + r * 20)) * 2.5 * u * cheer;
+      const r = (rc * 7.31 + row * 0.377) % 1;
+      const bob = row % 2 ? colBob * 0.6 : colBob;
       const cx = x0 + (col + 0.5) * step, cy = top + 16 * u + row * 11 * u - bob;
       ctx.fillStyle = CROWD[(i + seed) % CROWD.length];
       ctx.fillRect(cx - 2.6 * u, cy, 5.2 * u, 6 * u);
       ctx.fillStyle = '#f0d2b0'; ctx.fillRect(cx - 1.8 * u, cy - 3.6 * u, 3.6 * u, 3.6 * u);
       if (r > 0.86 && bob > 1.2 * u) { ctx.fillStyle = CROWD[(i * 3 + seed) % CROWD.length]; ctx.fillRect(cx + 1.5 * u, cy - 9 * u, 1.5 * u, 7 * u); ctx.fillRect(cx + 1.5 * u, cy - 11 * u, 5 * u, 3 * u); }
+    }
     }
   };
   stand(-45, 90, 1);
