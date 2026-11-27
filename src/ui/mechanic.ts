@@ -231,9 +231,17 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
         const bw = Math.max(44, b.offsetWidth);
         const bh = Math.max(44, b.offsetHeight);
         let l = Math.max(2, Math.min(W - bw - 2, pinAt[z].x - bw / 2));
-        const t = Math.max(2, Math.min(H - bh - 2, pinAt[z].y - bh / 2));
-        // keep pins apart: slide left past any pin already placed on the same band
-        for (const o of placed) if (t < o.b && t + bh > o.t && l < o.r + 4 && l + bw > o.l - 4) l = Math.max(2, o.l - bw - 4);
+        let t = Math.max(2, Math.min(H - bh - 2, pinAt[z].y - bh / 2));
+        // keep pins (and their 44 px tap areas) apart: slide left past a pin on the same band, else right, else
+        // drop below it, so no two tap areas ever overlap on narrow phones
+        const hits = (o: { l: number; r: number; t: number; b: number }) => t < o.b && t + bh > o.t && l < o.r + 4 && l + bw > o.l - 4;
+        for (let pass = 0; pass < 3; pass++) {
+          const o = placed.find(hits);
+          if (!o) break;
+          if (o.l - bw - 4 >= 2) l = o.l - bw - 4;
+          else if (o.r + 4 + bw <= W - 2 && !placed.some((p) => p !== o && t < p.b && t + bh > p.t && o.r + 4 < p.r && o.r + 4 + bw > p.l)) l = o.r + 4;
+          else t = Math.min(H - bh, o.b + 2);
+        }
         placed.push({ l, r: l + bw, t, b: t + bh });
         b.style.left = `${l}px`;
         b.style.top = `${t}px`;

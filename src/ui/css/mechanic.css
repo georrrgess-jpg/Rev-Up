@@ -144,3 +144,9 @@ html.reduced .mech-bay, html.reduced .mech-outline { transition: none; }
 .mech .pips i { width: 14px; height: 7px; border-radius: 2px; border: 1px solid var(--line); background: rgba(255,255,255,.08); }
 .mech .pips i.done { background: var(--gold); border-color: var(--gold); }
 .mech-fitted.locked { opacity: .7; border-style: dashed; }
+/* a visible open/closed arrow (flex summaries lose the native marker) */
+.mech-kits summary { list-style: none; }
+.mech-kits summary::-webkit-details-marker { display: none; }
+.mech-kits summary::before { content: '▸'; color: var(--amber2); font-size: 1.1em; transition: transform .15s; }
+.mech-kits[open] summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .mech-kits summary::before { transition: none; } }

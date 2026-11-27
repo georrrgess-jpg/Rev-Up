@@ -1,10 +1,22 @@
 # Rev Up
 
-An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Junker**) to a restored muscle coupe (the **Muscle**), a coastal grand tourer (the **Altamar GT**), a city lightweight (the **Kestrel 1600**) and, as the headline prize of Downtown Nights, a hybrid hypercar (the **Lumen RS**).
+An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Tapeback 1.1**) through muscle, grand tourers, rally and endurance cars to three Azure Riviera supercars and the flagship **Sovereign**.
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
-- **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~143 KB JS + 19 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+- **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio (engines and an original soundtrack, generated at runtime: no audio files). No backend, no account, no runtime dependencies.
+- **Size:** ~180 KB JS + 22 KB CSS gzipped (the title screen is a separate ~3 KB chunk), plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.8 · Master update
+
+- **Title screen.** A short, skippable intro: an ignition cue, a light sweep over the Sovereign's silhouette, the wordmark and the soundtrack's hook, then **Play**. Repeat launches show your own car for about a second and go straight to the Garage. Tap skips; mute and reduced motion are respected; the module loads on its own small chunk and is precached for offline play.
+- **Garage.** Brighter panels; the top bar separates earned progress (Garage Level, Rep and the next Rep threshold) from the wallet (cash, scrap); the goal card lists what you still need, unmet first; a car tile beside the fitted slots opens the Mechanic Shop (or fits better parts in one tap); Race is the one primary action. Merge tiles are larger on every screen (390×844: 61 → 68 px on the 5×6 board, 48 → 55 px on 6×7; 320 px phones 37 → 40 px). A full board has one ranked recovery action: merge a pair, else recycle unused parts (scrap shown), else scrap the least useful part.
+- **Mechanic Shop.** The car sits in a service bay: tap its engine, wheels or body (or the tabs) for **Engine Bay** (engine and turbo parts, a ▶ Hear engine preview, the hood opens), **Wheels and Tires** (tyres and wheel sets), **Body and Paint** (finishes, materials, liveries, restoration) and **Tuning** (Tune-up stages, Build Sheet, race-day kits — there is no gearing choice in the race model, so none is invented). Every choice previews on the car and in the stats first; one button commits with its exact price and currency or says where your old part goes. Swaps of parts you own never need space; a purchase with a full inventory is blocked before anything is charged. Opened from Pit Setup, Close returns to the same race. The Shop is grouped by purpose (Parts · Crates · Garage · Style · Scrap), each tier has its own metal colour, and locked items say what opens them.
+- **Azure Riviera and three supercars.** After the Halcyon X: the **Vireo 9R** (nimble, high-revving V10; 15,000 Rep, a T9 Tires keystone, win the Summit Gala), the **Mako TT** (twin-turbo V8; 18,500 Rep, T9 Engine, win Corniche Hairpins in the Vireo) and the flagship **Sovereign** (V12 hybrid, cap T10; 23,000 Rep, a crafted T10 Engine, win Port Sprint in the Mako). Each has a course that suits it: Corniche Hairpins (tight), Port Sprint (launch, short straights) and the Grand Riviera final (long and fast). Part tiers now run to **T10** (merge only; T9 orders $32,000 once the Sovereign is the goal).
+- **Spare parts and scrap.** A three-stage **Concours restoration** for every car from the fourth on, paid in scrap (looks only, a badge at stage 3, shown on the car). Bulk recycle shows its exact scrap return and what it protects before you tap. A sweep over every tier (T1–T10) checks that no buy → recycle, order → deliver or polish loop makes money.
+- **Car art.** All 13 cars have sculpted fenders, paint that answers the light, layered lamps, drilled rotors and calipers, and side details that now carry into races. The supercars stand on a turning, spotlit platform in the Showroom. Concours stages and T10 parts have their own looks; brake lights sit on each car's real tail lamps.
+- **Racing.** Riviera and Neon Skyline scenery with landmarks; braking boards, bend warnings (with the speed this car can take them), chevrons and straight boards sized to their text; bends marked on the progress bar; car-specific burnout, launch smoke, gravel, light trails and exhaust pops; the camera looks further ahead at speed. MPH everywhere is the simulation's one conversion.
+- **Shifting.** The shift window is measured once per attempt (nitro and boost zones no longer move it), a braking zone makes one rev-matched downshift into the right gear instead of a saw-tooth of two, the arc holds still and dims while braking, the needle is the judged engine speed while green, and a green tap right after an automatic shift is no longer swallowed. Measured: arc moves inside a live attempt 6 → 0 (sim) and 4 → 0 (browser); clean taps 60/60; automatic downshifts 23 → 16 over the same races.
+- **Audio.** Every car has its own engine (real firing pitch from cylinders and rpm; Vireo V10, Mako twin-turbo with whistle and blow-off, Sovereign V12 hybrid whine), with upshift cut and bark, downshift blips, launch, burnout and tyre squeal synced to the race's actual gear changes and slip. Better engine parts sound brighter and meaner. An original soundtrack (D minor, 104 BPM, one hook) plays a calm Garage loop, a race arrangement that builds with the race, an intro and results stings. Separate **Music** and **Effects** sliders; a limiter keeps peaks under −3 dBFS, and shift cues duck the engine.
 
 ## Update 1.7 · Builds, Jobs and steady shifting
 
@@ -183,14 +195,17 @@ src/core/              rules, independent of the DOM (unit-tested)
   state.ts / save.ts   versioned save schema, validation/migration, checksum, tab-conflict guard, export/import
   game.ts              transactional wrapper: draft → validate → persist → emit events
 src/ui/                Garage, Race, Showroom, reveal, settings (DOM + Canvas)
-src/render/            original car silhouettes (Canvas) and part illustrations (SVG)
+src/render/            original car silhouettes (Canvas), part illustrations (SVG), race effects (raceFx.ts)
+src/audio*.ts          engine synthesis (audio-engine), per-car voices, race sync (audio-race), soundtrack (audio-music), API (audio-api)
+src/ui/mechanic.ts     the Mechanic Shop service bay; src/ui/intro.ts the title screen
+src/core/milestones.ts next milestone and earned-vs-wallet summary; src/core/purchases.ts exact price/benefit/lock for every purchase
 src/sw/sw-template.js  service worker template; vite.config.ts fills in the version and asset list
 src/dev.ts             dev-only late-state presets (stripped from production builds)
 tests/                 rules, race, progression/save tests and the playthrough bot
 scripts/               icons, static server, smoke, perf, input checks, gh-pages publish
 ```
 
-**Dev shortcuts** (only in `npm run dev`, never in production): `?dev=beater-ready | ray | muscle-ready | late | full | cascade | offline | reveal` loads a late or edge-case state, and `&seed=123` fixes the RNG.
+**Dev shortcuts** (only in `npm run dev`, never in production): `?dev=beater-ready | ray | muscle-ready | late | desert | summit | finale | riviera | super1 | super2 | flagship | full | fullx | cascade | offline | reveal` (`?intro` forces the title screen in automated browsers) loads a late or edge-case state, and `&seed=123` fixes the RNG.
 
 ## Tuning knobs
 
@@ -241,6 +256,14 @@ Source lives on the development branch; the compiled site is published to a dedi
 ## Verification results
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
+
+### 1.8 · Master update
+
+- **Tests:** 277 passing, 12 probes skipped. New: `supercars` (20: unlock ladder and chapter order, each supercar fastest on its course, T10 in every tier system, T1–T10 loop sweep, recycle preview, restoration, purchase info equals the charge, old saves), `shift-target` (one window per attempt, arc fixed through braking holds, one downshift per zone, no green flicker, nitro never moves the window), `race-hud` (one mph conversion everywhere), `audio` (11: every car voiced, upgrades change the sound, nothing sounds after stop, seamless loop), `art` (5: every car drawn, factory looks, service zones). Rival pace re-probed after the gearing changes (all Riviera multipliers ×1.000).
+- **Release checks:** build, smoke 22/22, input 24/24.
+- **Layout pass** (320×568, 390×844, 1280×800; title, Garage incl. the full 6×7 board and $1.25M balances, Shop tabs, all four Mechanic Shop areas, Spares, Race menu, Pit Setup, Job Board, Settings, Showroom, reveal, live HUD incl. the Yard sign, results): fixed overlapping Body/Wheels tap areas on the car at 320 px and added an open/closed arrow to the race-day kits section; earlier fixes by each area are in the notes above.
+- **Browser playthrough** (390×844): fresh save from the title (Play → Garage, drag-merge T1+T1 → T2, fit, race, $0 → $100); returning Riviera save through a Mechanic Shop swap (old part placed on the bench), a bulk recycle (+512 scrap, as previewed), a crate bought for $7,000, a won race paying exactly the $1,400 shown, and the Vireo unlock kept after reload. No page errors.
+- **Not run:** real phones and real speakers (audio was checked by rendering and measuring levels, pitch, loop seams and stuck nodes).
 
 ### 1.7 · Builds, Jobs and steady shifting
 
