@@ -154,7 +154,8 @@ export class GuideCoach {
     this.coach.el.classList.add('guide');
     // Views and sheets rebuild their DOM freely: re-resolve targets after any structural change (one per frame).
     new MutationObserver((muts) => {
-      if (muts.every((m) => this.coach.el.contains(m.target))) return;
+      // ignore the coach's own DOM and the live race HUD (its text changes every frame; tips don't target it)
+      if (muts.every((m) => this.coach.el.contains(m.target) || (m.target instanceof Element ? m.target : m.target.parentElement)?.closest('.racescreen'))) return;
       this.update();
     }).observe(app.root, { childList: true, subtree: true });
     document.addEventListener('scroll', () => this.coach.place(), { capture: true, passive: true });

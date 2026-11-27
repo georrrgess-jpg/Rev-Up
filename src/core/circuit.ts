@@ -16,6 +16,7 @@ import { bestOwnedUpgrade, grantPrize } from './rivalRuns';
 import type { GameState } from './state';
 import { mph } from './units';
 import { RACE } from '../data/tables';
+import { LAUNCH_CONTROL } from '../data/circuit';
 
 // Rival and series paints join the Showroom's blueprint finishes (additive, like the Rival Runs paint).
 for (const f of [...Object.values(CIRCUIT_FINISHES), { name: 'Giant Killer Red', paint: '#b3122e' }]) {
@@ -349,6 +350,9 @@ export function explainFinish(o: RaceOutcome, s?: GameState): FinishExplanation 
   const skillReasons: [number, string][] = [];
   if (shift >= 0.05) skillReasons.push([shift, `Shifting cost ${sec(shift)}${shiftWhy}`]);
   if (boost >= 0.05) skillReasons.push([boost, `Boost timing cost ${sec(boost)}${boostWhy}`]);
+  // a launch-control car that started without it (measured on the Tempest: about 0.3 s off the line)
+  const lcMissed = !!me && LAUNCH_CONTROL.cars.includes(me.car) && !o.launchControl;
+  if (lcMissed) skillReasons.push([0.3, 'Launch control wasn’t engaged — about 0.3 s lost off the line']);
   if (!me || me.finishTime === null || !track) {
     return { headline: me?.finishTime == null ? 'Did not finish' : `${me.finishTime.toFixed(2)} s`, reasons: skillReasons.map((r) => r[1]), suggestion: { text: 'Shift on the green and fire nitro inside each boost zone.' }, foe: null, margin: null, close: false };
   }
@@ -413,7 +417,9 @@ export function explainFinish(o: RaceOutcome, s?: GameState): FinishExplanation 
   const buildZone = zoneReasons.filter(([lost, , z]) => lost > 0.05 && statLine(z).better).sort((a, b) => b[0] - a[0])[0];
   const buildLost = buildZone?.[0] ?? 0;
   let suggestion: FinishExplanation['suggestion'];
-  if (shift >= 0.1 && shift >= boost && shift >= buildLost * 0.8) {
+  if (lcMissed && margin > 0 && shift < 0.3 && boost < 0.3) {
+    suggestion = { text: `Tap ⚡LAUNCH right on GO: launch control is worth about 0.3 s off the line${margin < 0.3 ? ` — enough to beat ${fn}` : ''}.`, action: { kind: 'launch' } };
+  } else if (shift >= 0.1 && shift >= boost && shift >= buildLost * 0.8) {
     suggestion = { text: `Clean shifts alone are worth ${sec(shift)} here${margin > 0 && shift > margin ? ` — enough to beat ${fn}` : ''}: tap SHIFT the moment the light turns green${worst ? `, especially into ${GEARS[worst.into] ?? 'the next gear'}` : ''}.`, action: { kind: 'shift' } };
   } else if (boost >= 0.1 && boost >= buildLost * 0.8) {
     suggestion = { text: `Perfect boosts are worth ${sec(boost)} here${margin > 0 && boost > margin ? ` — enough to beat ${fn}` : ''}: fire nitro inside each boost zone.`, action: { kind: 'boost' } };

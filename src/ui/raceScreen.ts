@@ -167,7 +167,9 @@ export class RaceScreen {
     // a retry of the same event soon after gets the short countdown: one tap and you are racing again
     const quick = lastStart.id === setup.eventId && Date.now() - lastStart.at < 120_000;
     lastStart = { id: setup.eventId, at: Date.now() };
-    this.countdown = this.reduced ? 1.2 : quick ? 1.6 : 2.4;
+    // the first Tempest race (launch control never landed yet) always gets the full countdown, to read the LAUNCH cue
+    const teachLaunch = this.sim.hasLaunchControl && !app.game.state.stats.milestones['cx:launch-control'];
+    this.countdown = this.reduced ? 1.2 : quick && !teachLaunch ? 1.6 : 2.4;
     const ev0 = eventById(setup.eventId);
     this.ghost = keepsGhost(ev0) && !app.game.rivalRunName ? readGhost(app.game.state, ev0.id) : null;
     this.rivalsAudio = new RivalAudio(this.sim);
@@ -247,6 +249,7 @@ export class RaceScreen {
     this.hum.start(this.countdown);
     this.updateHud(true);
     this.showCallout('3', 'countdown');
+    if (teachLaunch) this.tick('⚡ Launch control: tap LAUNCH right on GO', 'gold');
     sfx.countdown(false);
   }
 
