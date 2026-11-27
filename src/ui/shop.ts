@@ -11,7 +11,7 @@ import * as P from '../core/progression';
 import type { GameState, Part } from '../core/state';
 import { mph } from '../core/units';
 import {
-  ACTIVE_FAMILIES, CRATE_SCRAP_COST, CRATE_TIER_ODDS, FAMILIES, Family, PART_ORDER_PRICE, TARGETED_CRATE_SCRAP_COST,
+  ACTIVE_FAMILIES, CRATE_SCRAP_COST, CRATE_TIER_ODDS, FAMILIES, Family, TARGETED_CRATE_SCRAP_COST,
   TUNE_STAGES, UPGRADES, UpgradeId, carById, tunePrice, CarId, OFFLINE_BUDGET_RACES, QUALITY_BONUS, SCRAP_VALUE, polishCost,
   scrapOrderCost, TARGETED_CRATE_CASH_COST, MAX_TIER,
 } from '../data/tables';
@@ -25,6 +25,7 @@ import type { App } from './app';
 import { bestBuy, ingredients } from '../core/tutorial';
 import { partGain, statDelta } from './benefit';
 import { openSpares } from './spares';
+import { openShelf } from './shelf'; // 1.9 Parts Shelf
 import { openBuilds } from './projects'; // Scrap & surplus
 import { fabBench } from './fabrication'; // Scrap & surplus
 import * as PJ from '../core/projects'; // Scrap & surplus
@@ -43,6 +44,8 @@ const UPGRADE_LOOK: Record<UpgradeId, { icon: string; kind: string }> = {
   crew: { icon: '⚑', kind: 'Quick Race pay' },
   nitroTank: { icon: '⚡', kind: 'Race nitro' },
   lockup: { icon: '⌂', kind: 'Away earnings' },
+  storage: { icon: '▤', kind: 'Storage' },
+  workshop: { icon: '⚒', kind: 'Targeted orders' },
 };
 
 /** The Shop's recommendation; the same rule decides whether the guide's "spend" beat has anything to show. */
@@ -77,6 +80,8 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
   let tier = o.tier ?? 0;
   let sTier = o.tier ?? 0; // the scrap order's tier
   let tab: ShopTab = o.tab === 'cash' || !o.tab ? 'parts' : o.tab;
+  let polished = false; // 1.9 Quality orders
+  let moreUpgrades = false; // 1.9 Garage tab: advanced options behind one tap
   return app.sheet((close) => {
     const body = h('div', { class: 'workshop' });
     const build = () => {
@@ -113,8 +118,8 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
           h('div', { class: 'grow' }, h('div', { class: 't' }, pick.title), h('div', { class: 'd' }, pick.why)),
           buyBtn(pick.price, `$${fmt(pick.price)}`, runPick, `Buy ${pick.title} for $${pick.price}`))) : null;
 
-      const doOrder = (f: Family, t: number) => {
-        const ev = game.orderPart(f, t);
+      const doOrder = (f: Family, t: number, pol = false) => {
+        const ev = game.orderPart(f, t, undefined, pol);
         if (ev.some((e) => e.type === 'place')) app.toast(`T${t} ${FAMILIES[f].name} is on your bench`);
         else if (!ev.some((e) => e.type === 'invalid')) app.toast(`T${t} ${FAMILIES[f].name} is first in the crate queue — make room on the bench`);
       };
@@ -126,7 +131,7 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
 
       // ---- Parts
       const parts = () => {
-        const price = PART_ORDER_PRICE[tier];
+        const price = B.orderPrice(s, tier, polished && B.polishedOrdersOpen(s));
         const gain = partGain(s, s.activeCar, { f: fam!, t: tier, q: 'std' });
         const goalLine = goalFam === fam && g ? (() => {
           const { have, need: n } = ingredients(s, fam!, g.tier);
@@ -140,9 +145,9 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
         }, h('span', { html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, h('small', {}, f === goalFam ? 'Goal' : FAMILIES[f].statLabel));
         const tierBtn = (t: number) => h('button', {
           class: `btn sm tier-pick metal${t === tier ? ' on' : ''}`, 'aria-pressed': String(t === tier), style: `--metal:${metalFor(t)}`,
-          'aria-label': `T${t} ${MATERIAL[t]}, $${PART_ORDER_PRICE[t]}`,
+          'aria-label': `T${t} ${MATERIAL[t]}, $${B.orderPrice(s, t)}`,
           onclick: () => { tier = t; build(); },
-        }, h('b', {}, `T${t}`), h('small', { class: 'mat' }, MATERIAL[t]), h('small', { class: 'num' }, `$${fmt(PART_ORDER_PRICE[t])}`));
+        }, h('b', {}, `T${t}`), h('small', { class: 'mat' }, MATERIAL[t]), h('small', { class: 'num' }, `$${fmt(B.orderPrice(s, t))}`));
         const stage = s.tune?.[s.activeCar] ?? 0;
         const tPrice = purchaseInfo(s, `tune:${s.activeCar}`)?.price ?? tunePrice(s.activeCar, stage);
         return [
@@ -158,7 +163,10 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
             h('ul', { class: 'facts' },
               h('li', { class: gain.better ? 'up' : '' }, gain.text),
               goalLine ? h('li', { class: 'goal-fact' }, goalLine) : null),
-            buyBtn(price, `Order T${tier} ${FAMILIES[fam!].name} · $${fmt(price)}`, () => doOrder(fam!, tier), `Order a T${tier} ${FAMILIES[fam!].name} for $${price}`)),
+            // 1.9 Workshop counter rank 2: Quality orders (Polished, +15%, for 1.5× the price)
+            B.polishedOrdersOpen(s) ? h('label', { class: 'row polished-pick' }, h('input', { type: 'checkbox', checked: polished, onchange: () => { polished = !polished; build(); } }),
+              h('span', { class: 'd' }, `Polished: +15% ${FAMILIES[fam!].statLabel.toLowerCase()} for $${fmt(B.orderPrice(s, tier, true))} (standard $${fmt(B.orderPrice(s, tier))})`)) : null,
+            buyBtn(price, `Order T${tier} ${FAMILIES[fam!].name} · $${fmt(price)}`, () => doOrder(fam!, tier, polished && B.polishedOrdersOpen(s)), `Order a T${tier} ${FAMILIES[fam!].name} for $${price}`)),
           h('h3', {}, `Tune-up · ${car.model}`),
           h('div', { class: 'row up-row' },
             h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '⚙'),
@@ -291,31 +299,52 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
         ];
       };
 
-      // ---- Garage upgrades: each its own icon, purpose, exact effect now → next
+      // ---- Garage upgrades (1.9 paths): Bench, Parts Shelf and Workshop counter first, each rank with its current
+      // benefit, next benefit, exact price and what still locks it, side by side; the other upgrades and every rank's
+      // ladder sit behind one tap ("More upgrades").
       const garage = () => {
         const full = P.offlinePayout(s, P.offlineMaxS(s));
         const yard = P.stagePurse(s);
         const hrs = P.offlineMaxS(s) / 3600;
+        const card = (u: typeof UPGRADES[number]) => {
+          const lvl = s.upgrades[u.id] ?? 0;
+          const next = u.levels[lvl];
+          const fx = P.upgradeEffect(s, u.id);
+          const look = UPGRADE_LOOK[u.id];
+          const lock = next ? P.upgradeLock(s, u.id) : null;
+          const price = P.upgradeCost(s, u.id);
+          const credit = P.upgradeCreditOf(s, u.id);
+          return h('div', { class: `row up-row up-${u.id}${lock ? ' locked' : ''}` },
+            h('span', { class: 'up-ico', 'aria-hidden': 'true' }, look.icon),
+            h('div', { class: 'grow' },
+              h('div', { class: 't' }, u.name, u.levels.length > 1 ? h('span', { class: 'lvl' }, ` ${lvl}/${u.levels.length}`) : null),
+              h('div', { class: 'kind' }, `${look.kind} · ${u.about}`),
+              h('div', { class: 'd' }, h('b', {}, 'Now: '), fx.now || 'Standard'),
+              next ? h('div', { class: 'd' }, h('b', {}, `Next (rank ${lvl + 1}): `), next.label) : h('div', { class: 'd done' }, 'Fully upgraded'),
+              next ? h('div', { class: 'd' }, h('b', {}, 'Price: '), `$${fmt(price ?? next.cost)}`, credit ? ` ($${fmt(next.cost)} less $${fmt(credit)} of contributed parts)` : '',
+                lock ? h('span', { class: 'lock-tag' }, ` · 🔒 ${lock}`) : null) : null,
+              moreUpgrades && u.levels.length > 1 ? h('ol', { class: 'up-ladder' }, ...u.levels.map((l, i) => h('li', { class: i < lvl ? 'done' : '' },
+                `${i < lvl ? '✓ ' : ''}$${fmt(l.cost)} · ${l.label}${l.opens && !s.owned.includes(l.opens) ? ` (opens with the ${carById(l.opens).model})` : ''}`))) : null,
+              next && !lock && u.path ? h('button', { class: 'btn sm', onclick: () => openShelf(app, { mode: 'contribute', upgrade: u.id, onChange: build }) }, 'Pay part with spare parts') : null),
+            next && !lock && price !== null ? buyBtn(price, `$${fmt(price)}`, () => { game.buyUpgrade(u.id); app.toast(`${u.name} rank ${lvl + 1}: ${next.label}`); }, `${u.name}: ${next.label}, $${price}`)
+              : next ? h('span', { class: 'lock-tag' }, '🔒') : h('span', { class: 'd done' }, '✓'));
+        };
+        const paths = UPGRADES.filter((u) => u.path);
+        const shown = UPGRADES.filter((u) => !u.path && P.upgradeShown(s, u));
+        const hidden = UPGRADES.filter((u) => !u.path && !P.upgradeShown(s, u));
+        const first = shown.filter((u) => u.id === 'printer' || u.id === 'crateTier');
         return [
-          h('p', { class: 'd' }, 'Permanent upgrades for your garage. Each does one thing, shown exactly.'),
-          ...UPGRADES.filter((u) => P.upgradeShown(s, u)).map((u) => {
-            const lvl = s.upgrades[u.id] ?? 0;
-            const next = u.levels[lvl];
-            const fx = P.upgradeEffect(s, u.id);
-            const look = UPGRADE_LOOK[u.id];
-            return h('div', { class: `row up-row up-${u.id}` },
-              h('span', { class: 'up-ico', 'aria-hidden': 'true' }, look.icon),
-              h('div', { class: 'grow' },
-                h('div', { class: 't' }, u.name, u.levels.length > 1 ? h('span', { class: 'lvl' }, ` ${lvl}/${u.levels.length}`) : null),
-                h('div', { class: 'kind' }, `${look.kind} · ${u.about}`),
-                h('div', { class: 'd' }, next ? h('span', {}, 'Now: ', fx.now, h('span', { class: 'arrow', 'aria-hidden': 'true' }, ' → '), h('b', {}, fx.next)) : h('span', {}, `${fx.now} · fully upgraded`))),
-              next ? (() => { const price = purchaseInfo(s, `upgrade:${u.id}`)?.price ?? next.cost; return buyBtn(price, `$${fmt(price)}`, () => game.buyUpgrade(u.id), `${u.name}: ${next.label}, $${price}`); })() : h('span', { class: 'd done' }, '✓'));
-          }),
-          ...UPGRADES.filter((u) => !P.upgradeShown(s, u)).map((u) => h('div', { class: `row up-row locked up-${u.id}` },
+          h('p', { class: 'd' }, 'Permanent upgrades for your garage. Each rank does one thing, shown exactly; later ranks open as your garage grows.'),
+          ...paths.map(card),
+          ...(moreUpgrades ? shown : first).map(card),
+          h('button', { class: 'btn wide', 'aria-expanded': String(moreUpgrades), onclick: () => { moreUpgrades = !moreUpgrades; build(); } },
+            moreUpgrades ? 'Fewer upgrades' : `More upgrades · every rank${shown.length > first.length ? ` · ${shown.length - first.length} more` : ''}`),
+          ...(moreUpgrades ? hidden.map((u) => h('div', { class: `row up-row locked up-${u.id}` },
             h('span', { class: 'up-ico', 'aria-hidden': 'true' }, UPGRADE_LOOK[u.id].icon),
             h('div', { class: 'grow' }, h('div', { class: 't' }, u.name), h('div', { class: 'kind' }, `${UPGRADE_LOOK[u.id].kind} · ${u.about}`),
-              h('div', { class: 'd' }, `First level $${fmt(u.levels[0].cost)}: ${u.levels[0].label}`)),
-            h('span', { class: 'lock-tag' }, `🔒 ${SHOWS_WHEN[u.shows ?? 'always']}`))),
+              h('div', { class: 'd' }, `First rank $${fmt(u.levels[0].cost)}: ${u.levels[0].label}`)),
+            h('span', { class: 'lock-tag' }, `🔒 ${SHOWS_WHEN[u.shows ?? 'always']}`))) : []),
+          h('button', { class: 'btn wide', onclick: () => openShelf(app, { onChange: build }) }, h('span', { class: 'stack' }, `Parts Shelf · ${B.shelfParts(s).length}/${B.shelfCap(s)}`, h('small', {}, 'Store over-cap parts, trade surplus toward a part, or pay part of an upgrade'))),
           h('h3', {}, 'While you are away'),
           h('p', { class: 'd away-note' }, `While the game is closed your crew does side jobs: up to $${fmt(full.cash)} for ${hrs} h away (${OFFLINE_BUDGET_RACES[Math.min(s.upgrades.lockup ?? 0, OFFLINE_BUDGET_RACES.length - 1)]}× the $${fmt(yard.cash)} win purse of ${yard.event.name}, your best open race), building evenly — $${fmt(P.offlinePayout(s, 3600).cash)} for an hour. Time past ${hrs} h isn't counted, and owning more cars doesn't add to it. Races pay more.`),
         ];

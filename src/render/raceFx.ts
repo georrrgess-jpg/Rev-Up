@@ -38,6 +38,9 @@ export const LAUNCH_FX: Record<string, LaunchFx> = {
   vireo: { smoke: '#ece6dc', amount: 0.8, sig: 'pops', accent: '#ff6a2a' }, // screaming V10: flame pops
   mako: { smoke: '#b8c2cc', amount: 1.3, sig: 'turbo', accent: '#9fd4ff' }, // twin-turbo: a big blue-grey cloud
   sovereign: { smoke: '#dcd6f0', amount: 0.7, sig: 'arcs', accent: '#7fb8ff' }, // V12 hybrid: electric arcs
+  ardent: { smoke: '#ece8e0', amount: 0.6, sig: 'pops', accent: '#ff8a2a' }, // screaming four: crackle and flame
+  meridian: { smoke: '#d8dde6', amount: 1.1, sig: 'none' }, // big-torque V8: a long, lazy burnout
+  tempest: { smoke: '#cfe6ee', amount: 0.25, sig: 'arcs', accent: '#5ef2ff' }, // four motors: no smoke, cyan arcs
 };
 const fxOf = (car: string) => LAUNCH_FX[car] ?? LAUNCH_FX.beater;
 
@@ -255,5 +258,122 @@ export function drawCourseSigns(ctx: CanvasRenderingContext2D, sim: RaceSim, cam
       post(x, roadTop - 34 * dpr);
       board(ctx, `STRAIGHT ${Math.round(sg.length / 10) * 10} m`, x, roadTop - 52 * dpr, 18 * dpr, dpr, '#1f8f47', '#f2fff5', '#0d3d20');
     }
+  }
+}
+
+// ---------------------------------------------------------------- trackside (start, finish, crowds, marshals)
+
+const CROWD = ['#e2337a', '#ffd23f', '#38a8e1', '#ffffff', '#ff7a2f', '#7fe08a', '#b98cff', '#f4d0a8'];
+
+/**
+ * Trackside drama, in world metres on the upper verge (and a little parallax behind it so it reads in motion): the
+ * start gantry whose lights count down and go green on GO, grandstands with a crowd that bounces and waves at the
+ * start and the finish, marshals waving flags at each bend entry, distance boards (300 / 200 / 100 m) before the
+ * line, and the finish gantry with a chequered banner and flags. `countdown` is the seconds left before GO (0 racing);
+ * `lightsTotal` the full countdown. Reduced motion keeps everything still.
+ */
+export function drawTrackside(ctx: CanvasRenderingContext2D, sim: RaceSim, camX: number, ppm: number, roadTop: number, roadBot: number, dpr: number,
+  t: number, countdown: number, lightsTotal: number, reduced: boolean, quality: number) {
+  const W = ctx.canvas.width;
+  const u = dpr;
+  const L = sim.length;
+  const still = reduced ? 0 : 1;
+  const vis = (m: number, pad = 120 * u) => { const x = (m - camX) * ppm; return x > -pad && x < W + pad ? x : null; };
+  // grandstands sit a little behind the verge: they slide at 0.88 of the road's speed (depth), anchored at m
+  const stand = (m: number, len: number, seed: number) => {
+    const x0 = (m - camX) * ppm * 0.88 + (W * 0.12) * 0.5;
+    const w = len * ppm * 0.88;
+    if (x0 > W + 20 * u || x0 + w < -20 * u) return;
+    const top = roadTop - 70 * u, base = roadTop - 12 * u;
+    ctx.fillStyle = '#3a3f4c'; ctx.fillRect(x0, top + 8 * u, w, base - top - 8 * u);
+    ctx.fillStyle = '#d6202a'; ctx.fillRect(x0, top, w, 8 * u);
+    ctx.fillStyle = '#ffffff'; for (let x = x0; x < x0 + w; x += 24 * u) ctx.fillRect(x, top + 2 * u, 12 * u, 2 * u);
+    const rows = 4, step = 7 * u;
+    const per = Math.max(1, Math.floor(w / step));
+    // only the columns on screen (a stand is far wider than the screen at race zoom); fewer at reduced effects
+    const c0 = Math.max(0, Math.floor(-x0 / step)), c1 = Math.min(per, Math.ceil((W - x0) / step));
+    const stride = quality ? 1 : 2;
+    const cheer = sim.player.finishTime !== null || countdown > 0 ? 1.6 : 1; // louder at the start and the finish
+    for (let col = c0; col < c1; col += stride) for (let row = 0; row < rows; row++) {
+      const i = col * rows + row;
+      const hsh = Math.sin((i + seed) * 12.9898) * 43758.5453;
+      const r = hsh - Math.floor(hsh);
+      const bob = still * Math.max(0, Math.sin(t * (6 + r * 5) * cheer + r * 20)) * 2.5 * u * cheer;
+      const cx = x0 + (col + 0.5) * step, cy = top + 16 * u + row * 11 * u - bob;
+      ctx.fillStyle = CROWD[(i + seed) % CROWD.length];
+      ctx.fillRect(cx - 2.6 * u, cy, 5.2 * u, 6 * u);
+      ctx.fillStyle = '#f0d2b0'; ctx.fillRect(cx - 1.8 * u, cy - 3.6 * u, 3.6 * u, 3.6 * u);
+      if (r > 0.86 && bob > 1.2 * u) { ctx.fillStyle = CROWD[(i * 3 + seed) % CROWD.length]; ctx.fillRect(cx + 1.5 * u, cy - 9 * u, 1.5 * u, 7 * u); ctx.fillRect(cx + 1.5 * u, cy - 11 * u, 5 * u, 3 * u); }
+    }
+  };
+  stand(-45, 90, 1);
+  stand(L - 95, 120, 7);
+  // flag on a pole: a waving cloth (a few strips with a phase lag)
+  const flag = (x: number, top: number, colA: string, colB: string, wave: number, chequer = false) => {
+    ctx.fillStyle = '#4a4d55'; ctx.fillRect(x - 1 * u, top, 2 * u, 26 * u);
+    const fw = 16 * u, fh = 10 * u, strips = 6;
+    for (let k = 0; k < strips; k++) {
+      const dy = Math.sin(t * 9 * wave - k * 0.9) * 2.2 * u * still * (k / strips);
+      ctx.fillStyle = chequer ? ((k % 2) ? '#111' : '#f4f4f0') : (k < strips / 2 ? colA : colB);
+      ctx.fillRect(x + 1 * u + (k * fw) / strips, top + dy, fw / strips + 0.5, fh);
+      if (chequer) { ctx.fillStyle = (k % 2) ? '#f4f4f0' : '#111'; ctx.fillRect(x + 1 * u + (k * fw) / strips, top + dy + fh / 2, fw / strips + 0.5, fh / 2); }
+    }
+  };
+  // ---- the start gantry: five light pods that fill red through the countdown and turn green on GO
+  const gx = vis(0);
+  if (gx !== null) {
+    const top = roadTop - 108 * u;
+    ctx.fillStyle = '#2b2f38'; ctx.fillRect(gx - 4 * u, top, 8 * u, roadTop - top);
+    ctx.fillRect(gx - 4 * u, roadBot, 8 * u, 14 * u);
+    ctx.fillStyle = '#1b1d22'; ctx.fillRect(gx - 34 * u, top, 68 * u, 20 * u);
+    const lit = countdown > 0 ? Math.min(5, Math.floor((1 - countdown / Math.max(0.01, lightsTotal)) * 6)) : -1;
+    for (let k = 0; k < 5; k++) {
+      const on = lit < 0 ? (sim.t < 3 ? 'go' : 'off') : k < lit ? 'red' : 'off';
+      ctx.fillStyle = on === 'red' ? '#ff2a2a' : on === 'go' ? '#3dff7a' : '#3a2a2a';
+      ctx.beginPath(); ctx.arc(gx - 26 * u + k * 13 * u, top + 10 * u, 5.4 * u, 0, 7); ctx.fill();
+      if (on !== 'off' && !reduced) { ctx.fillStyle = on === 'red' ? 'rgba(255,40,40,0.22)' : 'rgba(61,255,122,0.25)'; ctx.beginPath(); ctx.arc(gx - 26 * u + k * 13 * u, top + 10 * u, 9 * u, 0, 7); ctx.fill(); }
+    }
+    flag(gx + 40 * u, roadTop - 42 * u, '#ffffff', '#1f8f47', 1);
+  }
+  // ---- marshals at each bend entry: an orange-suited figure waving a yellow flag
+  for (let s0 = 0, i = 0; i < sim.track.segments.length; s0 += sim.track.segments[i].length, i++) {
+    const sg = sim.track.segments[i];
+    if (!sg.radius || sim.track.segments[i - 1]?.radius) continue;
+    const x = vis(s0 - 6, 40 * u);
+    if (x === null) continue;
+    const base = roadTop - 8 * u;
+    ctx.fillStyle = '#e8e2d4'; ctx.fillRect(x - 9 * u, base - 2 * u, 18 * u, 4 * u); // the marshal post
+    ctx.fillStyle = '#ff7a1a'; ctx.fillRect(x - 3 * u, base - 16 * u, 6 * u, 14 * u);
+    ctx.fillStyle = '#f0d2b0'; ctx.fillRect(x - 2.2 * u, base - 21 * u, 4.4 * u, 4.4 * u);
+    const near = Math.abs(sim.player.x - s0) < 80;
+    const a = -1.2 + (near ? Math.sin(t * 10) * 0.7 * still : 0.2);
+    const hx = x + 2 * u, hy = base - 15 * u;
+    const ex = hx + Math.cos(a) * 14 * u, ey = hy + Math.sin(a) * 14 * u;
+    ctx.strokeStyle = '#3a3a3a'; ctx.lineWidth = 1.4 * u; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(ex - (Math.cos(a) < 0 ? 10 * u : 0), ey - 3 * u, 10 * u, 7 * u);
+  }
+  // ---- distance boards before the line, and the finish gantry
+  for (const d of [300, 200, 100]) {
+    if (d > L - 60) continue;
+    const x = vis(L - d);
+    if (x === null) continue;
+    ctx.fillStyle = '#4a4d55'; ctx.fillRect(x - 1.5 * u, roadTop - 34 * u, 3 * u, 32 * u);
+    const w = board(ctx, `${d}`, x, roadTop - 52 * u, 18 * u, u, '#f4f4f0', '#111', '#111');
+    // a chequered strip on top so they read as finish boards, not braking boards
+    for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#111' : '#f4f4f0'; ctx.fillRect(x - w / 2 + (k * w) / 6, roadTop - 56 * u, w / 6 + 0.5, 4 * u); }
+  }
+  const fx = vis(L);
+  if (fx !== null) {
+    const top = roadTop - 112 * u;
+    ctx.fillStyle = '#2b2f38';
+    ctx.fillRect(fx - 4 * u, top, 8 * u, roadTop - top);
+    ctx.fillRect(fx - 4 * u, roadBot, 8 * u, 16 * u);
+    // the banner: chequered band with FINISH on it
+    const bw = 120 * u, bh = 26 * u, bx = fx - bw / 2;
+    for (let k = 0; k < 24; k++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (k + j) % 2 ? '#111' : '#f4f4f0'; ctx.fillRect(bx + (k * bw) / 24, top + j * 5 * u, bw / 24 + 0.5, 5 * u); }
+    ctx.fillStyle = '#d6202a'; ctx.fillRect(bx, top + 10 * u, bw, bh - 10 * u);
+    signText(ctx, 'FINISH', bx, top + 10 * u, bw, bh - 10 * u, 2 * u, '#ffffff', 14 * u, 900, 'Barlow, system-ui');
+    flag(fx - 70 * u, roadTop - 44 * u, '', '', 1.3, true);
+    flag(fx + 56 * u, roadTop - 44 * u, '', '', 1.1, true);
   }
 }

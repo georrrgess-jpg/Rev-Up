@@ -20,6 +20,30 @@ import { rivalRunsSection } from './rivalRuns';
 import { jobBoardSection } from './jobs';
 import { jobsUnlocked, readJobs } from '../core/jobs';
 import type { CarId } from '../data/tables';
+import { competitionSummary, hintFor } from './contracts';
+
+const fmtN = (n: number) => n.toLocaleString('en-US');
+
+/** Competitive progress at a glance: the rival ladder, the next rival and prize, a class series, best vs ghost. */
+function competitionStrip(s: GameState, jump: (eventId: string) => void): HTMLElement | null {
+  const c = competitionSummary(s);
+  if (!c) return null;
+  const items: HTMLElement[] = [];
+  if (c.ladder) items.push(h('div', { class: 'cs-item ladder' }, h('small', {}, c.ladder.label ?? 'Rival ladder'),
+    h('b', { class: 'num' }, `${c.ladder.position}/${c.ladder.total}`),
+    h('span', { class: 'cs-pips', 'aria-hidden': 'true' }, ...Array.from({ length: Math.min(12, c.ladder.total) }, (_, i) => h('i', { class: i < c.ladder!.position ? 'on' : '' })))));
+  if (c.nextRival) {
+    const nr = c.nextRival;
+    items.push(h(nr.eventId ? 'button' : 'div', { class: `cs-item next${nr.ready ? ' ready' : ''}`, ...(nr.eventId ? { onclick: () => jump(nr.eventId!), 'aria-label': `Next rival ${nr.name}${nr.prize ? `, prize ${nr.prize}` : ''}. Show the race` } : {}) },
+      h('small', {}, nr.ready ? 'Next rival · ready' : 'Next rival'), h('b', {}, nr.name), nr.prize ? h('span', { class: 'cs-prize' }, nr.prize) : null));
+  }
+  if (c.series) items.push(h('div', { class: 'cs-item series' }, h('small', {}, c.series.name), h('b', { class: 'num' }, `Round ${c.series.round}/${c.series.of}`),
+    c.series.points !== undefined ? h('span', {}, `${c.series.points} pts${c.series.leader ? ` · leader ${c.series.leader}` : ''}`) : null));
+  if (c.ghost && (c.ghost.text || c.ghost.best)) items.push(h('div', { class: 'cs-item ghost' }, h('small', {}, 'Best vs ghost'),
+    h('b', { class: 'num' }, c.ghost.text ?? `${c.ghost.best!.toFixed(2)} s`)));
+  if (!items.length) return null;
+  return h('section', { class: 'comp-strip', 'aria-label': 'Competition progress' }, ...items);
+}
 
 /** Speed-trap thresholds and records are stored in km/h until the stage-2 tables move to mph: show them in mph. */
 
@@ -77,9 +101,12 @@ export class RaceView implements View {
       label, badge ? h('span', { class: 'jb-n num' }, badge) : null)));
   }
 
+  /** Save revision of the last render: coming back to the tab with nothing changed skips the rebuild. */
+  private renderedRev = -1;
   show() {
     this.visible = true;
-    this.render();
+    const st = this.app.game.state;
+    if (st.rev !== this.renderedRev || st.pendingQuick) this.render();
     if (this.pitReturn && !this.app.busy) {
       const id = this.pitReturn;
       this.pitReturn = null;
@@ -93,6 +120,7 @@ export class RaceView implements View {
 
   render() {
     const s = this.app.game.state;
+    this.renderedRev = s.rev;
     const cls = carById(s.activeCar);
     const lo = computeLoadout(s);
     this.head.replaceChildren(h('strong', {}, cls.model),
@@ -117,6 +145,7 @@ export class RaceView implements View {
     const rec = P.recommendedEvent(s);
     const q = s.pendingQuick;
     const expanded = new Set(Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.event-detail[open]')).map((d) => d.dataset.event));
+    for (const dd of Array.from(this.list.querySelectorAll<HTMLDetailsElement>('details.feat-rules[open]'))) expanded.add(`rules:${dd.dataset.event}`);
     const nitroNote = `${s.nitro + CREW_NITRO} nitro${s.nitro ? '' : ' (crew)'}`; // banked charges plus the free crew charge
     const details = (e: RaceEvent) => {
       const p = P.purse(s, e);
@@ -168,25 +197,36 @@ export class RaceView implements View {
     const d = difficulty(s, shown, P.eventUnlocked(s, rec).switchCar ?? s.activeCar);
     const winRep = shown.payout.rep[0];
     const fact = (k: string, v: (string | HTMLElement)[] | string, cls = '') => h('div', { class: `fact ${cls}` }, h('small', {}, k), h('span', {}, ...(Array.isArray(v) ? v : [v])));
-    const featured = h('section', { class: 'featured', 'aria-label': 'Recommended race', 'data-jump': 'top' },
+    const pz = P.purse(s, shown);
+    const reward = shown.timeAttack ? `$${fmtN(shown.payout.cash[0])} a run · medals pay once`
+      : `$${fmtN(shown.payout.cash[0] + (pz.firstClear ?? 0))} · ${winRep} Rep${shown.payout.crates[0] ? ` · ${shown.payout.crates[0]} crate${shown.payout.crates[0] > 1 ? 's' : ''}` : ''}`;
+    // the goal's race hint only when it points somewhere other than this pick (no repeating the card above)
+    const hint = hintFor(s, 'race');
+    const tip = hint && !(hint.action?.kind === 'race' && hint.action.eventId === rec.id) ? hint.text : null;
+    const featured = h('section', { class: 'featured lead', 'aria-label': 'Recommended race', 'data-jump': 'top' },
       h('div', { class: 'feat-label' }, 'Recommended for you'),
-      h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null),
+      h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null, h('span', { class: `diff ${d.cls}` }, d.label)),
       h('p', { class: 'reason' }, reasonFor(rec)),
+      h('div', { class: 'feat-reward' }, h('small', {}, shown.timeAttack ? 'Pays' : pz.firstClear ? 'First win pays' : 'Win pays'), h('b', { class: 'num' }, reward)),
+      rec.goals ? goalList(s, rec) : null,
+      rec.knockout ? heatList(s, rec) : null,
+      h('button', { class: `btn primary race-live feat-go${q && q.eventId === rec.id ? ' off' : ''}`, 'data-coach': 'race-live', onclick: () => this.startLive(rec.id) },
+        h('span', { class: 'stack' }, 'Race live', h('small', {}, `you drive · full purse · ${nitroNote}`))),
+      h('div', { class: 'feat-more' },
+        h('button', { class: 'btn sm pit-btn', 'data-pit': rec.id, onclick: () => this.openPit(rec.id) }, 'Pit Setup'),
+        quickPart(rec, true)),
+      tip ? h('p', { class: 'feat-tip' }, tip) : null,
+      q?.eventId === rec.id ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null,
+      h('details', { class: 'feat-rules', 'data-event': rec.id, ...(expanded.has(`rules:${rec.id}`) ? { open: '' } : {}) },
+        h('summary', {}, 'Track, rules and payouts'),
       h('div', { class: 'facts' },
         fact('Track', [course(rec), ` ${TRACKS[rec.track].favours}`]),
         fact('Difficulty', [h('span', { class: `diff ${d.cls}` }, d.label), ` ${d.why}`]),
         fact('Win pays', shown.timeAttack ? `$${shown.payout.cash[0]} a run · medals pay once` : `$${shown.payout.cash[0]} and ${winRep} Rep${shown.payout.crates[0] ? ` · ${shown.payout.crates[0]} crate${shown.payout.crates[0] > 1 ? 's' : ''}` : ''}${P.purse(s, shown).firstClear ? ` · +$${P.purse(s, shown).firstClear} first win` : ''}`),
         fact('Needs', P.eventUnlocked(s, rec).switchCar ? `The ${carById(P.eventUnlocked(s, rec).switchCar!).model} (we'll switch to it)` : 'Nothing more — open now'),
         fr?.bestTime ? fact('Your record', `${fr.bestTime.toFixed(2)} s`) : null),
-      rec.goals ? goalList(s, rec) : null,
-      rec.knockout ? heatList(s, rec) : null,
-      h('div', { class: 'btns' },
-        h('button', { class: 'btn pit-btn', 'data-pit': rec.id, onclick: () => this.openPit(rec.id) }, h('span', { class: 'stack' }, 'Pit Setup', h('small', {}, 'fit, then race'))),
-        h('button', { class: `btn primary race-live${q && q.eventId === rec.id ? ' off' : ''}`, 'data-coach': 'race-live', onclick: () => this.startLive(rec.id) },
-          h('span', { class: 'stack' }, 'Race live', h('small', {}, `you drive · full purse · ${nitroNote}`)))),
       quickPart(rec, false),
-      details(rec),
-      q?.eventId === rec.id ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null);
+      details(rec)));
 
     // A second choice beside the recommendation: a different route with its own reward.
     const alts = P.alternatives(s, rec);
@@ -194,7 +234,8 @@ export class RaceView implements View {
       ...alts.map(({ e }) => h('div', { class: 'alt' }, h('div', { class: 'grow' }, h('b', {}, e.name), ' ', diffTag(e), h('div', { class: 'd' }, reasonFor(e))),
         h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'),
         h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
-    const out: HTMLElement[] = altBox ? [featured, altBox] : [featured];
+    const comp = competitionStrip(s, (id) => this.jumpToEvent(id));
+    const out: HTMLElement[] = [...(comp ? [comp] : []), featured, ...(altBox ? [altBox] : [])];
     const jobs = jobBoardSection(this.app); // Job Board: short jobs, right under the races they ask for
     if (jobs) { jobs.dataset.jump = 'jobs'; out.push(jobs); }
     const runs = rivalRunsSection(this.app, (id, car) => this.startRivalRun(id, car));
@@ -269,6 +310,17 @@ export class RaceView implements View {
     this.list.replaceChildren(...out);
     this.list.scrollTop = scroll;
     this.renderJump(s);
+  }
+
+  /** Scroll to an event's row (opening its district) and flash it. */
+  jumpToEvent(id: string) {
+    const btn = this.list.querySelector<HTMLElement>(`[data-pit="${id}"]`);
+    const row = btn?.closest<HTMLElement>('.evt-row, .featured, .alt');
+    if (!row) return;
+    const sec = row.closest('details');
+    if (sec) (sec as HTMLDetailsElement).open = true;
+    row.scrollIntoView({ block: 'center', behavior: this.app.game.state.settings.reducedMotion ? 'auto' : 'smooth' });
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
   }
 
   /** Pit Setup for an event: fit the car that will race it, then start (or come back here after a merge/order). */

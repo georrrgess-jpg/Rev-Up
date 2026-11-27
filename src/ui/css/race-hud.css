@@ -92,3 +92,26 @@
 .racescreen .hud .row1 > div:first-child { min-width: 0; flex: 1 1 auto; }
 .racescreen .hud .stand { max-width: min(62vw, 260px); }
 .racescreen .hud .stand > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- 1.9 Circuit: race start curtain, ghost delta, launch control, the result card's ghost / earned / why rows ---- */
+.racescreen .race-curtain { position: absolute; inset: 0; background: #05060a; pointer-events: none; z-index: 5; animation: rs-curtain .55s ease-out .05s forwards; }
+@keyframes rs-curtain { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .racescreen .race-curtain { animation-duration: .15s; } }
+.racescreen .ghostdelta { margin-top: 2px; text-align: right; font-size: var(--fs-sm); font-weight: var(--w-heavy); color: #bfefff; text-shadow: 0 1px 2px rgba(0,0,0,.7); min-height: 1.2em; }
+.racescreen .ghostdelta:empty { display: none; }
+.racescreen .ghostdelta.ahead { color: #5dff8a; }
+.racescreen .ghostdelta.behind { color: #ff9b8e; }
+.racescreen .prog .dot.ghost { background: rgba(191,239,255,.85); border: 1px dashed #4fb8d8; opacity: .9; }
+.shiftbtn.launch { border-color: #5ef2ff; background: linear-gradient(180deg, #1d3f4a, #0d1f26); color: #c9fbff; }
+.shiftbtn.launch.soon { border-color: #ffc457; }
+.shiftbtn.launch.green { background: linear-gradient(180deg, #5ef2ff, #1689a3); color: #03222a; border-color: #e6feff; }
+.race-flash.on.volt { background: radial-gradient(circle at 30% 70%, rgba(94,242,255,.45), transparent 60%); }
+.result .ghost-row, .result .cx-earned { font-size: var(--fs-sm); padding: 4px 0; }
+.result .ghost-row.ahead .num { color: #2f9e5a; }
+.result .ghost-row.behind .num { color: #c0392b; }
+.result .cx-earned b { color: #1f8f47; }
+.result .cx-why { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(127,127,127,.12); font-size: var(--fs-sm); }
+.result .cx-why.close { box-shadow: inset 3px 0 0 #f2a33a; }
+.result .cx-why .cx-head { display: block; margin-bottom: 2px; }
+.result .cx-why ul { margin: 2px 0 4px 18px; padding: 0; }
+.result .cx-why .cx-tip { margin: 2px 0 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

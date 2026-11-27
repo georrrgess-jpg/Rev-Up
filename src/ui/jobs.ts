@@ -178,7 +178,7 @@ export class JobsPill {
     this.bar.style.width = `${Math.round(L.frac * 100)}%`;
     this.el.setAttribute('aria-label', `Job Board: ${open.length} of ${j.slots.length} jobs open${ready ? `, ${ready} ready to deliver` : ''}. Garage Level ${L.level}. Tap to open.`);
   }
-  pulse() { this.el.classList.remove('jp-hit'); void this.el.offsetWidth; this.el.classList.add('jp-hit'); }
+  pulse() { this.el.classList.remove('jp-hit'); requestAnimationFrame(() => this.el.classList.add('jp-hit')); }
 }
 
 /** For the race result: the jobs this race finished (paid already), and how close the rest are. */

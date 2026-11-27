@@ -2,6 +2,7 @@ import {
   ACTIVE_FAMILIES, BOARD_EXPANDED, FAMILIES, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
   Family, MAX_TIER, MERGE_ALL_NITRO_MIN_CHAIN, MERGE_CASH, QUALITY_ODDS, Quality, SCRAP_VALUE, PART_ORDER_PRICE, nitroCapFor, carById, ENABLED_CARS,
   TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST, polishCost, scrapOrderCost,
+  AUTO_SHELF_RANK, BATCH_MERGE_RANK, CHAIN_BENCH_RANK, ORDER_DISCOUNT, POLISHED_ORDER_MUL, POLISHED_ORDER_RANK, SHELF_SLOTS, roundCash,
 } from '../data/tables';
 import { nextRandom, pickWeighted } from './rng';
 import type { Crate, GameState, Part } from './state';
@@ -196,15 +197,18 @@ export function mergePreview(s: GameState, from: SlotRef, to: SlotRef): { family
 // ---------------- Merge All ----------------
 
 /** Deterministic batch merge with normal fusion rules. Nitro: one charge if the longest chain ≥ threshold. */
-export function mergeAll(s: GameState): GameEvent[] {
+export function mergeAll(s: GameState, only?: Family): GameEvent[] {
   const events: GameEvent[] = [];
   let longest = 0;
   let fusions = 0;
+  let longChains = 0; // 1.9 Chain bench: chains of the nitro length
   let found = true;
+  // 1.9 Batch merge (Bench rank 2): one family only
+  const fams = only && (s.upgrades.grid ?? 0) >= BATCH_MERGE_RANK ? [only] : ACTIVE_FAMILIES;
   while (found) {
     found = false;
     outer: for (let t = 1; t < MAX_TIER; t++) {
-      for (const f of ACTIVE_FAMILIES) {
+      for (const f of fams) {
         const refs: SlotRef[] = [];
         s.board.forEach((p, i) => { if (p && p.f === f && p.t === t) refs.push({ zone: 'board', i }); });
         s.tray.forEach((p, i) => { if (p && p.f === f && p.t === t) refs.push({ zone: 'tray', i }); });
@@ -213,6 +217,7 @@ export function mergeAll(s: GameState): GameEvent[] {
           const chain = fuseChain(s, refs[1], refs[0], events);
           fusions += chain;
           longest = Math.max(longest, chain);
+          if (chain >= MERGE_ALL_NITRO_MIN_CHAIN) longChains++;
           found = true;
           break outer; // re-scan from the lowest tier after each chain
         }
@@ -221,11 +226,12 @@ export function mergeAll(s: GameState): GameEvent[] {
   }
   if (fusions > 0) {
     s.mergeAllUses++;
-    if (longest >= MERGE_ALL_NITRO_MIN_CHAIN) {
+    const bank = Math.min(longChains, (s.upgrades.grid ?? 0) >= CHAIN_BENCH_RANK ? 2 : 1); // 1.9 Chain bench: up to 2
+    for (let k = 0; k < bank; k++) {
       if (s.nitro < nitroCapFor(s.upgrades.nitroTank)) {
         s.nitro++;
         events.push({ type: 'nitro', total: s.nitro, source: 'mergeAll' });
-      } else events.push({ type: 'nitroFull' });
+      } else { events.push({ type: 'nitroFull' }); break; }
     }
   }
   events.push({ type: 'mergeAll', fusions, longest });
@@ -262,10 +268,10 @@ export function crateContents(s: GameState, c: Crate): { f: Family; t: number } 
   return { f, t: Math.min(t, MAX_TIER) };
 }
 
-export function placeNew(s: GameState, f: Family, t: number, source: string, events: GameEvent[]): boolean {
+export function placeNew(s: GameState, f: Family, t: number, source: string, events: GameEvent[], q: Quality = 'std'): boolean {
   const at = firstFree(s);
   if (!at) return false;
-  setPart(s, at, { id: s.nextPartId++, f, t, q: 'std' });
+  setPart(s, at, { id: s.nextPartId++, f, t, q });
   events.push({ type: 'place', at, family: f, tier: t, source });
   return true;
 }
@@ -276,12 +282,23 @@ export function openCrates(s: GameState, max = Infinity): GameEvent[] {
   let opened = 0;
   while (s.crates.length > 0 && opened < max) {
     if (!firstFree(s)) {
+      // 1.9 overflow auto-shelving (Storage rank 2): a reward part (an order, a stage payout, a race prize) that finds
+      // no room on the bench or rack goes onto the Parts Shelf. Printer and starter crates keep waiting.
+      const c0 = s.crates[0];
+      if (autoShelfOn(s) && shelfFree(s) > 0 && c0.source !== 'printer' && c0.source !== 'starter') {
+        const c = s.crates.shift()!;
+        const { f, t } = crateContents(s, c);
+        const p: Part = { id: s.nextPartId++, f, t, q: c.q ?? 'std' };
+        (s.shelf ??= []).push(p);
+        opened++;
+        continue;
+      }
       events.push({ type: 'crateBlocked' });
       break;
     }
     const c = s.crates.shift()!;
     const { f, t } = crateContents(s, c);
-    placeNew(s, f, t, c.source, events);
+    placeNew(s, f, t, c.source, events, c.q);
     opened++;
   }
   return events;
@@ -399,21 +416,42 @@ export function buyCrate(s: GameState, kind: 'std' | 'targeted' | 'cash', family
 export function orderMaxTier(s: GameState): number {
   const cap = Math.max(...s.owned.map((id) => carById(id).cap));
   // the next car's keystone craft is always reachable: two bought parts of the tier below make it
-  const next = ENABLED_CARS.find((c) => !s.owned.includes(c.id));
-  const goalTier = next?.unlock ? next.unlock.tier : 0;
+  // every car you can chase now (two at a branch), so the keystone of either is reachable
+  const goalTier = Math.max(0, ...ENABLED_CARS.filter((c) => c.unlock && !s.owned.includes(c.id) && s.owned.includes(c.unlock.after ?? ENABLED_CARS[ENABLED_CARS.indexOf(c) - 1]?.id)).map((c) => c.unlock!.tier));
   return Math.max(1, Math.min(Math.max(cap, goalTier) - 1, MAX_TIER - 1));
 }
 
-/** Order a Part: a known family and tier for cash. It goes straight onto the bench, or first in the crate queue. */
-export function orderPart(s: GameState, family: Family, tier: number): GameEvent[] {
-  if (tier < 1 || tier > orderMaxTier(s)) return [{ type: 'invalid', reason: `T${tier} parts aren't sold yet` }];
-  const price = PART_ORDER_PRICE[tier];
+/** The cash price of an order now: the list price less the Workshop discount, ×1.5 for a Polished order, on a cash
+ *  step. The preview and the charge both read this. */
+export function orderPrice(s: GameState, tier: number, polished = false): number {
+  const list = PART_ORDER_PRICE[tier] ?? 0;
+  const lvl = s.upgrades.workshop ?? 0;
+  const disc = ORDER_DISCOUNT[Math.min(lvl, ORDER_DISCOUNT.length - 1)] ?? 0;
+  return roundCash(list * (1 - disc) * (polished ? POLISHED_ORDER_MUL : 1));
+}
+export const polishedOrdersOpen = (s: GameState) => (s.upgrades.workshop ?? 0) >= POLISHED_ORDER_RANK;
+
+/** Order a Part: a known family and tier for cash. It goes straight onto the bench, or first in the crate queue
+ *  (or onto the shelf with overflow auto-shelving). `polished` (Workshop rank 2) delivers it Polished. */
+export function orderPart(s: GameState, family: Family, tier: number, polished = false): GameEvent[] {
+  if (!ACTIVE_FAMILIES.includes(family)) return [{ type: 'invalid', reason: 'Pick a family' }];
+  if (!Number.isInteger(tier) || tier < 1 || tier > orderMaxTier(s)) return [{ type: 'invalid', reason: `T${tier} parts aren't sold yet` }];
+  if (polished && !polishedOrdersOpen(s)) return [{ type: 'invalid', reason: 'Polished orders open with the Workshop counter rank 2' }];
+  const price = orderPrice(s, tier, polished);
   if (s.cash < price) return [{ type: 'invalid', reason: `Need $${price - s.cash} more` }];
   s.cash -= price;
   s.stats.spent = (s.stats.spent ?? 0) + price;
-  s.crates.unshift({ kind: 'targeted', family, tier, source: 'shop' });
+  s.crates.unshift({ kind: 'targeted', family, tier, source: 'shop', ...(polished ? { q: 'polished' as const } : {}) });
   return openCrates(s, 1);
 }
+
+// ---------------- Parts Shelf (1.9; the moves and surplus uses live in core/shelf.ts) ----------------
+
+/** Shelf slots now, by Storage rank. */
+export const shelfCap = (s: GameState) => SHELF_SLOTS[Math.min(s.upgrades.storage ?? 0, SHELF_SLOTS.length - 1)];
+export const shelfParts = (s: GameState): Part[] => (s.shelf ?? []).filter((p): p is Part => !!p);
+export const shelfFree = (s: GameState) => Math.max(0, shelfCap(s) - shelfParts(s).length);
+export const autoShelfOn = (s: GameState) => (s.upgrades.storage ?? 0) >= AUTO_SHELF_RANK;
 
 /** Expand 5×6 → 6×7, keeping each part at its row/column. */
 export function expandBoard(s: GameState) {

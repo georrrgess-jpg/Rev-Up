@@ -37,6 +37,8 @@ export interface Crate {
   family?: Family;
   tier?: number;
   source: 'starter' | 'printer' | 'race' | 'firstClear' | 'boss' | 'shop' | 'catchup';
+  /** 1.9 Quality orders: the part arrives with this quality (Polished). */
+  q?: Quality;
 }
 
 export interface EventRecord {
@@ -48,6 +50,8 @@ export interface EventRecord {
   bestSpeed?: number;
   /** Speed trap record, mph. */
   bestMph?: number;
+  /** 1.9 live podiums (top 3) here; a car's unlock race also counts after progression.PERSIST_PODIUMS of them. */
+  podiums?: number;
 }
 
 export interface LastResult {
@@ -125,7 +129,9 @@ export interface GameState {
   nitro: number;
   combo: { count: number; lastAt: number };
   crafted: string[]; // keystone ledger entries "family:tier"
-  upgrades: { grid: number; printer: number; crateTier: number; nitroTank: number; crew: number; lockup: number };
+  upgrades: { grid: number; printer: number; crateTier: number; nitroTank: number; crew: number; lockup: number;
+    /** 1.9 Garage paths: Parts Shelf storage and the Workshop counter (0 in older saves, filled on load). */
+    storage: number; workshop: number };
   printerS: number; // progress toward next crate in seconds
   owned: CarId[];
   activeCar: CarId;
@@ -179,6 +185,8 @@ export interface GameState {
   goalPick?: string | null;
   /** 1.9 Car unlock stages already paid (key `${car}:${stage}`). */
   stagesPaid?: string[];
+  /** 1.9 Parts contributed toward the next rank of a Garage upgrade: cash credit by upgrade id (core/shelf.ts). */
+  upgradeCredit?: Partial<Record<string, number>>;
   /** 1.9 Time trials: personal-best ghost per event (compact samples of distance over time). */
   ghosts?: Record<string, { t: number; car: CarId; d: number[] }>;
   // ---- end Scrap & surplus
@@ -217,7 +225,7 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     nitro: 0,
     combo: { count: 0, lastAt: -1e12 },
     crafted: [],
-    upgrades: { grid: 0, printer: 0, crateTier: 0, nitroTank: 0, crew: 0, lockup: 0 },
+    upgrades: { grid: 0, printer: 0, crateTier: 0, nitroTank: 0, crew: 0, lockup: 0, storage: 0, workshop: 0 },
     printerS: 0,
     owned: ['junker'],
     activeCar: 'junker',
@@ -298,6 +306,7 @@ export function validateState(s: unknown): string[] {
   if (!Array.isArray(g.livePodiums) || !Array.isArray(g.owned) || g.livePodiums.some((id) => !g.owned.includes(id))) errs.push('car podiums');
   if (!g.offline || !isNum(g.offline.lastSeenAt) || !isNum(g.offline.pendingCash)) errs.push('offline');
   if (g.favorites !== undefined && (!Array.isArray(g.favorites) || !g.favorites.every(isNum))) errs.push('favorites');
+  if (g.shelf !== undefined && (!Array.isArray(g.shelf) || !g.shelf.every(isPart))) errs.push('shelf'); // 1.9 Parts Shelf
   if (!g.settings || typeof g.settings.muted !== 'boolean') errs.push('settings');
   if (!g.upgrades || !isNum(g.upgrades.grid)) errs.push('upgrades');
   if (!g.events || typeof g.events !== 'object') errs.push('events');
@@ -306,11 +315,37 @@ export function validateState(s: unknown): string[] {
   // unique part ids
   if (Array.isArray(g.board) && Array.isArray(g.tray)) {
     const fittedIds = Object.values(g.installed ?? {}).flatMap((sl) => Object.values(sl ?? {}).filter(Boolean).map((p) => (p as Part).id));
-    const ids = [...[...g.board, ...g.tray].filter(Boolean).map((p) => (p as Part).id), ...fittedIds];
+    const shelfIds = (Array.isArray(g.shelf) ? g.shelf : []).filter(Boolean).map((p) => (p as Part).id); // 1.9 Parts Shelf
+    const ids = [...[...g.board, ...g.tray].filter(Boolean).map((p) => (p as Part).id), ...fittedIds, ...shelfIds];
     if (new Set(ids).size !== ids.length) errs.push('duplicate part ids');
     if (isNum(g.nextPartId) && ids.some((id) => id >= g.nextPartId)) errs.push('part id counter');
   }
   return errs;
+}
+
+/** 1.9 Circuit fields: optional, cleaned on load. The shelf keeps every well-formed part (never trimmed to the current
+ *  capacity, so nothing is lost); a part id already used elsewhere (board, rack, a car) is dropped from the shelf. */
+function sanitizeCircuit(m: GameState, g: Partial<GameState>) {
+  const used = new Set([...m.board, ...m.tray].filter(Boolean).map((p) => (p as Part).id));
+  for (const sl of Object.values(m.installed ?? {})) for (const p of Object.values(sl ?? {})) if (p) used.add((p as Part).id);
+  if (Array.isArray(g.shelf)) {
+    const shelf: Part[] = [];
+    for (const p of g.shelf) {
+      if (!p || !isPart(p) || used.has(p.id)) continue;
+      used.add(p.id);
+      shelf.push({ id: p.id, f: p.f, t: p.t, q: p.q });
+    }
+    m.shelf = shelf;
+    if (shelf.length && shelf.some((p) => p.id >= m.nextPartId)) m.nextPartId = Math.max(...shelf.map((p) => p.id)) + 1;
+  } else delete m.shelf;
+  if (typeof g.goalPick === 'string' && g.goalPick.length < 64) m.goalPick = g.goalPick; else delete m.goalPick;
+  if (Array.isArray(g.stagesPaid)) m.stagesPaid = [...new Set(g.stagesPaid.filter((k) => typeof k === 'string' && k.length < 64))];
+  else delete m.stagesPaid;
+  if (g.upgradeCredit && typeof g.upgradeCredit === 'object' && !Array.isArray(g.upgradeCredit)) {
+    const c: Record<string, number> = {};
+    for (const [k, v] of Object.entries(g.upgradeCredit)) if (isNum(v) && v > 0) c[k] = Math.floor(v);
+    m.upgradeCredit = c;
+  } else delete m.upgradeCredit;
 }
 
 /** Migrate older save shapes forward. Returns null when the save cannot be used. */
@@ -339,6 +374,7 @@ export function migrate(raw: unknown): GameState | null {
   // ---- Job Board: keep an object (core/jobs.readJobs repairs each field), drop anything else
   if (!g.jobs || typeof g.jobs !== 'object' || Array.isArray(g.jobs)) delete merged.jobs;
   sanitizeSurplus(merged); // ---- Scrap & surplus: well-formed builds and kits, or none
+  sanitizeCircuit(merged, g); // ---- 1.9 Circuit: shelf, goal pick, paid stages, upgrade credit
   if (fromV1) { merged.v = SAVE_VERSION; installLegacyLoadout(merged); }
   return validateState(merged).length === 0 ? merged : null;
 }

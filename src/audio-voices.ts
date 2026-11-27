@@ -84,6 +84,17 @@ export const ENGINES: Record<string, EngineSpec> = {
   // Sovereign: the flagship V12 hybrid, smooth and refined, with a low motor hum under it
   sovereign: { layout: 'V12 hybrid flagship', cyl: 12, tilt: 0.65, odd: 0.1, sub: 0.04, subRatio: 0.5, lope: 0, lopeRatio: 0.25,
     cut: [980, 4800], q: 0.9, formants: [[400, 4, 1], [1900, 5, 1.5]], drive: 1.6, rasp: 0.15, raspHz: 2600, whine: 0.35, whineRatio: 5.1, gain: 1.24 },
+  // Ardent Spyder: a screaming, naturally aspirated high-revving four right behind your head — raw intake howl,
+  // a hard cam change-over near the top and a few crackles on the lift
+  ardent: { layout: 'I4 high-rev, open intake', cyl: 4, tilt: 0.48, odd: 0.55, sub: 0.04, subRatio: 0.5, lope: 0.04, lopeRatio: 0.25,
+    cut: [1100, 4600], q: 2.2, formants: [[900, 6, 2.5], [3400, 6, 3]], drive: 2.9, rasp: 0.5, raspHz: 3600, vtec: 0.72, crackle: 0.25, gain: 1.12 },
+  // Meridian LT: a smooth long-legged V12 cruiser — even, silky, barely any burble, opening out up top
+  meridian: { layout: 'V12 long-tail cruiser', cyl: 12, tilt: 0.75, odd: 0.05, sub: 0.06, subRatio: 0.5, lope: 0, lopeRatio: 0.25,
+    cut: [880, 4200], q: 0.8, formants: [[330, 4, 1], [1600, 4, 1.4]], drive: 1.4, rasp: 0.12, raspHz: 2200, gain: 1.2 },
+  // Tempest E4: four electric motors — a clean, nearly pure motor tone (no idle burble, no lope, no crackle), a
+  // rising motor whine over it and a high inverter whistle that comes in with load
+  tempest: { layout: 'Four electric motors', cyl: 4, tilt: 1.4, odd: 0, sub: 0, subRatio: 0.5, lope: 0, lopeRatio: 0.25,
+    cut: [1400, 6500], q: 0.7, formants: [[1200, 3, 1.2]], drive: 0.6, rasp: 0.06, raspHz: 5200, turbo: 0.35, turboHz: [6200, 9400], whine: 0.95, whineRatio: 6.2, gain: 1.15 },
 };
 
 export const engineFor = (car: string): EngineSpec => ENGINES[car] ?? ENGINES.beater;

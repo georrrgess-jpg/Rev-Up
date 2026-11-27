@@ -13,6 +13,8 @@ import * as RR from '../core/rivalRuns';
 import type { RaceView } from './raceMenu';
 import { openRivalBrief } from './rivalRuns';
 import { jobsResultBlock } from './jobs';
+import { currentGoal, explainFinish, hintFor, type GoalAction } from './contracts';
+import { runGoalAction } from './goalCard';
 
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
@@ -62,39 +64,73 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
   const fs = fitStatus(s);
   const canFit = fs.empty.length > 0 || fs.better.length > 0;
 
+  // ---- one compact reward block: every reward as a chip, the explanations behind one tap
+  const chips: HTMLElement[] = [...pills];
+  const notes: (HTMLElement | null)[] = [];
+  if (r.boss && ev.boss) {
+    chips.unshift(h('span', { class: 'chip boss' }, `${RIVALS[ev.boss.rival].name} beaten`));
+    notes.push(h('p', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ({ ray: ' The Suburbs are open.', vale: ' The coast road is yours.', nova: ' Downtown is yours.', sable: ' The canyon is yours.', iver: ' The summit is yours — the whole ladder is beaten.' } as Record<string, string>)[ev.boss.rival] ?? '', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`));
+  }
+  if (r.newMedals?.length) {
+    chips.push(h('span', { class: 'chip medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')}`));
+    notes.push(h('p', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal: ${r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ')}, paid once.`));
+  }
+  if (r.newStars?.length) {
+    chips.push(h('span', { class: 'chip star' }, `★ ${r.newStars.length} goal${r.newStars.length > 1 ? 's' : ''}`));
+    notes.push(h('p', {}, `New goals: ${r.newStars.join(', ')} · ${P.starsIn(s, ev.district)} ${DISTRICTS[ev.district].name} star${P.starsIn(s, ev.district) === 1 ? '' : 's'}.`));
+  }
+  if (r.trophy) { chips.push(h('span', { class: 'chip trophy' }, `🏆 ${r.trophy}`)); notes.push(h('p', {}, 'Class trophy added to the Showroom.')); }
+  if (r.earnedStyle?.length) {
+    chips.push(h('span', { class: 'chip style' }, `🎨 ${r.earnedStyle.map((id) => styleItem(id)?.name ?? id).join(', ')}`));
+    notes.push(h('p', {}, 'Earned style: apply it in the Showroom Paint shop.'));
+  }
+  if (finish) { chips.push(h('span', { class: 'chip style' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), finish.name)); notes.push(h('p', {}, `${finish.name}: signature finish unlocked in the Showroom.`)); }
+  if (ev.id === 'foundry-final' && r.firstClear) chips.push(h('span', { class: 'chip trophy' }, 'Campaign finale won'));
+  if (r.nextMedal) notes.push(h('p', {}, (r.trapMph ?? r.trapKmh) ? `${r.nextMedal.name} at ${r.nextMedal.target} mph — ${Math.max(0, Math.round(r.nextMedal.gap))} mph to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`));
+  if (r.breakdown && r.breakdown.length > 1) notes.push(h('div', { class: 'breakdown', 'aria-label': 'Cash breakdown' },
+    ...r.breakdown.map((b) => h('div', { class: `bd ${b.kind}` }, h('span', {}, b.label), h('span', { class: 'num' }, `+$${b.cash}`)))));
+  if (r.firstClear) notes.push(h('p', { class: 'quick-open' }, 'Quick Race is now open for this event: your crew can race it while you merge.'));
+  if (other.length) notes.push(h('div', { class: 'still-needed' }, h('small', {}, `Also needed for the ${g!.car.model}`), ...other.map((t) => h('div', {}, t))));
+  if (s.stats.races <= 2) notes.push(h('p', {}, 'Cash is spending money for the Shop. Rep is never spent: it builds up and opens new races and cars.'));
+  const realNotes = notes.filter((x): x is HTMLElement => !!x);
+  const rewards = h('div', { class: 'rewards' },
+    h('div', { class: 'pays' }, ...chips),
+    repBlock,
+    realNotes.length ? h('details', { class: 'reward-more' }, h('summary', {}, 'Reward details'), ...realNotes) : null);
+
+  // ---- why it went that way, and the one next step (Racing's explanation when available, else the advice)
+  const why = explainFinish(r);
+  let next: { label: string; sub?: string; run: () => void } | null = null;
+  const close = () => o.onClose();
+  if (s.pendingReveal) next = { label: 'Reveal car', sub: carById(s.pendingReveal).model, run: close };
+  else if (why?.suggestion.action) { const a = why.suggestion.action; next = { label: a.label, run: () => { close(); runGoalAction(app, a); } }; }
+  else if (canFit) next = { label: 'Fit parts', sub: fs.empty.length ? `${fs.empty.length} empty slot${fs.empty.length > 1 ? 's' : ''}` : `better ${fs.better.map((f) => FAMILIES[f].name).join(' and ')} waiting`, run: () => { close(); openFitParts(app); } };
+  else {
+    const goal = currentGoal(s);
+    const a: GoalAction | undefined = goal?.action;
+    if (goal && a && !(a.kind === 'race' && a.eventId === r.eventId)) next = { label: a.label, sub: goal.missing, run: () => { close(); runGoalAction(app, a); } };
+  }
+  // the race screen's own coach line already says what to try: no second copy of it
+  const coached = !why && !s.pendingReveal && !!o.extras?.some((x) => x.classList.contains('race-coach') || !!x.querySelector?.('.race-coach'));
+  const advice = why ? why.suggestion.text : s.pendingReveal ? nextText : r.advice || hintFor(s, 'results')?.text || nextText;
+
   const card = h('div', { class: `card${tierCls}`, role: 'dialog', 'aria-label': 'Race result' },
     h('div', { class: `place${r.place === 1 ? ' p1' : ''}` }, ev.speedTrap ? (r.medal ? `${MEDAL_NAMES[r.medal]} run` : 'Run complete') : ev.timeAttack ? (r.medal ? `${MEDAL_NAMES[r.medal]} time` : 'Run complete') : r.place === 1 ? 'You won!' : `${ordinal(r.place)} place`),
-    h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
-    r.boss && ev.boss ? h('div', { class: 'boss' }, h('b', {}, `${RIVALS[ev.boss.rival].name} is beaten.`), ({ ray: ' The Suburbs are open.', vale: ' The coast road is yours.', nova: ' Downtown is yours.', sable: ' The canyon is yours.', iver: ' The summit is yours — the whole ladder is beaten.' } as Record<string, string>)[ev.boss.rival] ?? '', ` Signature blueprint: ${ev.boss.reward.blueprint} paint (apply it in the Showroom) and the “${ev.boss.reward.badge}” badge.`) : null,
-    r.newMedals?.length ? h('div', { class: 'finish-earned medal' }, h('span', { class: `medal-ico m${r.newMedals[r.newMedals.length - 1]}`, 'aria-hidden': 'true' }), h('div', {}, h('strong', {}, `${r.newMedals.map((m) => MEDAL_NAMES[m]).join(' + ')} medal`), h('div', {}, r.newMedals.map((m) => `+$${MEDAL_REWARDS[MEDAL_KEYS[m] as 'gold'].cash}`).join(' · ') + ' · paid once'))) : null,
-    r.nextMedal ? h('p', { class: 'explain' }, (r.trapMph ?? r.trapKmh) ? `${r.nextMedal.name} at ${r.nextMedal.target} mph — ${Math.max(0, Math.round(r.nextMedal.gap))} mph to find.` : `${r.nextMedal.name} at ${r.nextMedal.target.toFixed(2)} s${r.time ? ` — ${Math.max(0, r.nextMedal.gap).toFixed(2)} s to find` : ''}.`) : null,
-    r.newStars?.length ? h('div', { class: 'finish-earned stars-earned' }, h('span', { class: 'star-ico', 'aria-hidden': 'true' }, '★'), h('div', {}, h('strong', {}, `${r.newStars.length} new goal${r.newStars.length > 1 ? 's' : ''}: ${r.newStars.join(', ')}`), h('div', {}, `${P.starsIn(s, ev.district)} ${DISTRICTS[ev.district].name} star${P.starsIn(s, ev.district) === 1 ? '' : 's'}`))) : null,
+    h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, why?.headline ?? r.gapText), h('span', { class: 'gap-sub' }, `${ev.name}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}${why?.headline ? ` · ${r.gapText}` : ''}`)),
     (r.trapMph ?? r.trapKmh) ? h('div', { class: 'trap' }, h('span', { class: 'num' }, `${r.trapMph ?? Math.round((r.trapKmh ?? 0) / 1.609344)}`), h('small', {}, 'mph through the gate')) : null,
-    r.earnedStyle?.length ? h('div', { class: 'finish-earned' }, h('span', { 'aria-hidden': 'true' }, '🎨'), h('div', {}, h('strong', {}, r.earnedStyle.map((id) => styleItem(id)?.name ?? id).join(', ')), h('div', {}, 'Earned — apply it in the Showroom Paint shop'))) : null,
     r.heat ? h('div', { class: `heat-result${r.heat.champion ? ' champ' : r.heat.advanced ? ' through' : ' out'}` },
       r.heat.champion ? `Main Event champion!` : r.heat.advanced ? `Through! Next: ${r.heat.next}` : `Knocked out in ${r.heat.name}. Change cars, build, and start again from heat 1.`) : null,
-    r.trophy ? h('div', { class: 'finish-earned' }, h('span', { class: 'trophy-ico', 'aria-hidden': 'true' }, '🏆'), h('div', {}, h('strong', {}, r.trophy), h('div', {}, 'Class trophy added to the Showroom'))) : null,
-    h('div', { class: 'pays' }, ...pills),
-    r.breakdown && r.breakdown.length > 1 ? h('div', { class: 'breakdown', 'aria-label': 'Cash breakdown' },
-      ...r.breakdown.map((b) => h('div', { class: `bd ${b.kind}` }, h('span', {}, b.label), h('span', { class: 'num' }, `+$${b.cash}`)))) : null,
-    repBlock,
-    jobsResultBlock(app, r.raceId),
-    other.length ? h('div', { class: 'still-needed' }, h('small', {}, `Also needed for the ${g!.car.model}`), ...other.map((t) => h('div', {}, t))) : null,
-    s.stats.races <= 2 ? h('p', { class: 'explain' }, 'Cash is spending money for the Shop. Rep is never spent: it builds up and opens new races and cars.') : null,
-    finish ? h('div', { class: 'finish-earned' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), h('div', {}, h('strong', {}, finish.name), h('div', {}, 'Signature finish unlocked in the Showroom'))) : null,
-    ev.id === 'foundry-final' && r.firstClear ? h('div', { class: 'finish-earned' }, 'Campaign finale won') : null,
-    o.extras?.length ? h('div', { class: 'extras' }, ...o.extras) : null,
-    h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),
-    h('button', { class: 'next', onclick: () => { o.onClose(); if (!s.pendingReveal) app.go('garage'); } }, h('small', {}, nextLabel), nextText,
-      g && !s.pendingReveal ? h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(g.progress * 100)}%` })) : null),
-    r.firstClear ? h('p', { class: 'pay quick-open' }, 'Quick Race is now open for this event: your crew can race it while you merge.') : null,
-    canFit && !s.pendingReveal ? h('button', { class: 'btn wide fit-cta', onclick: () => { o.onClose(); openFitParts(app); } },
-      fs.empty.length ? `Fit parts · ${fs.empty.length} empty slot${fs.empty.length > 1 ? 's' : ''}` : `Fit parts · better ${fs.better.map((f) => FAMILIES[f].name).join(' and ')} on your bench`) : null,
+    rewards,
+    // the next step and the buttons right under the rewards, so they are in reach without scrolling
+    coached ? null : h('div', { class: 'next' }, h('small', {}, nextLabel), advice),
+    next ? h('button', { class: 'btn primary wide next-act', onclick: next.run }, h('span', { class: 'stack' }, next.label, next.sub ? h('small', {}, next.sub) : null)) : null,
     h('div', { class: 'btns' },
-      s.pendingReveal
-        ? h('button', { class: 'btn primary', onclick: () => o.onClose() }, 'Reveal car')
-        : h('button', { class: 'btn primary', onclick: () => { o.onClose(); app.go('garage'); } }, 'Back to Garage'),
+      s.pendingReveal ? null : h('button', { class: `btn${next ? '' : ' primary'}`, onclick: () => { close(); app.go('garage'); } }, 'Back to Garage'),
       !s.pendingReveal ? h('button', { class: 'btn', onclick: () => o.onRetry(r.eventId) }, 'Race again') : null),
+    why?.reasons.length ? h('ul', { class: 'why-list' }, ...why.reasons.slice(0, 3).map((t) => h('li', {}, t))) : null,
+    o.extras?.length ? h('div', { class: 'extras' }, ...o.extras) : null,
+    jobsResultBlock(app, r.raceId),
+    h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),
   );
   return card;
 }

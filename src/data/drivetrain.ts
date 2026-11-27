@@ -72,13 +72,19 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Sovereign: the long-legged flagship V12 hybrid: six tall gears that each pull for a long time (fewer shifts, each
   // one worth more), the highest top speed in the game and the biggest speedometer.
   sovereign: { gears: [0.33, 0.5, 0.66, 0.81, 0.95, 1.3], idle: 900, redline: 8800, band: [0.8, 0.96], shiftS: 0.018, gaugeMph: 290, topScale: 1.34, accelScale: 0.95, pullExp: 2.7 },
-  // 1.9 Circuit supercars (placeholders; the Racing agent tunes gearing, Progression tunes topScale/accelScale).
-  // Ardent Spyder: a featherweight open-top track car; short gears, a screaming four, the best grip-to-weight.
-  ardent: { gears: [0.34, 0.5, 0.65, 0.8, 0.94, 1.3], idle: 1200, redline: 9800, band: [0.84, 0.97], shiftS: 0.022, gaugeMph: 220, topScale: 1.12, accelScale: 1.0, pullExp: 2.4 },
-  // Meridian LT: a long-tail highway missile; tall gears, the best top end for its tier.
-  meridian: { gears: [0.3, 0.46, 0.61, 0.76, 0.9, 1.3], idle: 850, redline: 8200, band: [0.8, 0.96], shiftS: 0.02, gaugeMph: 280, topScale: 1.38, accelScale: 0.8, pullExp: 2.8 },
-  // Tempest E4: quad-motor electric flagship; a violent launch, a three-speed box (two shifts), silent top end.
-  tempest: { gears: [0.42, 0.72, 1.3], idle: 600, redline: 14000, band: [0.82, 0.97], shiftS: 0.015, gaugeMph: 300, topScale: 1.4, accelScale: 0.9, pullExp: 2.6 },
+  // 1.9 Circuit supercars (gearing: the Racing workstream; Progression may tune only topScale / accelScale).
+  // Ardent Spyder: a featherweight track car with a screaming naturally aspirated four. Six short, close gears and a
+  // 10,200 rpm redline: the needle flies and a shift comes every second or so. Peaky (it bogs if you short-shift:
+  // lowPull 0.66), the quickest box on a miss after the Vireo, and light enough to keep pulling hard to its top.
+  ardent: { gears: [0.3, 0.43, 0.56, 0.69, 0.83, 1.26], idle: 1300, redline: 10200, band: [0.86, 0.975], windowS: 0.45, shiftS: 0.016, autoS: 0.32, lowPull: 0.66, gaugeMph: 220, topScale: 1.12, accelScale: 1.0, pullExp: 2.3 },
+  // Meridian LT: a long-tail highway car with a big-torque V8. Five tall gears (first runs to over 90 mph), a low
+  // redline and a wide band; strong pull below it (lowPull 0.86), so few shifts that each carry a lot of speed, and a
+  // long top end (pullExp 2.9) that keeps pulling on a kilometre of causeway.
+  meridian: { gears: [0.37, 0.58, 0.78, 0.98, 1.35], idle: 800, redline: 7400, band: [0.76, 0.95], windowS: 0.5, shiftS: 0.022, lowPull: 0.86, gaugeMph: 280, topScale: 1.38, accelScale: 0.8, pullExp: 2.9 },
+  // Tempest E4: four electric motors and a three-speed box (two shifts a race): full torque from zero rpm (lowPull 1),
+  // a 15,500 rpm motor redline, the quickest shifts in the game and a wide green. Its signature is launch control
+  // (data/circuit.ts LAUNCH_CONTROL): tap LAUNCH on GO for more traction and pull through the launch segment.
+  tempest: { gears: [0.45, 0.78, 1.32], idle: 600, redline: 15500, band: [0.8, 0.97], windowS: 0.55, shiftS: 0.012, lowPull: 1, gaugeMph: 300, topScale: 1.4, accelScale: 0.9, pullExp: 2.6 },
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };

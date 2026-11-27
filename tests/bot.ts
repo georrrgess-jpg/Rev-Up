@@ -13,7 +13,7 @@ import { fitRecommended as fitRec } from '../src/core/install';
 import * as P from '../src/core/progression';
 import { NitroPolicy, RaceSim, ShiftPolicy } from '../src/core/race';
 import { MemoryKV } from '../src/core/save';
-import { ACTIVE_FAMILIES, CarId, MAX_TIER, PART_ORDER_PRICE, TUNE_STAGES, UPGRADES, carById, eventById, Family, tunePrice, RaceEvent } from '../src/data/tables';
+import { ACTIVE_FAMILIES, CarId, MAX_TIER, TUNE_STAGES, UPGRADES, carById, eventById, Family, tunePrice, RaceEvent } from '../src/data/tables';
 import type { SlotRef } from '../src/core/events';
 
 export interface BotLog {
@@ -222,26 +222,30 @@ export function runBot(o: BotOpts): BotLog {
       continue;
     }
     if (g.state.owned.length >= 2 && unfitForPair()) continue;
-    // upgrades
-    let bought = false;
-    for (const u of UPGRADES) {
-      if (!P.upgradeShown(g.state, u)) continue;
-      const c = P.upgradeCost(g.state, u.id);
-      if (c !== null && g.state.cash >= c + 40) { g.buyUpgrade(u.id, now); bought = true; log(`${t.toFixed(0)}s upgrade ${u.id} $${c}`); spend(COST.buy); break; }
-    }
-    if (bought) continue;
-    // Tune-ups: the no-nitro player buys them once losing; everyone else when stuck on one race (two losses running)
+    // Tune-ups first: the no-nitro player buys them once losing; everyone else when stuck on one race (two losses
+    // running). While a needed Tune-up is still unaffordable during a losing run, Garage upgrades wait (a player
+    // who keeps losing saves for the car, not the garage).
+    let saving = false;
     if (o.tune !== false && ((o.policy === 'none' || o.tune) ? L.lossRaces > 2 : lastStreak >= 2)) {
       const car = lastStreak >= 2 && stuckCar ? stuckCar : g.state.activeCar;
       const st = g.state.tune?.[car] ?? 0;
       if (st < TUNE_STAGES && g.state.cash >= tunePrice(car, st) + 100) { g.buyTune(car, now); log(`${t.toFixed(0)}s tune ${car} ${st + 1} $${tunePrice(car, st)}`); spend(COST.buy); continue; }
+      saving = st < TUNE_STAGES && lastStreak >= 1;
     }
+    // upgrades
+    let bought = false;
+    if (!saving) for (const u of UPGRADES) {
+      if (!P.upgradeShown(g.state, u) || P.upgradeLock(g.state, u.id)) continue;
+      const c = P.upgradeCost(g.state, u.id);
+      if (c !== null && g.state.cash >= c + 40) { g.buyUpgrade(u.id, now); bought = true; log(`${t.toFixed(0)}s upgrade ${u.id} $${c}`); spend(COST.buy); break; }
+    }
+    if (bought) continue;
     const goal = P.goalStatus(g.state);
     // scrap → targeted crate toward the keystone
     if (goal && !goal.keystoneDone && g.state.scrap >= 15) { g.buyCrate('targeted', goal.family, now); spend(COST.buy); continue; }
     if (goal && !goal.keystoneDone && o.buyParts !== false) {
       const tt = Math.min(B.orderMaxTier(g.state), goal.tier - 1);
-      const price = PART_ORDER_PRICE[tt];
+      const price = B.orderPrice(g.state, tt);
       const have = [...g.state.board, ...g.state.tray].filter((q) => q && q.f === goal.family && q.t === tt).length;
       if (have < 2 && g.state.cash >= price + 200 && B.freeSlots(g.state) > 0) { g.orderPart(goal.family, tt, now); log(`${t.toFixed(0)}s order ${goal.family} T${tt} $${price}`); spend(COST.buy); continue; }
     }
@@ -271,7 +275,9 @@ export function runBot(o: BotOpts): BotLog {
     const shift: ShiftPolicy = o.shift === 'mixed' ? (L.races % 2 ? 'ordinary' : 'clean') : (o.shift ?? 'ordinary');
     const policy: NitroPolicy = o.policy === 'mixed' ? (L.races % 2 ? 'late' : 'perfect') : (o.policy ?? 'perfect');
     const raced = eventById(setup.eventId);
-    const sim = new RaceSim({ ...setup, shift, rivalShift: P.rivalShiftFor(raced), analysis: false });
+    // the Tempest's launch control (tap on GO): clean players hit it, mixed every other race, weak players never
+    const launch = o.shift === 'missed' ? 'none' as const : o.shift === 'mixed' ? (L.races % 2 ? 'none' as const : 'perfect' as const) : 'perfect' as const;
+    const sim = new RaceSim({ ...setup, shift, launch, rivalShift: P.rivalShiftFor(raced), analysis: false });
     const out = drive(sim, policy);
     spend((out.playerTime ?? 30) + COST.raceOverhead);
     const wonBefore = (g.state.events[ev.id]?.wins ?? 0) > 0;

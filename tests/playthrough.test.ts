@@ -50,24 +50,32 @@ describe('baseline playthrough (simulation)', () => {
 //   mixed     alternates clean shifts + Perfect boosts with late shifts + late boosts, race by race
 //   ordinary  always a beat late on the shift, Perfect boosts
 //   weak      never taps SHIFT (the automatic fallback every time), never uses nitro; buys Tune-ups
-const CARS = ['beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign'];
+const CARS = ['beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign', 'tempest'];
+/** 1.9 branches: each opens beside a main-line car (the Ardent with the Halcyon, the Meridian with the Sovereign). */
+const BRANCHES: [string, string, string][] = [['ardent', 'gt', 'vireo'], ['meridian', 'mako', 'tempest']];
+const ALL = [...CARS.slice(0, 8), 'ardent', 'proto', 'vireo', 'mako', 'meridian', 'sovereign', 'tempest'];
 
-describe('full ladder playthrough to the Sovereign (simulation)', () => {
-  const runs = Object.entries(PLAYERS).flatMap(([kind, o]) => (kind === 'clean' || kind === 'mixed' ? [1, 2] : [1]).map((seed) => ({ kind, seed, log: runBot({ ...o, seed, untilCar: 'sovereign', maxS: 4 * 3600 }) })));
+describe('full ladder playthrough to the Tempest (simulation)', () => {
+  const runs = Object.entries(PLAYERS).flatMap(([kind, o]) => (kind === 'clean' || kind === 'mixed' ? [1, 2] : [1]).map((seed) => ({ kind, seed, log: runBot({ ...o, seed, untilCar: 'tempest', maxS: 4 * 3600 }) })));
   const finale = runBot({ ...PLAYERS.clean, seed: 1, untilWin: 'grand-riviera', maxS: 4 * 3600 });
 
   it('prints milestones, races and repeats per player type', () => {
     for (const r of runs) {
       const m = r.log.milestones;
-      console.log(`${r.kind.padEnd(8)} seed ${r.seed}: ${CARS.map((c) => `${c} ${fmtMin(m[c])} (${r.log.racesAt[c] ?? '—'})`).join(' · ')} | races ${r.log.races} (quick ${r.log.quick}) max repeat ${r.log.maxRepeat} longest losing run ${r.log.maxLossStreak}`);
+      console.log(`${r.kind.padEnd(8)} seed ${r.seed}: ${ALL.map((c) => `${c} ${fmtMin(m[c])} (${r.log.racesAt[c] ?? '—'})`).join(' · ')} | races ${r.log.races} (quick ${r.log.quick}) max repeat ${r.log.maxRepeat} longest losing run ${r.log.maxLossStreak}`);
     }
     console.log(`clean seed 1: Summit Gala won at ${fmtMin(finale.milestones['win-summit-gala'])} (Halcyon at ${fmtMin(finale.milestones.proto)}) · Grand Riviera won at ${fmtMin(finale.milestones['win-grand-riviera'])} (Sovereign at ${fmtMin(finale.milestones.sovereign)})`);
   });
 
-  it('every player type reaches the Sovereign, in ladder order, without grinding one race', () => {
+  it('every player type reaches the Tempest, in ladder order, without grinding one race', () => {
     for (const r of runs) {
       const m = r.log.milestones;
       for (let i = 1; i < CARS.length; i++) expect(m[CARS[i]], `${r.kind} ${CARS[i]}`).toBeGreaterThanOrEqual(m[CARS[i - 1]]);
+      // a branch car arrives after the car it opens with, and before the main line has moved two cars on
+      for (const [b, after, before] of BRANCHES) {
+        expect(m[b], `${r.kind} ${b}`).toBeGreaterThanOrEqual(m[after]);
+        expect(m[b], `${r.kind} ${b}`).toBeLessThanOrEqual(m[before]);
+      }
       expect(r.log.maxRepeat, r.kind).toBeLessThanOrEqual(5);
     }
   });
@@ -97,6 +105,9 @@ describe('full ladder playthrough to the Sovereign (simulation)', () => {
       // each supercar arrives a few minutes after the one before (no instant double unlock)
       expect(m.mako - m.vireo, r.kind).toBeGreaterThan(2 * 60);
       expect(m.sovereign - m.mako, r.kind).toBeGreaterThan(5 * 60);
+      // the Tempest is the last car: a few minutes after the Sovereign, never the same session minute
+      expect(m.tempest - m.sovereign, r.kind).toBeGreaterThan(3 * 60);
+      expect(m.tempest - m.sovereign, r.kind).toBeLessThan(25 * 60);
     }
   });
 

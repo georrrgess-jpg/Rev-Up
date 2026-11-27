@@ -1,5 +1,6 @@
 import { RACE, RIVALS, STAT_SCALE, Segment, TIER_STAT, Track, TRACKS, carById, eventById, trackLength, CarId } from '../data/tables';
 import { Drivetrain, drivetrainFor } from '../data/drivetrain';
+import { LAUNCH_CONTROL } from '../data/circuit';
 import { makeRng } from './rng';
 import type { LeanOutcome } from './state';
 import { mph } from './units';
@@ -31,6 +32,9 @@ export interface RaceSetup {
   practice?: boolean;
   /** Internal: counterfactual runs skip their own analysis. */
   analysis?: boolean;
+  /** Launch control (cars with LAUNCH_CONTROL, the Tempest E4): 'perfect' starts with it engaged (bots, tests, the
+   *  counterfactual replay); the live screen calls tapLaunch() on GO instead. */
+  launch?: 'perfect' | 'none';
 }
 
 export interface Racer {
@@ -67,6 +71,8 @@ export interface Racer {
   brakeTo: number;
   /** Tyre slip this step, 0..1: launch wheelspin, or how close to the grip limit a bend is taken (sound and smoke). */
   slip: number;
+  /** Launch control engaged for this start (Tempest E4: more traction and pull through the launch segment). */
+  lc?: boolean;
 }
 
 /** One gear change of the player's, for the race screen's sound and HUD (a new object each time). */
@@ -152,7 +158,17 @@ export interface RaceOutcome {
   boostLoss?: number | null;
   /** The single most useful reason for this result: a missed shift, a late boost, or the build. */
   coach?: Coach | null;
+  /** The event raced (for explaining the finish against its course). */
+  eventId?: string;
+  /** Launch: the first shift was clean and the player led out of the launch segment; launch control engaged. */
+  perfectLaunch?: boolean;
+  launchControl?: boolean;
+  /** The player's distance every GHOST_STEPS sim steps, in decimetres (a personal-best ghost is saved from this). */
+  trace?: number[];
 }
+
+/** Sim steps between ghost samples (0.25 s at 60 Hz). */
+export const GHOST_STEPS = 15;
 
 export function segmentAt(track: Track, x: number): { seg: Segment; index: number; start: number } {
   let start = 0;
@@ -282,10 +298,13 @@ export class RaceSim {
       gearT: -9, brakeT: -9, zoneDown: 0, brakeTo: 0, slip: 0,
     });
     this.racers = [mk('player', setup.player.name, setup.player.car, setup.player.paint, { ...setup.player.stats }, true, setup.shift ?? 'ordinary')];
+    if (setup.launch === 'perfect' && LAUNCH_CONTROL.cars.includes(setup.player.car)) this.racers[0].lc = true;
     for (const rid of ev.rivals) {
       const r = RIVALS[rid];
       const vary = () => 1 + (rng() * 2 - 1) * RACE.rivalVariance;
       this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false, setup.rivalShift ?? 'ordinary'));
+      // rivals in a launch-control car are pros: they always hit it
+      if (LAUNCH_CONTROL.cars.includes(r.car)) this.racers[this.racers.length - 1].lc = true;
     }
     // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured. It shifts clean.
     this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false, 'clean');
@@ -314,6 +333,7 @@ export class RaceSim {
     c.attempt = { ...this.attempt, band: [...this.attempt.band] as [number, number] };
     c.lastDown = this.lastDown ? { ...this.lastDown } : null;
     c.gearEvents = this.gearEvents.map((e) => ({ ...e }));
+    c.trace = [...this.trace];
     return c;
   }
 
@@ -361,8 +381,8 @@ export class RaceSim {
     if (mul > 0) { accel += RACE.nitroAccel * mul; top *= 1 + RACE.nitroTopMul * mul; }
     const normal = accel * Math.max(0, 1 - (v / top) ** (d.pullExp ?? 2));
     if (segmentAt(this.track, r.x).seg.type !== 'launch') return normal;
-    const raw = accel * RACE.launchTurboMul;
-    const traction = st.grip * RACE.tractionG * d.accelScale;
+    const raw = accel * RACE.launchTurboMul * (r.lc ? 1 + LAUNCH_CONTROL.pull : 1);
+    const traction = st.grip * RACE.tractionG * d.accelScale * (r.lc ? LAUNCH_CONTROL.traction : 1);
     return Math.max(normal, (raw > traction ? traction + (raw - traction) * RACE.wheelspinKeep : raw) * Math.max(0, 1 - (v / top) ** 4));
   }
 
@@ -381,6 +401,23 @@ export class RaceSim {
   }
 
   topGear(r: Racer = this.player) { return r.gear >= drivetrainFor(r.car).gears.length - 1; }
+
+  /** The player's distance every GHOST_STEPS steps until the line (decimetres), for the personal-best ghost. */
+  trace: number[] = [];
+  /** The player's launch-control attempt: null until tried. */
+  launchTry: 'perfect' | 'early' | 'late' | null = null;
+  /** This car has a launch-control mechanic (the Tempest E4). */
+  get hasLaunchControl() { return LAUNCH_CONTROL.cars.includes(this.player.car); }
+  /** The live LAUNCH tap. `offset`: seconds before GO (positive, from the countdown) or after it (negative). One try
+   *  per start; within LAUNCH_CONTROL.windowS of GO engages launch control for the launch segment. */
+  tapLaunch(offset: number): 'perfect' | 'early' | 'late' | 'na' | 'done' {
+    if (!this.hasLaunchControl) return 'na';
+    if (this.launchTry || this.player.lc) return 'done';
+    const ok = Math.abs(offset) <= LAUNCH_CONTROL.windowS;
+    this.launchTry = ok ? 'perfect' : offset > 0 ? 'early' : 'late';
+    if (ok) this.player.lc = true;
+    return this.launchTry;
+  }
 
   /** Upcoming or current nitro window relative to the player. */
   windowState(): { active: NitroWindow | null; next: NitroWindow | null } {
@@ -588,8 +625,9 @@ export class RaceSim {
     }
     let a: number;
     if (seg.type === 'launch') {
-      const raw = accel * RACE.launchTurboMul;
-      const traction = st.grip * RACE.tractionG * d.accelScale; // the calibration scales the whole launch, so grip still matters off the line
+      // launch control (Tempest E4): the motors meter torque to the grip, so more of it reaches the road
+      const raw = accel * RACE.launchTurboMul * (r.lc ? 1 + LAUNCH_CONTROL.pull : 1);
+      const traction = st.grip * RACE.tractionG * d.accelScale * (r.lc ? LAUNCH_CONTROL.traction : 1); // the calibration scales the whole launch, so grip still matters off the line
       a = raw > traction ? traction + (raw - traction) * RACE.wheelspinKeep : raw;
       // wheelspin: how far the launch's pull exceeds the tyres' grip (fades as the car gets rolling)
       r.slip = raw > traction ? Math.min(1, ((raw - traction) / raw) * 1.6) * Math.max(0, 1 - r.v / 25) : 0;
@@ -659,6 +697,7 @@ export class RaceSim {
     }
     this.t += dt;
     this.steps++;
+    if (this.steps % GHOST_STEPS === 0 && this.player.finishTime === null) this.trace.push(Math.round(this.player.x * 10));
     this.refreshAttempt();
     if (this.racers.every((r) => r.finishTime !== null)) this.done = true;
     else if (this.t >= RACE.safetyCutoffS) {
@@ -705,14 +744,27 @@ export class RaceSim {
       cutoff: this.cutoff, advice,
       shifts: counted.length, shiftsClean: counted.filter((s) => s.grade === 'clean').length, shiftLog: this.shiftLog.map((s) => ({ ...s })),
       topSpeed: p.peak, shiftLoss: null, boostLoss: null, coach: null,
+      eventId: this.setup.eventId, perfectLaunch: this.perfectLaunch(), launchControl: !!p.lc, trace: [...this.trace],
     };
     if (this.setup.analysis !== false && p.finishTime !== null) this.analyse(out, place > 1 ? st[place - 2] : null);
     return out;
   }
 
+  /** A perfect launch: the shift out of first was clean and the player led the field out of the launch segment
+   *  (alone on the road, the clean shift is enough; a launch-control car must also have engaged it). */
+  perfectLaunch(): boolean {
+    const p = this.player;
+    const first = this.shiftLog.find((s) => s.grade !== 'assist');
+    if (!first || first.into !== 1 || first.grade !== 'clean') return false;
+    if (this.hasLaunchControl && !p.lc) return false;
+    const mine = p.splits[0];
+    if (mine === undefined) return false;
+    return this.racers.every((r) => r.isPlayer || r.splits[0] === undefined || r.splits[0] >= mine - 1e-9);
+  }
+
   /** Re-run the same race (same seed, rivals and build) with clean shifts, then also with Perfect boosts. */
   private counterfactual(nitro: 'replay' | 'perfect'): number | null {
-    const sim = new RaceSim({ ...this.setup, shift: 'clean', analysis: false });
+    const sim = new RaceSim({ ...this.setup, shift: 'clean', analysis: false, launch: this.player.lc ? 'perfect' : 'none' });
     let k = 0;
     while (!sim.done && sim.player.finishTime === null) {
       if (nitro === 'replay') { while (k < this.nitroTaps.length && this.nitroTaps[k] <= sim.steps) { sim.tapNitro(); k++; } }

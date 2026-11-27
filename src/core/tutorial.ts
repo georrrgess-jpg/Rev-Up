@@ -1,8 +1,8 @@
-import { allParts, canFuse, freeSlots, hasAnyPair, orderMaxTier } from './board';
+import { allParts, canFuse, freeSlots, hasAnyPair, orderMaxTier, orderPrice } from './board';
 import { fitted, recommendedFit } from './install';
 import { computeLoadout } from './loadout';
-import { goalStatus, mergeAllUnlocked, upgradeShown } from './progression';
-import { ACTIVE_FAMILIES, FAMILIES, Family, PART_ORDER_PRICE, TUNE_STAGES, UPGRADES, UpgradeId, carById, tunePrice } from '../data/tables';
+import { goalStatus, mergeAllUnlocked, upgradeCost, upgradeLock, upgradeShown } from './progression';
+import { ACTIVE_FAMILIES, FAMILIES, Family, TUNE_STAGES, UPGRADES, UpgradeId, carById, tunePrice } from '../data/tables';
 import type { GameState } from './state';
 
 /**
@@ -96,7 +96,7 @@ export function bestBuy(s: GameState): { pick: BuyPick | null; affordable: boole
       const add = 2 ** (t - 1);
       if (add > need - have && t > 1) continue; // never overshoot: buy what closes the gap
       options.push({
-        kind: 'order', fam: g.family, tier: t, price: PART_ORDER_PRICE[t], title: `T${t} ${fam.name}`,
+        kind: 'order', fam: g.family, tier: t, price: orderPrice(s, t), title: `T${t} ${fam.name}`,
         why: `Toward the T${g.tier} ${fam.name} the ${g.car.model} needs: ingredients ${have}/${need} → ${Math.min(need, have + add)}/${need}. You still merge it yourself.`,
       });
     }
@@ -108,7 +108,7 @@ export function bestBuy(s: GameState): { pick: BuyPick | null; affordable: boole
     if (g && !g.keystoneDone && f === g.family && ingredients(s, f, g.tier).have >= ingredients(s, f, g.tier).need) continue; // merge them up instead
     const held = Math.max(slots[f]?.t ?? 0, ...allParts(s).filter((p) => p.f === f).map((p) => p.t));
     for (let t = Math.min(car.cap, maxT); t > held; t--) {
-      parts.push({ kind: 'order', fam: f, tier: t, price: PART_ORDER_PRICE[t], title: `T${t} ${FAMILIES[f].name}`,
+      parts.push({ kind: 'order', fam: f, tier: t, price: orderPrice(s, t), title: `T${t} ${FAMILIES[f].name}`,
         why: `Fit it to your ${car.model} for more ${FAMILIES[f].statLabel.toLowerCase()} (yours: ${slots[f] ? `T${slots[f]!.t}` : 'empty slot'}).` });
     }
   }
@@ -116,9 +116,10 @@ export function bestBuy(s: GameState): { pick: BuyPick | null; affordable: boole
   const stage = s.tune?.[s.activeCar] ?? 0;
   if (stage < TUNE_STAGES) options.push({ kind: 'tune', price: tunePrice(s.activeCar, stage), title: `Tune-up stage ${stage + 1}`, why: `+2% speed, acceleration and grip for your ${car.model}.` });
   for (const u of UPGRADES) {
-    if (!upgradeShown(s, u)) continue;
+    if (!upgradeShown(s, u) || upgradeLock(s, u.id)) continue;
     const next = u.levels[s.upgrades[u.id] ?? 0];
-    if (next) options.push({ kind: 'upgrade', id: u.id, price: next.cost, title: u.name, why: next.label });
+    const cost = upgradeCost(s, u.id);
+    if (next && cost !== null) options.push({ kind: 'upgrade', id: u.id, price: cost, title: u.name, why: next.label });
   }
   const can = options.find((o) => o.price <= s.cash);
   if (can) return { pick: can, affordable: true };

@@ -1,0 +1,13 @@
+/* 1.9 Parts Shelf sheet and the Shop's Garage-path cards (Progression workstream). Reuses the spare-row layout. */
+.shelf-sheet .preview { color: var(--text, #f2ece2); font-size: var(--fs-sm); margin: 6px 0; }
+.shelf-sheet .btn.pick { min-width: 44px; min-height: 44px; }
+.shelf-sheet .btn.pick.on { background: var(--amber2, #f2b33d); color: #1b1d21; }
+.shelf-sheet .btn.sm.on { outline: 2px solid var(--amber2, #f2b33d); }
+.shelf-sheet .fams { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.shelf-sheet .bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.shelf-sheet .segs.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 6px 0; }
+.shelf-sheet .bench-tools { margin-top: 8px; }
+.workshop .up-ladder { margin: 4px 0 0; padding-left: 18px; font-size: var(--fs-2xs); color: var(--muted); }
+.workshop .up-ladder li.done { color: var(--amber2, #f2b33d); }
+.workshop .polished-pick { display: flex; gap: 8px; align-items: center; min-height: 44px; }
+.workshop .up-row .btn.sm + .btn.sm, .workshop .up-row .grow > .btn.sm { margin-top: 6px; }

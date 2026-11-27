@@ -25,6 +25,7 @@ import {
 import { drawCar, fitCanvas, serviceZoneAt, serviceZones, type CarStyle, type PaintMaterial, type ServiceZones, type WheelSetId } from '../render/car';
 import { MATERIAL, familyIcon, metalFor, partTileHtml, qualityName } from '../render/parts';
 import type { App } from './app';
+import { bayFloorY, drawServiceBay } from '../render/bay';
 import { fmt, h } from './dom';
 import { fabBench } from './fabrication';
 import { openBuilds } from './projects';
@@ -45,18 +46,15 @@ export interface MechanicOpts {
   returnTo?: { label: string; run: () => void } | (() => void);
 }
 
-const AREAS: { id: MechArea; label: string; short: string }[] = [
-  { id: 'engine', label: 'Engine Bay', short: 'Engine' },
-  { id: 'wheels', label: 'Wheels and Tires', short: 'Wheels' },
-  { id: 'body', label: 'Body and Paint', short: 'Body' },
-  { id: 'tuning', label: 'Tuning', short: 'Tuning' },
+const AREAS: { id: MechArea; label: string; short: string; icon: string }[] = [
+  { id: 'engine', label: 'Engine Bay', short: 'Engine', icon: '⚙' },
+  { id: 'wheels', label: 'Wheels and Tires', short: 'Wheels', icon: '◎' },
+  { id: 'body', label: 'Body and Paint', short: 'Body', icon: '◆' },
+  { id: 'tuning', label: 'Tuning', short: 'Tuning', icon: '≋' },
 ];
-const AREA_FAMS: Record<MechArea, Family[]> = { engine: ['engine', 'turbo'], wheels: ['tires'], body: [], tuning: [] };
-export const areaOf = (f: Family): MechArea => (f === 'tires' || f === 'aero' ? 'wheels' : 'engine');
-/** Bay lighting per area: key light on the paint, hood opening. */
-const LOOK: Record<MechArea, { hood: number; light: number }> = {
-  engine: { hood: 1, light: 0.35 }, wheels: { hood: 0, light: 0.55 }, body: { hood: 0, light: 1 }, tuning: { hood: 0.35, light: 0.25 },
-};
+
+/** Bay lamp brightness per area: the Art bay (src/render/bay.ts) lights the room for the area being serviced. */
+const BAY_LIGHT: Record<MechArea, number> = { engine: 0.9, wheels: 0.85, body: 1, tuning: 0.8 };
 
 // ---- stat words shared with Fit Parts and Pit Setup
 export function statText(k: keyof Stats, v: number) {
@@ -197,6 +195,10 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       const ctx = canvas.getContext('2d');
       if (!ctx || !w || !hh) return;
       ctx.clearRect(0, 0, w, hh);
+      // the lit service bay first (Art: cached per size and area), then the car on its floor line
+      const t = reduced() ? 0 : performance.now() / 1000;
+      drawServiceBay(ctx, w, hh, { area, light: BAY_LIGHT[area], t });
+      const len0 = Math.min(w * 0.72, hh * 2.3);
       // floor spot follows the area: warm over the engine, cool over the wheels, white on the body
       const spot = area === 'engine' ? 'rgba(236,159,76,.22)' : area === 'wheels' ? 'rgba(142,211,250,.2)' : area === 'body' ? 'rgba(255,255,255,.2)' : 'rgba(164,219,155,.16)';
       const cx = area === 'engine' ? w * 0.68 : area === 'wheels' ? w * 0.3 : w / 2;
@@ -207,9 +209,9 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       ctx.fillRect(0, 0, w, hh);
       const cls = carById(car);
       const { paint, style } = shownLook();
-      const len = Math.min(w * 0.86, hh * 2.4);
+      const len = len0;
       const x = (w - len) / 2;
-      const y = hh * 0.86;
+      const y = bayFloorY(hh);
       const focus = area === 'tuning' ? null : area;
       drawCar(ctx, car, x, y, len, { paint, trim: cls.trim, livery: finishStripe(car, paint), style, detail: true, shadow: true, hood: look.hood, focus, light: look.light });
       zones = serviceZones(car, x, y, len, look.hood);
@@ -644,7 +646,8 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
         return h('button', {
           class: `seg${a.id === area ? ' on' : ''}`, role: 'tab', 'aria-selected': String(a.id === area), 'data-area': a.id,
           onclick: () => setArea(a.id),
-        }, a.label, badge ? h('span', { class: 'dot', 'aria-label': ', a better part is ready' }) : null);
+          'aria-label': a.label,
+        }, h('span', { class: 'ai', 'aria-hidden': 'true' }, a.icon), h('span', { class: 'al' }, a.short), badge ? h('span', { class: 'dot', 'aria-label': ', a better part is ready' }) : null);
       }));
       const panel = area === 'body' ? bodyPanel(s) : area === 'tuning' ? tuningPanel(s) : [...partsPanel(s), area === 'wheels' ? wheelStyles(s) : null];
       body.replaceChildren(...[

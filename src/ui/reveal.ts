@@ -5,6 +5,7 @@ import { signature } from '../audio-reveal';
 import { fullTop } from '../core/race';
 import { CarId, ENABLED_CARS, carById, finishStripe } from '../data/tables';
 import { FACTORY_LOOKS, PLATFORM_CARS, carLengthM, drawCar, drawCarCover, drawHeadlightBeam, fitCanvas } from '../render/car';
+import { drawRevealSignature } from '../render/revealFx';
 import type { App } from './app';
 import { h } from './dom';
 
@@ -25,6 +26,9 @@ const ROOMS: Record<string, { wall: [number, number, number]; spot: string; floo
   vireo: { wall: [150, 40, 30], spot: '255,236,228', floor: '#0e0505', rim: '#f4f1ea' },
   mako: { wall: [40, 80, 50], spot: '236,255,200', floor: '#040805', rim: '#c7f23a' },
   sovereign: { wall: [130, 105, 60], spot: '255,240,210', floor: '#0b0905', rim: '#c9a24a' },
+  ardent: { wall: [150, 70, 20], spot: '255,236,214', floor: '#0d0704', rim: '#f26a1b' },
+  meridian: { wall: [40, 80, 160], spot: '226,238,255', floor: '#04070e', rim: '#e8edf3' },
+  tempest: { wall: [10, 90, 110], spot: '200,250,255', floor: '#020709', rim: '#5ef2ff' },
 };
 
 /**
@@ -53,16 +57,21 @@ export class RevealOverlay {
   private stageCache = document.createElement('canvas');
   private cacheKey = '';
   private stageKey = '';
+  /** Darkens the fully lit room: its opacity is the only thing that changes as the lights come up (compositor-only). */
+  private dimmer: HTMLElement;
+  private carReady = false;
+  private warmTimer = 0;
 
   constructor(private app: App, private car: CarId, private onDone: () => void, private replay = false) {
     this.reduced = app.game.state.settings.reducedMotion;
     const c = carById(car);
     this.canvas = h('canvas', { 'aria-hidden': 'true' });
+    this.dimmer = h('div', { 'aria-hidden': 'true', style: 'position:absolute;inset:0;background:#030305;pointer-events:none;will-change:opacity' });
     this.textEl = h('div', { class: 'rtext' },
       h('div', { class: 'm' }, replay ? c.model : 'New car unlocked'),
       h('div', { class: 'instr' }, 'Pull the cover or tap to unveil'));
     this.el = h('div', { class: 'reveal reveal-stage', role: 'dialog', 'aria-label': `Reveal the ${c.model}` },
-      this.canvas, this.textEl,
+      this.dimmer, this.canvas, this.textEl,
       h('div', { class: 'rbtns' }, h('button', { class: 'btn sm', onclick: () => this.skip() }, 'Skip')));
     this.el.addEventListener('pointerdown', (e) => this.down(e));
     this.el.addEventListener('pointermove', (e) => this.move(e));
@@ -162,6 +171,7 @@ export class RevealOverlay {
 
   private finish() {
     cancelAnimationFrame(this.raf);
+    clearTimeout(this.warmTimer);
     window.removeEventListener('resize', this.requestDraw);
     if (!this.replay) this.app.game.finishReveal(this.car);
     this.el.remove();
@@ -244,13 +254,15 @@ export class RevealOverlay {
     const lit = this.light();
     const turn = this.turn();
     // Room lighting is a CSS gradient (composited by the browser), updated only when it changes.
-    const q = Math.round(lit * 20) / 20;
-    const key = `${q}|${this.car}`;
-    if (key !== this.bgKey) {
-      this.bgKey = key;
+    // The lit room is painted once; a dark layer over it fades out as the lights come up, so the light cue never
+    // repaints a full-screen gradient (that repaint was a visible hitch on phones).
+    if (this.bgKey !== this.car) {
+      this.bgKey = this.car;
       const [r, g, b] = room.wall;
-      this.el.style.background = `linear-gradient(to bottom, transparent 66%, ${room.floor} 66%), radial-gradient(80% 60% at 50% 35%, rgb(${Math.round(12 + r * 0.5 * q)},${Math.round(10 + g * 0.5 * q)},${Math.round(14 + b * 0.5 * q)}), #030305 78%)`;
+      this.el.style.background = `linear-gradient(to bottom, transparent 66%, ${room.floor} 66%), radial-gradient(80% 60% at 50% 35%, rgb(${Math.round(12 + r * 0.5)},${Math.round(10 + g * 0.5)},${Math.round(14 + b * 0.5)}), #030305 78%)`;
     }
+    const dim = (0.92 * (1 - Math.round(lit * 40) / 40)).toFixed(3);
+    if (this.dimmer.style.opacity !== dim) this.dimmer.style.opacity = dim;
     ctx.clearRect(0, 0, w, hh);
     // layout: the platform sits on the floor line; the car fills ~80% of its diameter
     const base = Math.min(w * 0.84, hh * 1.25, 720 * dpr);
@@ -278,16 +290,21 @@ export class RevealOverlay {
     const depth = { x: 0.2 * 1.9 * k, y: 0.085 * 1.9 * k }; // the renderer's oblique depth, roughly, in px
     const bw = Math.round(base);
     const ck = `${bw}|${this.paint}|${JSON.stringify(carStyle(this.app.game.state, this.car))}`;
+    const paintCar = (cv: HTMLCanvasElement, sil: boolean) => {
+      cv.width = Math.round(bw * 1.3);
+      cv.height = Math.round(bw * 0.62);
+      drawCar(cv.getContext('2d')!, this.car, bw * 0.08, bw * 0.55, bw, { paint: this.paint, trim: this.look.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true, style: carStyle(this.app.game.state, this.car), shadow: false, light: PLATFORM_CARS.includes(this.car) ? 0.7 : 0.35 });
+    };
     if (this.cacheKey !== ck) {
+      // Only the cheap silhouette is needed under the cover; the detailed car (the expensive part) is painted
+      // a moment later while the cover still hangs still, so neither the opening nor the pull stutters.
       this.cacheKey = ck;
-      const style = carStyle(this.app.game.state, this.car);
-      for (const [cv, sil] of [[this.carCache, false], [this.silCache, true]] as const) {
-        cv.width = Math.round(bw * 1.3);
-        cv.height = Math.round(bw * 0.62);
-        const cc = cv.getContext('2d')!;
-        drawCar(cc, this.car, bw * 0.08, bw * 0.55, bw, { paint: this.paint, trim: this.look.trim, livery: finishStripe(this.car, this.paint), silhouette: sil, detail: true, style, shadow: false, light: PLATFORM_CARS.includes(this.car) ? 0.7 : 0.35 });
-      }
+      this.carReady = false;
+      paintCar(this.silCache, true);
+      clearTimeout(this.warmTimer);
+      this.warmTimer = window.setTimeout(() => { if (this.cacheKey === ck && !this.carReady) { paintCar(this.carCache, false); this.carReady = true; } }, 120);
     }
+    if (!this.carReady && (lit > 0 || this.phase !== 'cover')) { paintCar(this.carCache, false); this.carReady = true; }
     // the car's ground point: centred on the platform (its depth runs up and to the right)
     const gx = px - cw / 2 - depth.x / 2, gy = py + depth.y * 0.35;
     // controlled turn: the car starts angled away (foreshortened) and the platform brings it round to the
@@ -327,6 +344,7 @@ export class RevealOverlay {
     ctx.save();
     ctx.translate(px, 0); ctx.scale(sx, 1); ctx.translate(-px, 0);
     drawHeadlightBeam(ctx, this.car, gx, gy, cw, headlights);
+    drawRevealSignature(ctx, this.car, gx, gy, cw, this.phase, this.t, this.reduced);
     drawCarCover(ctx, this.car, gx, gy, cw, this.cover);
     ctx.restore();
     void c;

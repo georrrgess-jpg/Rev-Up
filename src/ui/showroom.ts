@@ -185,29 +185,141 @@ export class ShowroomView implements View {
   private redrawInspect: (() => void) | null = null;
   private redrawCards: (() => void)[] = [];
 
+  /** The hero stage: one car filling the top of the screen, with who it is, what to earn next and why to race it. */
+  private hero: HTMLElement;
+  private heroCanvas: HTMLCanvasElement;
+  private heroInfo: HTMLElement;
+  private heroId: CarId | null = null;
+
   constructor(private app: App) {
     this.grid = h('div', { class: 'showgrid' });
     this.milestones = h('div', { class: 'milestones' });
     this.count = h('span', { class: 'collection-count num' });
-    this.el = h('section', { class: 'view', 'aria-label': 'Showroom' },
-      h('div', { class: 'showtitle' }, h('h1', {}, 'Showroom'), this.count),
-      h('div', { class: 'scroll', style: 'flex:1;min-height:0' }, this.milestones, this.grid));
+    this.heroCanvas = h('canvas', { 'aria-hidden': 'true' });
+    this.heroInfo = h('div', { class: 'hero-info' });
+    this.hero = h('section', { class: 'show-hero', 'aria-label': 'Your car' }, this.heroCanvas, this.heroInfo);
+    this.el = h('section', { class: 'view showroom-view', 'aria-label': 'Showroom' },
+      h('div', { class: 'scroll', style: 'flex:1;min-height:0' }, this.hero,
+        h('div', { class: 'showtitle' }, h('h2', {}, 'Collection'), this.count), this.grid,
+        h('details', { class: 'ms-drawer' }, h('summary', {}, 'Collection goals · finishes, medals, trophies'), this.milestones)));
     window.addEventListener('resize', () => {
       if (!this.visible) return;
       for (const draw of this.redrawCards) draw();
+      this.drawHero();
       this.redrawInspect?.();
     });
   }
 
-  show() { this.visible = true; this.render(); }
+  /** Why to race this car now: its own class meet or event, else the recommended race when it is the active car. */
+  private reasonToRace(id: CarId): { text: string; eventId: string | null } {
+    const s = this.app.game.state;
+    const own = EVENTS.find((e) => !e.heatOf && (e.carOnly === id || e.requires.car === id) && P.eventUnlocked(s, e).ok && !s.events[e.id]?.wins);
+    if (own) return { text: `${own.name} is made for it${own.payout ? ` · win pays $${fmt(own.payout.cash[0])}` : ''}`, eventId: own.id };
+    if (s.activeCar === id) { const r = P.recommendedEvent(s); return { text: `${r.name} · ${P.eventReason(s, r)}`, eventId: r.id }; }
+    const m = P.masteryFor(s, id);
+    return { text: m.races ? `${m.wins} win${m.wins === 1 ? '' : 's'} in ${m.races} race${m.races === 1 ? '' : 's'} — take it out again` : 'Not raced yet — its first live podium earns its signature finish', eventId: null };
+  }
+
+  /** The next thing to collect for this car: its signature finish, Concours stages, or the collection's next item. */
+  private nextCollectible(id: CarId): string {
+    const s = this.app.game.state;
+    const sig = SIGNATURE_FINISHES[id];
+    if (sig && !s.livePodiums.includes(id)) return `${sig.name} finish · top 3 in a live race`;
+    const cc = s.concours?.[id] ?? 0;
+    if (s.owned.length >= 4 && cc < 3) return `Concours stage ${cc + 1} of 3 · restoration in the Workshop`;
+    return P.collection(s).next;
+  }
+
+  private renderHero() {
+    const s = this.app.game.state;
+    const owned = s.owned.filter((c) => ENABLED_CARS.some((e) => e.id === c));
+    if (!this.heroId || !owned.includes(this.heroId)) this.heroId = s.activeCar;
+    const id = this.heroId;
+    const car = carById(id);
+    const lo = computeLoadout(s, id).stats;
+    const why = this.reasonToRace(id);
+    const idx = owned.indexOf(id);
+    const step = (d: number) => { this.heroId = owned[(idx + d + owned.length) % owned.length]; this.renderHero(); };
+    const active = s.activeCar === id;
+    this.heroInfo.replaceChildren(...([
+      owned.length > 1 ? h('button', { class: 'hero-nav prev', 'aria-label': 'Previous car', onclick: () => step(-1) }, '‹') : null,
+      owned.length > 1 ? h('button', { class: 'hero-nav next', 'aria-label': 'Next car', onclick: () => step(1) }, '›') : null,
+      h('div', { class: 'hero-id' },
+        h('small', {}, `${car.name} · ${DISTRICTS[car.district].name}${active ? ' · racing now' : ''}`),
+        h('h1', {}, car.model),
+        h('div', { class: 'hero-stats' },
+          h('span', {}, h('b', { class: 'num' }, `${mph(lo.top)}`), ' mph'),
+          h('span', {}, 'Accel ', h('b', { class: 'num' }, lo.accel.toFixed(1))),
+          h('span', {}, 'Grip ', h('b', { class: 'num' }, lo.grip.toFixed(2))),
+          h('span', {}, 'Parts ', h('b', {}, `T${car.cap}`)))),
+      h('div', { class: 'hero-lines' },
+        h('p', {}, h('small', {}, 'Next to earn'), this.nextCollectible(id)),
+        h('p', {}, h('small', {}, 'Race it'), why.text)),
+      h('div', { class: 'hero-acts' },
+        h('button', { class: 'btn', onclick: () => this.inspect(id) }, h('span', { class: 'stack' }, 'Customize', h('small', {}, 'paint · wheels'))),
+        h('button', { class: 'btn', onclick: () => this.compare(id) }, h('span', { class: 'stack' }, 'Compare', h('small', {}, 'vs your cars'))),
+        h('button', { class: 'btn primary', onclick: () => {
+          if (!active) { this.app.game.setActiveCar(id); this.app.toast(`Racing the ${car.model}`); }
+          const race = this.app.views.race as unknown as { jumpToEvent?(id: string): void };
+          this.app.go('race');
+          if (why.eventId) requestAnimationFrame(() => race.jumpToEvent?.(why.eventId!));
+        } }, h('span', { class: 'stack' }, active ? 'Race it' : 'Race this car', h('small', {}, why.eventId ? 'see the race' : 'Race menu')))),
+    ] as (HTMLElement | null)[]).filter((x): x is HTMLElement => !!x));
+    this.hero.style.setProperty('--hero-tint', (STAGES[id]?.light ?? '#b2d3e046').slice(0, 7));
+    requestAnimationFrame(() => this.drawHero());
+  }
+
+  private drawHero() {
+    const id = this.heroId;
+    if (!id || !this.visible) return;
+    const s = this.app.game.state;
+    studio(this.heroCanvas, id, s.paints[id], 0, false, false, carStyle(s, id), 1);
+  }
+
+  /** Side-by-side stats: this car against every other car you own (and the next car, stock). */
+  private compare(id: CarId) {
+    const s = this.app.game.state;
+    const rows = s.owned.filter((c) => ENABLED_CARS.some((e) => e.id === c)).map((c) => ({ id: c, st: computeLoadout(s, c).stats, cap: carById(c).cap, stock: false }));
+    const nx = P.nextCar(s);
+    if (nx) rows.push({ id: nx.id, st: nx.base, cap: nx.cap, stock: true });
+    const me = rows.find((r) => r.id === id)!.st;
+    const d = (v: number, base: number, k = 1, dp = 0) => {
+      const x = Math.round((v - base) * k * 10 ** dp) / 10 ** dp;
+      return x === 0 ? null : h('small', { class: x > 0 ? 'up' : 'down' }, `${x > 0 ? '+' : '−'}${Math.abs(x).toFixed(dp)}`);
+    };
+    this.app.sheet((close) => h('div', { class: 'compare' },
+      h('button', { class: 'btn sm close', onclick: close }, 'Close'),
+      h('h2', {}, `Compare · ${carById(id).model}`),
+      h('table', { class: 'cmp-table' },
+        h('tr', {}, h('th', {}, 'Car'), h('th', {}, 'Top'), h('th', {}, 'Accel'), h('th', {}, 'Grip'), h('th', {}, 'Parts')),
+        ...rows.map((r) => h('tr', { class: r.id === id ? 'me' : r.stock ? 'stock' : '' },
+          h('th', {}, carById(r.id).model, r.stock ? h('small', {}, ' next · stock') : null),
+          h('td', { class: 'num' }, `${mph(r.st.top)}`, r.id === id ? null : d(mph(r.st.top), mph(me.top))),
+          h('td', { class: 'num' }, r.st.accel.toFixed(1), r.id === id ? null : d(r.st.accel, me.accel, 1, 1)),
+          h('td', { class: 'num' }, r.st.grip.toFixed(2), r.id === id ? null : d(r.st.grip, me.grip, 1, 2)),
+          h('td', {}, `T${r.cap}`)))),
+      h('p', { class: 'd' }, 'Top speed in mph with each car’s fitted parts; the next car is shown stock, before any parts.'),
+    ));
+  }
+
+  private renderedRev = -1;
+  show() {
+    this.visible = true;
+    if (this.app.game.state.rev !== this.renderedRev || !this.grid.childElementCount) this.render();
+    else requestAnimationFrame(() => this.drawHero());
+  }
+  /** Show a car on the hero stage (e.g. from the Race menu). */
+  showCar(id: CarId) { this.heroId = id; if (this.visible) this.renderHero(); }
   hide() { this.visible = false; this.closeDialog?.(); }
   onEvents(ev: GameEvent[]) { if (this.visible && ev.some((e) => e.type === 'unlock')) this.render(); }
 
   render() {
     const state = this.app.game.state;
+    this.renderedRev = state.rev;
     const next = P.goalStatus(state);
     this.count.textContent = `${state.owned.length} of ${ENABLED_CARS.length} collected`;
     this.renderMilestones();
+    this.renderHero();
     this.redrawCards = [];
     const cards = ENABLED_CARS.map((car) => {
       const owned = state.owned.includes(car.id);
@@ -236,7 +348,11 @@ export class ShowroomView implements View {
       return card;
     });
     this.grid.replaceChildren(...cards);
-    requestAnimationFrame(() => this.redrawCards.forEach((draw) => draw()));
+    // cards draw one at a time in idle time (a detailed car each), so the tab opens at once with the hero car
+    const draws = [...this.redrawCards];
+    const idle = (fn: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 16));
+    const next1 = () => { const d = draws.shift(); if (!d || !this.visible) return; d(); if (draws.length) idle(next1); };
+    requestAnimationFrame(() => idle(next1));
   }
 
   /** Collection goals: cars, finishes, medals and trophies, with the next one named. */

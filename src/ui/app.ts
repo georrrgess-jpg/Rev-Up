@@ -172,12 +172,10 @@ export class App {
       const el = this.chips[k];
       const span = el.querySelector('.v')!;
       if (span.textContent !== v) {
+        if ((span.textContent ?? '').length !== v.length) this.refit = true;
         span.textContent = v;
-        if (bump) {
-          el.classList.remove('bump');
-          void el.offsetWidth;
-          el.classList.add('bump');
-        }
+        // restart the bump on the next frame instead of forcing a layout here (a merge must paint at once)
+        if (bump) { el.classList.remove('bump'); requestAnimationFrame(() => el.classList.add('bump')); }
       }
     };
     const any = ev.length > 0;
@@ -186,18 +184,23 @@ export class App {
     const pg = progressInfo(s);
     const of = this.chips.rep.querySelector('.of')!;
     const ofText = pg.repNext ? `/${fmt(pg.repNext)}` : '';
-    if (of.textContent !== ofText) of.textContent = ofText;
+    if (of.textContent !== ofText) { if ((of.textContent ?? '').length !== ofText.length) this.refit = true; of.textContent = ofText; }
     this.repBar.style.width = `${Math.round(pg.repFrac * 100)}%`;
     const lv = pg.level ? `Lv ${pg.level}` : '';
     if (this.lvEl.textContent !== lv) this.lvEl.textContent = lv;
     this.lvEl.hidden = !lv;
     this.chips.rep.setAttribute('aria-label', `${lv ? `Garage Level ${pg.level}. ` : ''}Rep ${s.rep}${pg.repNext ? `, next at ${pg.repNext}: ${pg.nextWhat}` : ''}. Earned progress, never spent. Tap for details`);
     set('scrap', fmt(s.scrap), any);
-    this.fitTop();
+    if (this.refit) { this.refit = false; this.fitTopSoon(); }
     this.navBtns.showroom.querySelector('.badge')?.remove();
     if (s.pendingReveal) this.navBtns.showroom.append(h('span', { class: 'badge' }, '1'));
   }
 
+  /** Set when a top-bar value changes length: only then can the bar need re-fitting. */
+  private refit = true;
+  private fitRaf = 0;
+  /** Re-fit the top bar at the next frame, when layout is due anyway (never in the middle of a merge). */
+  fitTopSoon() { if (!this.fitRaf) this.fitRaf = requestAnimationFrame(() => { this.fitRaf = 0; this.fitTop(); }); }
   /** Words ("Rep", "Scrap") read best, but large balances need the room: fall back to glyphs when a value would clip. */
   private topBar: HTMLElement | null = null;
   fitTop() {

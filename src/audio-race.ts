@@ -7,10 +7,10 @@
 //   nitro → whine and whistle up · launch → an extra chirp off the line · braking at speed → a little tyre scrub
 // and position / progress / nitro → music intensity. If the snapshot is missing (an older sim), the same values are
 // derived from the racer (rpmFrac, cut, limiterT, braking, nitroLeft, and the launch traction sums).
-import { duckEngine, newEngine } from './audio';
+import { duckEngine, isMuted, live, newEngine, tone } from './audio';
 import { music } from './audio-api';
 import type { EngineVoice, PartLike } from './audio-engine';
-import { runScript } from './audio-engine';
+import { EngineVoice as Voice, resolveEngine, runScript } from './audio-engine';
 import { drivetrainFor } from './data/drivetrain';
 import { RACE, trackLength, type CarId } from './data/tables';
 import { segmentAt, type RaceSim, type Racer } from './core/race';
@@ -122,4 +122,79 @@ export class RaceAudio {
     this.v?.stop(undefined, 0.3);
     this.v = null;
   }
+}
+
+/** The Tempest E4's launch-control signature: a rising four-motor whine and a crackle of current on GO. */
+export function launchControlSound() {
+  try {
+    tone(220, 0.75, 'sawtooth', 0.07, 0, 2600);
+    tone(330, 0.7, 'sine', 0.09, 0.02, 3300);
+    tone(1760, 0.12, 'square', 0.04, 0.05, 880);
+  } catch { /* sound is optional */ }
+}
+
+/**
+ * Rival engines: the two rivals nearest the player each get their own engine voice (the same synth as the player's,
+ * voiced for their car), panned by where they are on screen (ahead: right) and faded in and out with distance, so a
+ * car coming past is heard before it is seen and fades as it pulls away. Always well under the player's engine
+ * (at most RIVAL_LEVEL of it) on the same engine bus, so the mix, the cue ducking and the limiter stay as they are.
+ */
+export const RIVAL_LEVEL = 0.34;
+export class RivalAudio {
+  private voices = new Map<string, { v: Voice; g: GainNode; pan: StereoPannerNode; quiet: number }>();
+  private stopped = false;
+  constructor(private sim: RaceSim, private max = 2, private reach = 55) {}
+
+  /** Every frame while racing (after the sim stepped). */
+  frame() {
+    if (this.stopped) return;
+    const L = live();
+    if (!L || isMuted() || L.ctx.state !== 'running') return;
+    try {
+      const c = L.ctx;
+      const t = c.currentTime;
+      const p = this.sim.player;
+      const near = this.sim.racers.filter((r) => !r.isPlayer && Math.abs(r.x - p.x) < this.reach)
+        .sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x)).slice(0, this.max);
+      const want = new Set(near.map((r) => r.id));
+      for (const r of near) {
+        let e = this.voices.get(r.id);
+        if (!e) {
+          const g = c.createGain(); g.gain.value = 0;
+          const pan = c.createStereoPanner();
+          g.connect(pan).connect(L.mix.engine);
+          const v = new Voice(c, g, L.noise, resolveEngine(r.car));
+          v.start(t);
+          e = { v, g, pan, quiet: 0 };
+          this.voices.set(r.id, e);
+        }
+        e.quiet = 0;
+        const dx = r.x - p.x;
+        const k = clamp(1 - Math.abs(dx) / this.reach);
+        e.g.gain.setTargetAtTime(RIVAL_LEVEL * k ** 1.6, t, 0.06);
+        e.pan.pan.setTargetAtTime(clamp(dx / 28, -0.85, 0.85), t, 0.08);
+        e.v.set({
+          frac: clamp(this.sim.rpmFrac(r), 0, 1.02),
+          throttle: r.finishTime !== null || r.cut > 0 || r.braking ? 0 : r.limiterT > 0 ? 0.6 : 1,
+          gear: r.gear, slip: r.slip, nitro: r.nitroLeft > 0, limiter: r.limiterT > 0,
+        }, t);
+      }
+      for (const [id, e] of this.voices) {
+        if (want.has(id)) continue;
+        e.g.gain.setTargetAtTime(0, t, 0.08);
+        if (++e.quiet > 30) { e.v.stop(t, 0.1); this.voices.delete(id); }
+        else e.v.set({ frac: 0.5, throttle: 0.5 }, t);
+      }
+    } catch { this.stop(); }
+  }
+
+  /** Race over or left: every rival voice fades out. */
+  stop() {
+    this.stopped = true;
+    const L = live();
+    for (const e of this.voices.values()) { try { e.g.gain.setTargetAtTime(0, L?.ctx.currentTime ?? 0, 0.1); e.v.stop(undefined, 0.3); } catch { /* gone */ } }
+    this.voices.clear();
+  }
+  /** Rival voices sounding now (tests and the perf check). */
+  get count() { return this.voices.size; }
 }

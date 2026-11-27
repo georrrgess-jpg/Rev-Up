@@ -6,7 +6,7 @@ import {
 } from '../data/tables';
 import { allParts, craftedTier, orderMaxTier } from './board';
 import { levelInfo, jobsUnlocked } from './jobs';
-import { collection, eventUnlocked, goalStatus, nextCar, starsIn } from './progression';
+import { carAfter, carStages, chaseable, collection, eventUnlocked, goalStatus, nextCar, starsIn, unlockEventDone, unlockEventText } from './progression';
 import type { GameState } from './state';
 
 /** One thing still needed for a milestone. `done` items stay in the list (ticked), so the card reads as a checklist. */
@@ -72,7 +72,12 @@ export interface ProgressSummary {
   glossary: { rep: string; level: string; carTier: string; partTier: string; cash: string; scrap: string };
   next: Milestone | null;
   /** the cars after the next one, in order, with their requirements in short (for a ladder view) */
-  ladder: { car: CarId; model: string; cap: number; district: string; owned: boolean; needs: string }[];
+  ladder: {
+    car: CarId; model: string; cap: number; district: string; owned: boolean; needs: string;
+    /** 1.9: how it drives (its strengths, shown before you invest), the car it opens after, whether you can chase it
+     *  now, and how many unlock stages pay on the way */
+    handling: string; after: CarId | null; chaseable: boolean; stages: number;
+  }[];
 }
 
 const carNeedsShort = (c: CarClass) => {
@@ -121,11 +126,11 @@ export function nextMilestone(s: GameState): Milestone | null {
     });
     if (u.event) {
       const e = eventById(u.event);
-      const done = (s.events[e.id]?.wins ?? 0) > 0;
+      const done = unlockEventDone(s, e.id); // 1.9: a win, or the persistence route
       const un = eventUnlocked(s, e);
       const boss = e.boss ? RIVALS[e.boss.rival].name : undefined;
       needs.push({ kind: 'event', event: e.id, eventName: e.name, done, open: un.ok || !!un.switchCar, why: un.ok ? '' : un.why, ...(un.switchCar ? { switchCar: un.switchCar } : {}), ...(boss ? { boss } : {}),
-        text: done ? `Won ${e.name}` : `Win ${e.name}${boss ? ` (beat ${boss})` : ''}${un.ok || un.switchCar ? '' : ` — ${un.why}`}` });
+        text: done ? ((s.events[e.id]?.wins ?? 0) > 0 ? `Won ${e.name}` : `${e.name}: podiums enough`) : `${unlockEventText(s, e.id)}${boss ? ` (beat ${boss})` : ''}${un.ok || un.switchCar ? '' : ` — ${un.why}`}` });
     }
     if (u.stars) {
       const have = starsIn(s);
@@ -187,6 +192,7 @@ export function progressSummary(s: GameState): ProgressSummary {
       scrap: 'Scrap comes from recycling parts and is spent on scrap orders, polish, kits and restoration. It never turns back into cash.',
     },
     next: nextMilestone(s),
-    ladder: ENABLED_CARS.filter((c) => c.unlock).map((c) => ({ car: c.id, model: c.model, cap: c.cap, district: DISTRICTS[c.district]?.name ?? c.district, owned: s.owned.includes(c.id), needs: carNeedsShort(c) })),
+    ladder: ENABLED_CARS.filter((c) => c.unlock).map((c) => ({ car: c.id, model: c.model, cap: c.cap, district: DISTRICTS[c.district]?.name ?? c.district, owned: s.owned.includes(c.id), needs: carNeedsShort(c),
+      handling: c.handling ?? c.blurb, after: carAfter(c), chaseable: chaseable(s, c), stages: carStages(c).length })),
   };
 }

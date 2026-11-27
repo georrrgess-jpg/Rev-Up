@@ -51,7 +51,8 @@ function stage(last: CarId): GameState {
 describe('the supercar ladder', () => {
   it('the three supercars are enabled in the Azure Riviera, after the Halcyon X, the Sovereign capped at T10', () => {
     const ids = ENABLED_CARS.map((c) => c.id);
-    expect(ids.slice(-4)).toEqual(['proto', 'vireo', 'mako', 'sovereign']);
+    // 1.9 Circuit: the Ardent sits beside the Halcyon, the Meridian beside the Sovereign, the Tempest last
+    expect(ids.slice(-8)).toEqual(['gt', 'ardent', 'proto', 'vireo', 'mako', 'meridian', 'sovereign', 'tempest']);
     expect(DISTRICTS.riviera.enabled).toBe(true);
     for (const id of SUPER) expect(carById(id).district).toBe('riviera');
     expect(carById('sovereign').cap).toBe(10);
@@ -363,20 +364,23 @@ describe('progress summary and the next milestone', () => {
   it('the Sovereign: a T10 Engine to craft, with T9 orders open; then the Grand Riviera finale, then collection', () => {
     const s = stage('mako');
     s.crafted = s.crafted.filter((k) => !k.startsWith('engine:10'));
+    // 1.9: the Meridian and the Sovereign are both open after the Mako; the Meridian is first unless you pick
+    expect(P.chaseableCars(s).map((c) => c.id)).toEqual(['meridian', 'sovereign']);
+    s.goalPick = 'sovereign';
     const m = M.nextMilestone(s)!;
     expect(m.car).toBe('sovereign');
     expect(m.needs.find((n) => n.kind === 'keystone')).toMatchObject({ tier: 10, orderTier: 9, done: false });
     expect(m.unlocks[0]).toMatch(/T10/);
-    const all = stage('sovereign');
-    all.bosses = all.bosses.filter((b) => b !== 'aurelia');
+    const all = stage('tempest');
+    all.bosses = all.bosses.filter((b) => b !== 'vesna');
     const f = M.nextMilestone(all)!;
-    expect(f).toMatchObject({ kind: 'finale', title: 'Grand Riviera' });
-    all.bosses.push('aurelia');
+    expect(f).toMatchObject({ kind: 'finale', title: 'Launch Control' });
+    all.bosses.push('vesna');
     expect(M.nextMilestone(all)?.kind ?? 'collection').toBe('collection');
     const sum = M.progressSummary(all);
     expect(sum.earned.topCarCap).toBe(10);
     expect(sum.earned.maxTier).toBe(10);
-    expect(sum.ladder.at(-1)).toMatchObject({ car: 'sovereign', owned: true });
+    expect(sum.ladder.at(-1)).toMatchObject({ car: 'tempest', owned: true });
   });
 });
 

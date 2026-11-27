@@ -422,8 +422,25 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         poly(c, [x + bw * 0.1, hz - hh, x + bw / 2, hz - hh, x + bw / 2 + 24 * u, hz + 2 * u, x + bw * 0.2, hz + 2 * u], '#e07a3f');
         c.fillStyle = 'rgba(90,30,20,0.35)'; for (let k = 1; k < 4; k++) c.fillRect(x - bw / 2 - k * 4 * u, hz - hh + k * hh * 0.24, bw + k * 8 * u, 3 * u);
       }, 14);
-      // landmark: the natural rock arch
-      place(1, (x) => {
+      // landmark: the natural rock arch (the Airfield Sprint: hangars and a control tower instead)
+      if (trackId === 'airstrip') place(2, (x, _r, k) => {
+        if (k === 0) {
+          // a pair of arched hangars with their doors open
+          for (const [dx, hw] of [[-70, 54], [20, 44]] as const) {
+            c.fillStyle = '#c9c2b4'; c.beginPath(); c.moveTo(x + (dx - hw) * u, hz + 2 * u); c.quadraticCurveTo(x + dx * u, hz - hw * 1.3 * u, x + (dx + hw) * u, hz + 2 * u); c.closePath(); c.fill();
+            c.fillStyle = '#3b3a40'; c.fillRect(x + (dx - hw * 0.45) * u, hz - hw * 0.42 * u, hw * 0.9 * u, hw * 0.44 * u);
+            c.fillStyle = '#9a9286'; for (let i = -2; i <= 2; i++) c.fillRect(x + (dx + i * hw * 0.3) * u, hz - hw * 0.62 * u, 1.5 * u, hw * 0.2 * u);
+          }
+          signText(c, 'RUNWAY 27', x - 110 * u, hz - 64 * u, 80 * u, 13 * u, 2 * u, '#ffd23f', 10 * u);
+        } else {
+          // the control tower with a green glass cab and a rotating beacon (emitted below)
+          c.fillStyle = '#e8e2d4'; c.fillRect(x - 7 * u, hz - 92 * u, 14 * u, 94 * u);
+          c.fillStyle = '#d6cfbf'; c.fillRect(x - 16 * u, hz - 104 * u, 32 * u, 12 * u);
+          c.fillStyle = '#2f7a6a'; c.fillRect(x - 15 * u, hz - 103 * u, 30 * u, 8 * u);
+          c.fillStyle = '#5b5348'; c.fillRect(x - 18 * u, hz - 107 * u, 36 * u, 3 * u); c.fillRect(x - 1 * u, hz - 116 * u, 2 * u, 9 * u);
+        }
+      }, 151);
+      else place(1, (x) => {
         c.fillStyle = '#d9663a';
         c.beginPath(); c.moveTo(x - 60 * u, hz + 2 * u); c.lineTo(x - 52 * u, hz - 70 * u); c.quadraticCurveTo(x, hz - 100 * u, x + 54 * u, hz - 66 * u); c.lineTo(x + 62 * u, hz + 2 * u);
         c.lineTo(x + 36 * u, hz + 2 * u); c.quadraticCurveTo(x + 32 * u, hz - 50 * u, x, hz - 54 * u); c.quadraticCurveTo(x - 30 * u, hz - 50 * u, x - 34 * u, hz + 2 * u); c.closePath(); c.fill();
@@ -433,6 +450,22 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
     add(0.3, hz - 40 * u, rt, (c, place) => {
       c.fillStyle = pal.ground; c.fillRect(0, hz + span * 0.35, tw, rt - hz);
       c.fillStyle = 'rgba(255,230,180,0.35)'; for (let k = 0; k < 30; k++) c.fillRect(hash(k * 2.1) * tw, hz + span * (0.4 + hash(k) * 0.5), 20 * u, 1.5 * u);
+      // the Airfield: a windsock, runway edge lights and a parked prop plane instead of cacti
+      if (trackId === 'airstrip') {
+        place(10, (x) => { c.fillStyle = '#4a4d55'; c.fillRect(x - 1 * u, rt - 22 * u, 2 * u, 8 * u); disc(c, x, rt - 23 * u, 3 * u, '#ffd23f'); }, 156);
+        place(1, (x) => {
+          c.fillStyle = '#6a6d75'; c.fillRect(x, rt - 74 * u, 2 * u, 62 * u);
+          poly(c, [x + 2 * u, rt - 74 * u, x + 34 * u, rt - 70 * u, x + 34 * u, rt - 64 * u, x + 2 * u, rt - 66 * u], '#ff7a2f');
+          c.fillStyle = '#ffffff'; c.fillRect(x + 12 * u, rt - 72.5 * u, 6 * u, 7 * u);
+          // a little high-wing prop plane parked on the apron
+          const px = x + 90 * u, py = rt - 26 * u;
+          c.fillStyle = '#f4f1ea'; c.beginPath(); c.ellipse(px, py, 30 * u, 6 * u, 0, 0, 7); c.fill();
+          c.fillRect(px - 34 * u, py - 12 * u, 56 * u, 3 * u);
+          poly(c, [px + 22 * u, py - 2 * u, px + 34 * u, py - 16 * u, px + 36 * u, py - 2 * u], '#d6202a');
+          c.fillStyle = '#26334a'; c.fillRect(px - 20 * u, py - 4 * u, 12 * u, 3 * u);
+          c.fillStyle = '#2c2f38'; disc(c, px - 10 * u, py + 7 * u, 3 * u, '#2c2f38'); disc(c, px + 8 * u, py + 7 * u, 3 * u, '#2c2f38');
+        }, 157);
+      } else
       // saguaro cacti and a windmill water pump
       place(9, (x, r) => {
         const s = (0.8 + r * 0.6) * u, y = hz + span * (0.6 + r * 0.3);
@@ -440,7 +473,7 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         c.beginPath(); c.roundRect(x - 13 * s, y - 24 * s, 5 * s, 14 * s, 2.5 * s); c.fill(); c.fillRect(x - 13 * s, y - 13 * s, 12 * s, 4 * s);
         c.beginPath(); c.roundRect(x + 8 * s, y - 28 * s, 5 * s, 12 * s, 2.5 * s); c.fill(); c.fillRect(x + 2 * s, y - 19 * s, 10 * s, 4 * s);
       }, 16);
-      place(1, (x) => {
+      if (trackId !== 'airstrip') place(1, (x) => {
         c.strokeStyle = '#5b3a24'; c.lineWidth = 2 * u;
         c.beginPath(); c.moveTo(x - 10 * u, rt - 10 * u); c.lineTo(x, rt - 70 * u); c.lineTo(x + 10 * u, rt - 10 * u); c.stroke();
         for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; c.beginPath(); c.moveTo(x, rt - 70 * u); c.lineTo(x + Math.cos(a) * 16 * u, rt - 70 * u + Math.sin(a) * 16 * u); c.stroke(); }
@@ -472,8 +505,37 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
         c.fillStyle = 'rgba(60,70,90,0.55)'; c.fillRect(x + bw * 0.2, y - bh * 0.62, 2.5 * u, 3.5 * u); c.fillRect(x + bw * 0.62, y - bh * 0.62, 2.5 * u, 3.5 * u);
       }, 42);
       place(14, (x, r) => { const s2 = (0.8 + r * 0.6) * u, y = hz - r * 26 * u; c.fillStyle = '#20402a'; c.beginPath(); c.ellipse(x, y - 14 * s2, 3.2 * s2, 14 * s2, 0, 0, 7); c.fill(); }, 43);
-      // landmark per track: the corniche viaduct and tunnel, the harbour lighthouse, or the domed grand casino
-      if (trackId === 'corniche') {
+      // landmark per track: the corniche viaduct and tunnel, the harbour lighthouse, the domed grand casino, the
+      // Esplanade's harbour wheel and clock tower, or the Causeway's lighthouse islet and distant arched viaduct
+      if (trackId === 'esplanade') {
+        place(1, (x) => {
+          const cx = x - 40 * u, cy = hz - 62 * u, R = 52 * u;
+          c.strokeStyle = '#f3efe6'; c.lineWidth = 2.5 * u;
+          c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
+          c.lineWidth = 1 * u;
+          for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); c.stroke(); }
+          const cab = ['#e2589f', '#ffd23f', '#38a8e1', '#ff7a2f'];
+          for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; c.fillStyle = cab[i % 4]; c.fillRect(cx + Math.cos(a) * R - 4 * u, cy + Math.sin(a) * R, 8 * u, 7 * u); }
+          c.strokeStyle = '#d6cfbf'; c.lineWidth = 3 * u;
+          c.beginPath(); c.moveTo(cx - 24 * u, hz + 2 * u); c.lineTo(cx, cy); c.lineTo(cx + 24 * u, hz + 2 * u); c.stroke();
+          // the clock tower on the quay
+          c.fillStyle = '#e9d6b0'; c.fillRect(x + 50 * u, hz - 86 * u, 18 * u, 88 * u);
+          poly(c, [x + 47 * u, hz - 86 * u, x + 71 * u, hz - 86 * u, x + 59 * u, hz - 104 * u], '#c8603a');
+          disc(c, x + 59 * u, hz - 72 * u, 6 * u, '#fbf6ea');
+          c.fillStyle = '#2c2f38'; c.fillRect(x + 58.5 * u, hz - 77 * u, 1 * u, 5 * u); c.fillRect(x + 59 * u, hz - 72.5 * u, 4 * u, 1 * u);
+        }, 52);
+      } else if (trackId === 'causeway') {
+        place(1, (x) => {
+          // a far viaduct of arches running out to sea, and the lighthouse on its islet
+          c.fillStyle = '#d8c6a2'; c.fillRect(x - 160 * u, hz - 22 * u, 240 * u, 5 * u);
+          for (let i = 0; i < 10; i++) { const ax = x - 156 * u + i * 24 * u; c.fillRect(ax, hz - 17 * u, 4 * u, 19 * u); }
+          c.fillStyle = '#6a7f9a'; c.beginPath(); c.ellipse(x + 130 * u, hz + 1 * u, 34 * u, 8 * u, 0, Math.PI, 0); c.fill();
+          poly(c, [x + 122 * u, hz - 4 * u, x + 138 * u, hz - 4 * u, x + 135 * u, hz - 72 * u, x + 125 * u, hz - 72 * u], '#f6f3ea');
+          c.fillStyle = '#d6202a'; c.fillRect(x + 124 * u, hz - 50 * u, 12 * u, 8 * u); c.fillRect(x + 125 * u, hz - 28 * u, 10 * u, 8 * u);
+          c.fillStyle = '#2c2f38'; c.fillRect(x + 123 * u, hz - 82 * u, 14 * u, 10 * u);
+          c.fillStyle = '#fff1a8'; c.fillRect(x + 125 * u, hz - 80 * u, 10 * u, 6 * u);
+        }, 53);
+      } else if (trackId === 'corniche') {
         place(1, (x) => {
           c.fillStyle = '#d8c6a2'; c.fillRect(x - 120 * u, hz - 46 * u, 240 * u, 8 * u);
           for (let i = 0; i < 6; i++) { const ax = x - 110 * u + i * 44 * u; c.fillRect(ax, hz - 38 * u, 8 * u, 44 * u); c.beginPath(); c.arc(ax + 26 * u, hz - 38 * u, 18 * u, 0, Math.PI); c.fill(); }
@@ -507,7 +569,20 @@ function buildLayers(v: SceneView, pal: Pal): { layers: Layer[]; fore: Layer | n
     });
     add(0.32, hz - 60 * u, rt, (c, place) => {
       // the corniche: a stone balustrade on the sea side, lamp posts, umbrella pines and bougainvillea
-      if (trackId === 'port') {
+      if (trackId === 'causeway') {
+        // open water right up to the causeway's parapet: fishing boats, channel buoys and a low stone wall
+        c.fillStyle = '#1f6fa8'; c.fillRect(0, hz + span * 0.3, tw, rt - hz);
+        c.fillStyle = 'rgba(255,255,255,0.35)'; for (let k = 0; k < 40; k++) c.fillRect(hash(k * 3.3) * tw, hz + span * (0.35 + hash(k * 1.9) * 0.55), (8 + hash(k) * 16) * u, 1.2 * u);
+        place(4, (x, r) => {
+          const y = hz + span * (0.55 + r * 0.3), L2 = (22 + r * 14) * u;
+          poly(c, [x, y, x + L2, y, x + L2 + 5 * u, y - 6 * u, x - 3 * u, y - 6 * u], r > 0.5 ? '#c8503a' : '#2f5a8a');
+          c.fillStyle = '#f4f1ea'; c.fillRect(x + L2 * 0.55, y - 13 * u, 8 * u, 7 * u);
+          c.fillStyle = '#5b4a3a'; c.fillRect(x + L2 * 0.25, y - 26 * u, 1.2 * u, 20 * u);
+        }, 54);
+        place(7, (x, r) => { const y = hz + span * (0.45 + r * 0.4); c.fillStyle = r > 0.5 ? '#d6202a' : '#2f9a4a'; c.fillRect(x - 2 * u, y - 9 * u, 4 * u, 9 * u); disc(c, x, y - 10 * u, 2.5 * u, c.fillStyle as string); }, 55);
+        c.fillStyle = '#cfc4ae'; c.fillRect(0, rt - 8 * u, tw, 8 * u);
+        c.fillStyle = '#b8ab92'; for (let x = 0; x < tw; x += 18 * u) c.fillRect(x, rt - 8 * u, 1.5 * u, 8 * u);
+      } else if (trackId === 'port') {
         c.fillStyle = '#1f6fa8'; c.fillRect(0, hz + span * 0.4, tw, rt - hz);
         place(6, (x, r) => {
           const y = rt - 14 * u, L2 = (40 + r * 30) * u;

@@ -4,7 +4,8 @@ import { expandBoard } from './core/board';
 import type { Game } from './core/game';
 import { fitRecommended } from './core/install';
 import type { GameState, Part } from './core/state';
-import { EVENTS, type Family } from './data/tables';
+import { ENABLED_CARS, EVENTS, type Family } from './data/tables';
+import { carStages } from './core/progression';
 
 function fill(s: GameState, list: [Family, number][]) {
   s.board = s.board.map(() => null);
@@ -115,6 +116,57 @@ export function applyPreset(game: Game, preset: string) {
         s.board[3 * s.cols + 2] = { id: s.nextPartId++, f: 'engine', t: 4, q: 'std' };
         s.stats.milestones.firstMerge = 1;
         break;
+      // ---- 1.9 Circuit presets
+      // 'slow': the old slowest stretch — the Strata GTR just won, the Ardent and the Halcyon both open (two goals),
+      // Rep part-way, no T8 Turbo yet, cash for one order. 'shelf': a full Parts Shelf (rank 1, 10 parts) and a full
+      // bench with over-cap parts. 'ardent' / 'meridian' / 'tempest': each new car owned and active on its build.
+      case 'slow':
+      case 'ardent':
+      case 'meridian':
+      case 'tempest': {
+        const upTo = ({ slow: 'gt', ardent: 'ardent', meridian: 'meridian', tempest: 'tempest' } as const)[preset as 'slow'];
+        const all = ENABLED_CARS.map((c) => c.id);
+        s.owned = all.slice(0, all.indexOf(upTo) + 1);
+        if (preset === 'slow') s.owned = s.owned.filter((c) => c !== 'ardent');
+        s.activeCar = upTo; s.revealed = [...s.owned];
+        s.rep = ({ slow: 10200, ardent: 11600, meridian: 20400, tempest: 27500 } as const)[preset as 'slow'];
+        s.cash = ({ slow: 16000, ardent: 30000, meridian: 60000, tempest: 90000 } as const)[preset as 'slow'];
+        s.scrap = 2500; s.activeS = 3600; s.nitro = 3; s.stats.races = 160;
+        for (const c of s.owned) { const u = ENABLED_CARS.find((x) => x.id === c)!.unlock; if (u) for (let t = 2; t <= u.tier; t++) if (!s.crafted.includes(`${u.family}:${t}`)) s.crafted.push(`${u.family}:${t}`); }
+        for (let k = 0; k < 6; k++) for (const e of EVENTS) {
+          if (e.heatOf || s.events[e.id] || (preset !== 'slow' && e.requires.car === upTo)) continue;
+          if (e.requires.car && !s.owned.includes(e.requires.car)) continue;
+          if (e.requires.afterWin && !s.events[e.requires.afterWin]) continue;
+          if (preset === 'tempest' && e.id === 'launch-final') continue;
+          if (preset === 'slow' && (e.id === 'summit-1000' || e.district === 'riviera')) continue;
+          s.events[e.id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
+          if (e.boss) { s.bosses.push(e.boss.rival); s.blueprints.push(e.boss.reward.blueprint); s.badges.push(e.boss.reward.badge); }
+        }
+        s.stars = { 'neon-mile': 7, 'skyline-run': 7, 'stock-cup': 7 };
+        s.stagesPaid = ENABLED_CARS.filter((c) => s.owned.includes(c.id)).flatMap((c) => carStages(c).map((d) => d.key));
+        const fam: Family[] = ['engine', 'tires', 'turbo'];
+        const cap = ENABLED_CARS.find((c) => c.id === upTo)!.cap;
+        s.installed = { [upTo]: Object.fromEntries(fam.map((f) => [f, { id: s.nextPartId++, f, t: cap, q: 'std' as const }])) };
+        s.upgrades = { ...s.upgrades, grid: 1, storage: 1, workshop: 1, printer: 3, crateTier: 3 };
+        expandBoard(s);
+        fill(s, preset === 'slow' ? [['turbo', 7], ['turbo', 7], ['engine', 7], ['tires', 6], ['turbo', 6]] : [['engine', cap - 1], ['tires', cap - 1], ['turbo', cap - 1], ['engine', 6]]);
+        break;
+      }
+      case 'shelf': {
+        s.owned = ['junker', 'beater', 'hothatch', 'muscle']; s.activeCar = 'muscle'; s.revealed = [...s.owned];
+        s.rep = 1800; s.crafted = ['tires:3', 'turbo:4', 'engine:5']; s.cash = 6000; s.scrap = 300; s.activeS = 1800; s.stats.races = 40;
+        s.bosses = ['ray']; s.stats.milestones.firstMerge = 1;
+        for (const id of ['yard-sprint', 'crusher-run', 'rusty-ray', 'cul-de-sac', 'maple-mile']) s.events[id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 18 };
+        s.upgrades = { ...s.upgrades, storage: 1, workshop: 1 };
+        s.shelf = ([['engine', 7], ['tires', 7], ['turbo', 6], ['engine', 6], ['tires', 4], ['turbo', 4], ['engine', 3], ['tires', 3], ['turbo', 2], ['engine', 2]] as [Family, number][])
+          .map(([f, t]) => ({ id: s.nextPartId++, f, t, q: 'std' as const }));
+        const list: [Family, number][] = [];
+        const fams: Family[] = ['engine', 'tires', 'turbo'];
+        for (let i = 0; i < s.board.length + s.tray.length; i++) list.push([fams[i % 3], i % 5 === 0 ? 7 : (i % 4) + 1]);
+        fill(s, list);
+        s.installed = { muscle: Object.fromEntries(fams.map((f) => [f, { id: s.nextPartId++, f, t: 5, q: 'std' as const }])) };
+        break;
+      }
       case 'offline':
         s.offline.lastSeenAt = Date.now() - 3 * 3600 * 1000; // three hours away, priced by the real rule on load
         break;

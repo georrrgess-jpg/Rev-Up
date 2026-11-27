@@ -19,7 +19,8 @@ import { openShop } from './shop';
 import { openSpares } from './spares';
 import { openFitParts } from './fit';
 import { openMechanic } from './mechanic';
-import { GoalCard } from './goalCard';
+import { GoalCard, findPair } from './goalCard';
+import { canStore, earliestCarFor, isOverCap, storePart } from './contracts';
 
 const PRESS: SlotRef = { zone: 'tray', i: -1 }; // sentinel for the scrap press
 
@@ -55,6 +56,8 @@ export class GarageView implements View {
   private carName!: HTMLElement;
   private carBtn!: HTMLButtonElement;
   private carKey = '';
+  /** The car tile canvas's CSS size (ResizeObserver): drawing never reads layout during a merge. */
+  private carBox: { w: number; h: number } | null = null;
   private goal: GoalCard;
   private sel: SlotRef | null = null;
   private drag: { from: SlotRef; id: number; x0: number; y0: number; ghost: HTMLElement | null } | null = null;
@@ -73,13 +76,15 @@ export class GarageView implements View {
     this.boardEl = h('div', { class: 'board', role: 'grid', 'aria-label': 'Parts board' });
     this.trayEl = h('div', { class: 'tray', role: 'grid', 'aria-label': 'Spare rack' });
     this.pressEl = h('button', { class: 'press', 'data-press': '1', 'aria-label': 'Scrap press: drop or select a part, then tap here to scrap it. Tap with nothing selected to sort spares.' },
-      h('span', { class: 'pi', 'aria-hidden': 'true' }, '♻'), 'SCRAP');
+      h('span', { class: 'pi', 'aria-hidden': 'true' }, '♻'), 'Recycle');
     this.pressEl.addEventListener('click', () => this.onPressTap());
     this.hintEl = h('div', { class: 'hint', role: 'status' });
     this.printerBar = h('i');
     this.cratesBtn = h('button', { class: 'btn crates', onclick: () => this.onCrates() });
     this.mergeAllBtn = h('button', { class: 'btn', 'data-coach': 'merge-all', onclick: () => this.onMergeAll() });
     this.raceBtn = h('button', { class: 'btn primary race', onclick: () => this.onRace() });
+    // Selection actions: while a part is picked up, the action bar's left side says what can be done with it.
+    this.selBar = h('div', { class: 'selbar', role: 'group', 'aria-label': 'Selected part' });
     const shopBtn = h('button', { class: 'btn', 'aria-label': 'Shop: parts, crates and upgrades', onclick: () => openShop(this.app) }, 'Shop');
     this.shopBtn = shopBtn;
 
@@ -92,11 +97,12 @@ export class GarageView implements View {
       h('span', { class: 'tc-t' }, 'Spares'), this.benchStatus);
     this.el = h('section', { class: 'view garage', 'aria-label': 'Garage' },
       h('div', { class: 'garage-body scroll' },
-        this.goal.el, h('div', { class: 'carrow' }, this.carBtn, this.equipEl), this.capEl,
+        this.goal.el,
         h('div', { class: 'boardwrap' }, this.boardEl),
+        h('div', { class: 'carrow' }, this.carBtn, this.equipEl), this.capEl,
         h('div', { class: 'trayrow' }, sortBtn, this.trayEl, this.pressEl),
         this.hintEl),
-      h('div', { class: 'actions' }, this.cratesBtn, shopBtn, this.mergeAllBtn, this.raceBtn),
+      this.actionsEl = h('div', { class: 'actions' }, this.cratesBtn, shopBtn, this.mergeAllBtn, this.selBar, this.raceBtn),
     );
     this.coach = new Coach(this.el,
       (id) => { this.app.game.markTip(id); this.render(); },
@@ -119,6 +125,8 @@ export class GarageView implements View {
     requestAnimationFrame(() => this.layout());
   }
   private coach!: Coach;
+  private selBar!: HTMLElement;
+  private actionsEl!: HTMLElement;
   private prevStats: { top: number; accel: number; grip: number; car: string } | null = null;
   private shopBtn!: HTMLButtonElement;
 
@@ -157,11 +165,16 @@ export class GarageView implements View {
     const s = this.s;
     const c = carById(s.activeCar);
     if (this.carName.textContent !== c.model) this.carName.textContent = c.model;
-    this.carBtn.setAttribute('aria-label', `Your car: ${c.model}, ${mph(computeLoadout(s).stats.top)} mph. Tap to service it in the Mechanic Shop`);
-    const { w, h: hh } = fitCanvas(this.carCanvas, 2);
-    const key = [w, hh, s.activeCar, s.paints[s.activeCar] ?? ''].join('|');
-    if (key === this.carKey || w < 8) return;
+    if (!this.carBox) {
+      this.carBox = { w: 0, h: 0 };
+      new ResizeObserver((en) => { const r = en[0].contentRect; this.carBox = { w: r.width, h: r.height }; this.drawCar(); }).observe(this.carCanvas);
+      return;
+    }
+    const key = [this.carBox.w, this.carBox.h, s.activeCar, s.paints[s.activeCar] ?? ''].join('|');
+    if (key === this.carKey || this.carBox.w < 4) return;
     this.carKey = key;
+    this.carBtn.setAttribute('aria-label', `Your car: ${c.model}. Tap to service it in the Mechanic Shop`);
+    const { w, h: hh } = fitCanvas(this.carCanvas, 2);
     const ctx = this.carCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, hh);
     const cw = Math.min(w * 0.94, hh * 2.3);
@@ -215,17 +228,20 @@ export class GarageView implements View {
     const ups = new Set(Object.values(I.recommendedFit(s, s.activeCar)).filter((r) => r && 'at' in r).map((r) => r!.part.id));
     const paint = (cell: HTMLButtonElement, p: Part | null, key: string) => {
       const html = p ? this.partHtml(p, p.t > cap, (counts.get(`${p.f}${p.t}`) ?? 0) > 1, ups.has(p.id)) : '';
-      if (cell.dataset.html !== html) {
+      const fresh = cell.dataset.html !== html;
+      if (fresh) {
         cell.innerHTML = html;
         cell.dataset.html = html;
+        const label = p ? cell.firstElementChild?.getAttribute('aria-label') ?? '' : 'Empty slot';
+        if (cell.getAttribute('aria-label') !== label) cell.setAttribute('aria-label', label);
       }
-      cell.setAttribute('aria-label', p ? cell.firstElementChild!.getAttribute('aria-label')! : 'Empty slot');
       const classes = anim.get(key);
       if (classes && cell.firstElementChild) {
         const el = cell.firstElementChild as HTMLElement;
-        el.classList.remove('pop', 'flash-mint', 'flash-pol', 'flash-high', 'drop-in', 'land', 'merged');
-        void el.offsetWidth;
-        el.classList.add(...classes);
+        // a new tile starts its animation as it is inserted; an unchanged one restarts on the next frame
+        // (no forced layout here: the merge result has to paint at once)
+        if (fresh) el.classList.add(...classes);
+        else { el.classList.remove('pop', 'flash-mint', 'flash-pol', 'flash-high', 'drop-in', 'land', 'merged'); requestAnimationFrame(() => el.classList.add(...classes)); }
       }
     };
     s.board.forEach((p, i) => paint(this.cells[i], p, `board:${i}`));
@@ -240,19 +256,19 @@ export class GarageView implements View {
     if (prev && prev.car === s.activeCar) {
       const bits = statDelta(prev, st);
       if (bits.length) {
-        const r = this.equipEl.getBoundingClientRect();
-        const host = this.el.getBoundingClientRect();
         const down = mph(st.top) < mph(prev.top) || st.accel < prev.accel - 0.01 || st.grip < prev.grip - 0.001;
         const f = h('div', { class: `floater stat${down ? ' down' : ''}` }, bits.join(' · '));
-        f.style.left = `${r.left - host.left + r.width / 2}px`;
-        f.style.top = `${r.top - host.top}px`;
-        this.el.append(f);
-        setTimeout(() => f.remove(), 1600);
+        this.place(() => {
+          const r = this.equipEl.getBoundingClientRect();
+          const host = this.hostRect!;
+          return () => { f.style.left = `${r.left - host.left + r.width / 2}px`; f.style.top = `${r.top - host.top}px`; this.el.append(f); setTimeout(() => f.remove(), 1600); };
+        });
       }
     }
     this.prevStats = { ...st, car: s.activeCar };
     this.renderActions();
     this.renderHint();
+    this.renderSelBar();
     this.coach.show(this.coachStep());
   }
 
@@ -527,7 +543,7 @@ export class GarageView implements View {
     else if (s.stats.races === 0 && !s.pendingRace) t = coached ? '' : 'Merged! Tap Race to earn cash and Rep';
     else if (this.sel) {
       const part = B.getPart(s, this.sel);
-      if (part) t = part.t >= MAX_TIER ? `T${part.t} ${FAMILIES[part.f].name}: top tier. Tap its slot above to fit it.` : `T${part.t} ${FAMILIES[part.f].name} selected · tap a glowing T${part.t} to merge, or its slot above to fit it`;
+      if (part) t = part.t >= MAX_TIER ? `T${part.t} ${FAMILIES[part.f].name}: top tier` : B.allParts(s).filter((q) => q.f === part.f && q.t === part.t).length > 1 ? `Craft a T${part.t + 1}: tap a glowing T${part.t}` : `T${part.t} ${FAMILIES[part.f].name} · no match on the bench yet`;
     } else if (s.nitro > 0 && !s.tips.nitro) t = 'Nitro ready · in a race, tap NITRO in a boost zone';
     if (this.hintEl.textContent !== t) this.hintEl.textContent = t;
     this.raceBtn.classList.toggle('pulse', !!s.stats.milestones.firstMerge && s.stats.races === 0);
@@ -678,51 +694,106 @@ export class GarageView implements View {
     if (fuseCount > FX_CAP) this.floaterTop(`+${fuseCount - FX_CAP} more merges`, '');
     this.render(anim);
     if (!reduced) for (const f of flights) this.fly(f.html, f.from, f.to);
+    // a new part above the car's cap (a crate or a merge): offer to store it right there
+    const fresh = [...sites.values()].map((x) => x.at).concat(ev.filter((e): e is Extract<GameEvent, { type: 'place' }> => e.type === 'place').map((e) => e.at));
+    this.offerStore(fresh);
+  }
+
+  private storeOffered = new Set<number | string>();
+  private offerStore(refs: SlotRef[]) {
+    const game = this.app.game;
+    if (!refs.length || !canStore(game) || document.querySelector('.sheet-back')) return;
+    const s = this.s;
+    for (const at of refs) {
+      const p = B.getPart(s, at);
+      if (!p || this.storeOffered.has(p.id) || !isOverCap(s, p)) continue;
+      this.storeOffered.add(p.id);
+      const car = carById(s.activeCar);
+      const later = earliestCarFor(p);
+      this.app.toast(`T${p.t} ${FAMILIES[p.f].name}: above the ${car.model}'s T${car.cap} cap${later ? ` · full power in the ${later}` : ''}`, {
+        label: 'Store', run: () => { const loc = I.locatePart(game.state, p.id); if (loc && 'at' in loc) storePart(game, loc.at); },
+      }, 5000);
+      return;
+    }
   }
 
   /** The live "Cascade ×n" label: each link replaces the last, so a chain counts up in one place. */
   private chainEl: HTMLElement | null = null;
   private rareEl: HTMLElement | null = null;
+  /**
+   * Floating labels and bursts are positioned in one batch on the next frame: every rect is read first, then every
+   * element is placed, so a merge never forces a layout of its own in the middle of the tap (reads interleaved with
+   * writes used to cost several layouts per merge on a slow phone).
+   */
+  private fxq: (() => (() => void) | null)[] = [];
+  private fxRaf = 0;
+  private place(read: () => (() => void) | null) {
+    this.fxq.push(read);
+    if (!this.fxRaf) this.fxRaf = requestAnimationFrame(() => {
+      this.fxRaf = 0;
+      const q = this.fxq; this.fxq = [];
+      const host = this.el.getBoundingClientRect();
+      this.hostRect = host;
+      const writes = q.map((fn) => fn());
+      for (const w of writes) w?.();
+    });
+  }
+  private hostRect: DOMRect | null = null;
   floater(at: SlotRef, text: string, cls: string, ms = 1000, dy = 4): HTMLElement | null {
     const c = this.cellFor(at);
     if (!c) return null;
-    const r = c.getBoundingClientRect();
-    const host = this.el.getBoundingClientRect();
     const f = h('div', { class: `floater ${cls}` }, text);
-    // keep the label inside the view on edge cells
-    const x = Math.max(70, Math.min(host.width - 70, r.left - host.left + r.width / 2));
-    f.style.left = `${x}px`;
-    f.style.top = `${r.top - host.top - dy}px`;
-    this.el.append(f);
-    setTimeout(() => f.remove(), ms);
+    this.place(() => {
+      const r = c.getBoundingClientRect();
+      const host = this.hostRect!;
+      // keep the label inside the view on edge cells
+      const x = Math.max(70, Math.min(host.width - 70, r.left - host.left + r.width / 2));
+      return () => {
+        f.style.left = `${x}px`;
+        f.style.top = `${r.top - host.top - dy}px`;
+        this.el.append(f);
+        setTimeout(() => f.remove(), ms);
+      };
+    });
     return f;
   }
   /** Board-level messages (combo, nitro, keystone): live ones stack downward instead of overprinting. */
   private topFloaters: HTMLElement[] = [];
   floaterTop(text: string, cls: string) {
-    const r = this.boardEl.getBoundingClientRect();
-    const host = this.el.getBoundingClientRect();
-    this.topFloaters = this.topFloaters.filter((x) => x.isConnected);
     const f = h('div', { class: `floater ${cls}` }, text);
-    f.style.left = `${r.left - host.left + r.width / 2}px`;
-    f.style.top = `${r.top - host.top + 6 + this.topFloaters.length * 26}px`;
-    this.el.append(f);
-    this.topFloaters.push(f);
-    setTimeout(() => f.remove(), 1000);
+    this.place(() => {
+      const r = this.boardEl.getBoundingClientRect();
+      const host = this.hostRect!;
+      this.topFloaters = this.topFloaters.filter((x) => x.isConnected || x.dataset.q === '1');
+      const n = this.topFloaters.length;
+      f.dataset.q = '1';
+      this.topFloaters.push(f);
+      return () => {
+        delete f.dataset.q;
+        f.style.left = `${r.left - host.left + r.width / 2}px`;
+        f.style.top = `${r.top - host.top + 6 + n * 26}px`;
+        this.el.append(f);
+        setTimeout(() => f.remove(), 1000);
+      };
+    });
   }
   /** A ring of light from a cell: Polished (silver) and Mint (gold) crafts. */
   private burst(at: SlotRef, kind: 'gold' | 'silver') {
     if (this.s.settings.reducedMotion) return;
     const c = this.cellFor(at);
     if (!c) return;
-    const r = c.getBoundingClientRect();
-    const host = this.el.getBoundingClientRect();
-    const b = h('div', { class: `mburst ${kind}` });
-    b.style.left = `${r.left - host.left + r.width / 2}px`;
-    b.style.top = `${r.top - host.top + r.height / 2}px`;
-    b.style.setProperty('--sz', `${r.width}px`);
-    this.el.append(b);
-    setTimeout(() => b.remove(), 800);
+    this.place(() => {
+      const r = c.getBoundingClientRect();
+      const host = this.hostRect!;
+      return () => {
+        const b = h('div', { class: `mburst ${kind}` });
+        b.style.left = `${r.left - host.left + r.width / 2}px`;
+        b.style.top = `${r.top - host.top + r.height / 2}px`;
+        b.style.setProperty('--sz', `${r.width}px`);
+        this.el.append(b);
+        setTimeout(() => b.remove(), 800);
+      };
+    });
   }
   /** A part tile flying between a cell and a car slot, so the player sees where it went. */
   private fly(html: string, from: DOMRect, to: DOMRect) {
@@ -901,6 +972,44 @@ export class GarageView implements View {
     this.hintEl.classList.remove('bad');
     this.renderHighlights();
     this.renderHint();
+    this.renderSelBar();
+  }
+
+  /** Fit · Store · Recycle for the picked-up part, in the action bar under the thumb (Race stays on the right). */
+  private selKey = '';
+  private renderSelBar() {
+    const s = this.s;
+    const p = this.sel ? B.getPart(s, this.sel) : null;
+    this.actionsEl.classList.toggle('sel-on', !!p);
+    if (!p || !this.sel) { this.selKey = ''; return; }
+    const ref = this.sel;
+    const car = carById(s.activeCar);
+    const over = isOverCap(s, p);
+    const store = canStore(this.app.game);
+    const key = [p.id, p.t, over, store, s.activeCar].join('|');
+    if (key === this.selKey) return;
+    this.selKey = key;
+    const fam = FAMILIES[p.f];
+    const btn = (cls: string, main: string, sub: string, aria: string, run: () => void) =>
+      h('button', { class: `btn ${cls}`, 'aria-label': aria, onclick: () => { this.app.game.input(); run(); } }, h('span', { class: 'stack' }, main, h('small', {}, sub)));
+    const later = over ? earliestCarFor(p) : null;
+    this.selBar.replaceChildren(
+      btn('sel-fit', 'Fit', over ? `runs T${car.cap}` : `to ${car.model.split(' ')[0]}`, `Fit the T${p.t} ${fam.name} to your ${car.model}${over ? `: it runs at T${car.cap}, the car's cap` : ''}`, () => this.fitTo(ref, p.f)),
+      store
+        ? btn(`sel-store${over ? ' hot' : ''}`, 'Store', later ? `for ${later.split(' ')[0]}` : 'Parts Shelf', `Store the T${p.t} ${fam.name} on the Parts Shelf${later ? ` for the ${later}` : ''}`, () => { this.setSel(null); this.flushFx(); storePart(this.app.game, ref); })
+        : btn('sel-cancel', 'Done', 'put it down', 'Put the part down', () => this.setSel(null)),
+      btn('sel-recycle', 'Recycle', `+${B.scrapValue(p)} scrap`, `Recycle the T${p.t} ${fam.name} for ${B.scrapValue(p)} scrap`, () => { this.setSel(null); this.requestScrap(ref); }),
+    );
+  }
+
+  /** Show a mergeable pair (the goal's, when given): the first part is picked up and its match pulses. */
+  showPair(family?: string, tier?: number): boolean {
+    const pair = findPair(this.s, family, tier);
+    if (!pair) return false;
+    this.setSel(pair[0]);
+    this.cellFor(pair[1])?.firstElementChild?.classList.add('pop');
+    this.cellFor(pair[0])?.scrollIntoView?.({ block: 'nearest' });
+    return true;
   }
 
   /** Move or merge; a drop on a part that doesn't match is refused right here with the reason, nothing changes. */

@@ -11,11 +11,13 @@
 </style>
 </head>
 <body>
-<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?sheet=concours">Concours</a><a href="?sheet=parts">Parts T7–T10</a><a href="?lit">Lit</a></nav>
+<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?sheet=concours">Concours</a><a href="?sheet=parts">Parts T7–T10</a><a href="?sheet=bay">Bay</a><a href="?sheet=hero">Hero</a><a href="?sheet=reveal">Reveal FX</a><a href="?lit">Lit</a></nav>
 <canvas id="c"></canvas>
 <script type="module">
   // Dev-only art sheet: every car at hero / card / race / thumbnail sizes, plus liveries, wheel sets, materials and race scenery.
-  import { drawCar, ART_CARS, FACTORY_LOOKS, LIVERIES, serviceZones, tailLampPoint } from '/src/render/car.ts';
+  import { drawCar, drawHeroCar, ART_CARS, FACTORY_LOOKS, LIVERIES, serviceZones, tailLampPoint } from '/src/render/car.ts';
+  import { drawServiceBay, bayFloorY } from '/src/render/bay.ts';
+  import { drawRevealSignature, REVEAL_SIGNATURE_CARS } from '/src/render/revealFx.ts';
   import { partSvg } from '/src/render/parts.ts';
   import { CARS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
   import { drawBackdrop, drawRoadDressing, drawForeground, roadColors, THEMES } from '/src/render/scene.ts';
@@ -111,6 +113,61 @@
     });
   } else if (sheet === 'parts') {
     document.body.insertAdjacentHTML('beforeend', `<div style="display:grid;grid-template-columns:repeat(4,96px);gap:10px;padding:12px;background:#151a20">${['engine', 'tires', 'turbo'].map((f) => [7, 8, 9, 10].map((t) => `<div style="width:96px;height:96px;background:#222a33;border-radius:12px;padding:6px;box-sizing:border-box">${partSvg(f, t, 'std', { badge: true })}</div>`).join('')).join('')}</div>`);
+  } else if (sheet === 'bay') {
+    // the Mechanic Shop backdrop in each area (phone-size panels), with a car on the lift
+    const areas = ['engine', 'wheels', 'body', 'tuning'], pw = 390, ph = 300;
+    const ctx = size(Math.ceil(areas.length / 2) * ph);
+    const car = look(only ?? 'tempest');
+    areas.forEach((a, i) => {
+      const off = document.createElement('canvas'); off.width = pw * dpr; off.height = ph * dpr;
+      const o = off.getContext('2d');
+      drawServiceBay(o, off.width, off.height, { area: a, light: 1, t: 2 });
+      const cw = off.width * 0.72;
+      drawCar(o, car.id, (off.width - cw) / 2, bayFloorY(off.height), cw, { paint: car.paint, trim: car.trim, detail: true, light: 0.6, hood: a === 'engine' ? 0.8 : 0, focus: a === 'tuning' ? null : a });
+      ctx.drawImage(off, (i % 2) * (pw + 10), Math.floor(i / 2) * ph, pw, ph);
+      ctx.fillStyle = '#fff'; ctx.fillText(a, (i % 2) * (pw + 10) + 8, Math.floor(i / 2) * ph + 16);
+    });
+  } else if (sheet === 'hero') {
+    // the title-screen hero helper at three sweep positions, with and without a rim light
+    const list = only ? cars : ['tempest', 'meridian', 'ardent', 'sovereign'].map(look);
+    const RH = 230;
+    const ctx = size(list.length * RH);
+    list.forEach((car, i) => {
+      const y0 = i * RH; ctx.fillStyle = '#07080b'; ctx.fillRect(0, y0, W, RH);
+      [0.2, 0.5, 0.8].forEach((sw, k) => drawHeroCar(ctx, car.id, 20 + k * (W / 3), y0 + RH - 40, W / 3 - 60, { paint: car.paint, trim: car.trim, sweep: sw, rimLight: k === 1 ? '#9fe6ff' : 0.6, headlights: 1 }));
+    });
+  } else if (sheet === 'reveal') {
+    // signature reveal moments: lights at 0.15 s and 0.5 s, then mid-turn; add &reduced for the reduced-motion version
+    const red = q.has('reduced'), RH = 220;
+    const ctx = size(REVEAL_SIGNATURE_CARS.length * RH);
+    REVEAL_SIGNATURE_CARS.map(look).forEach((car, i) => {
+      const y0 = i * RH; ctx.fillStyle = '#07080b'; ctx.fillRect(0, y0, W, RH);
+      [['lights', 0.15], ['lights', 0.5], ['turn', 0.8]].forEach(([ph, t], k) => {
+        const x = 20 + k * (W / 3), y = y0 + RH - 40, cw = W / 3 - 60;
+        drawCar(ctx, car.id, x, y, cw, { paint: car.paint, trim: car.trim, detail: true, light: 0.7, headlights: 0.85 });
+        drawRevealSignature(ctx, car.id, x, y, cw, ph, t, red);
+        ctx.fillStyle = '#dfe6ec'; ctx.fillText(`${car.id} · ${ph} ${t}s${red ? ' · reduced' : ''}`, x, y0 + 16);
+      });
+    });
+  } else if (sheet === 'bench') {
+    // race-frame benchmark: 4 lanes of cached cars at phone race size (390 css px × dpr 2) with blur, nitro, brakes and
+    // headlights, the camera zooming slowly. Reports window.__bench = { coldMs, avgMs, p95Ms } (used by the perf scripts).
+    const ids = (q.get('cars') ?? 'tempest,meridian,ardent,sovereign').split(',');
+    const cw = 390, ch = 420, k = 2;
+    c.width = cw * k; c.height = ch * k; c.style.width = cw + 'px'; c.style.height = ch + 'px';
+    const ctx = c.getContext('2d');
+    const frame = (i) => {
+      ctx.fillStyle = '#2a3038'; ctx.fillRect(0, 0, c.width, c.height);
+      ids.forEach((id, n) => {
+        const car = look(id);
+        const len = (4.4 + (q.get('zoom') === '0' ? 0 : 0.25 * Math.sin(i / 90))) * 22 * k;
+        drawCar(ctx, id, 40 * k + n * 12 * k + (i % 50), (150 + n * 60) * k, len, { paint: car.paint, trim: car.trim, cache: true, detail: false, wheelAngle: i * 0.4, blur: 0.4 + (n % 2) * 0.5, nitro: n % 2 ? 1.2 : 0, brake: i % 40 < 8, headlights: 0.4 });
+      });
+    };
+    const t0 = performance.now(); frame(0); const coldMs = performance.now() - t0;
+    const times = []; let i = 1;
+    const step = () => { const a = performance.now(); frame(i++); times.push(performance.now() - a); if (times.length < 240) requestAnimationFrame(step); else { const s = [...times].sort((x, y) => x - y); window.__bench = { coldMs: +coldMs.toFixed(1), avgMs: +(times.reduce((x, y) => x + y, 0) / times.length).toFixed(2), p95Ms: +s[Math.floor(s.length * 0.95)].toFixed(2) }; } };
+    requestAnimationFrame(step);
   } else if (sheet === 'scenes') {
     // phone-size race frames for every theme (390x420 css each)
     const sw = 390, sh = 420, per = Math.max(1, Math.floor(W / sw));

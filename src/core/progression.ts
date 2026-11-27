@@ -1,7 +1,9 @@
 import {
   ACTIVE_FAMILIES, ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
-  PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, OFFLINE_BUDGET_RACES, SCRAP_VALUE, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
+  PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, OFFLINE_BUDGET_RACES, SCRAP_VALUE, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice,
+  STAGE_LINKS, SHELF_SLOTS, ORDER_DISCOUNT, TRADE_RATE, POLISHED_ORDER_MUL, AUTO_SHELF_RANK, SHELF_SORT_RANK, BATCH_MERGE_RANK,
+  CHAIN_BENCH_RANK, POLISHED_ORDER_RANK } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
 import { fillEmptyFromBench, fitRecommended, fitted } from './install';
 import type { GameEvent } from './events';
@@ -33,8 +35,151 @@ export const STAR_LABELS = ['Win', 'Under par', 'A Perfect boost'];
 /** Each goal pays once: half the event's win purse. */
 export const starCash = (e: RaceEvent) => roundCash(e.payout.cash[0] * 0.5);
 
+// ---------------- Car ladder (1.9: branches) ----------------
+
+/** The car you must own before chasing `c`: its `unlock.after`, else the enabled car before it in CARS. */
+export function carAfter(c: CarClass): CarId | null {
+  if (!c.unlock) return null;
+  if (c.unlock.after) return c.unlock.after;
+  const i = ENABLED_CARS.findIndex((x) => x.id === c.id);
+  return i > 0 ? ENABLED_CARS[i - 1].id : null;
+}
+/** A car you can work toward now: enabled, not owned, and the car before it is yours. */
+export const chaseable = (s: GameState, c: CarClass) =>
+  c.enabled && !!c.unlock && !s.owned.includes(c.id) && s.owned.includes(carAfter(c) as CarId);
+/** Every car you can work toward now, in ladder order (two at a branch: the Ardent and the Halcyon, the Meridian and
+ *  the Sovereign). An older car you skipped stays chaseable. */
+export const chaseableCars = (s: GameState): CarClass[] => ENABLED_CARS.filter((c) => chaseable(s, c));
+
+/** The car the garage is working toward: the one you picked (Next Goal), else the first chaseable car in ladder order. */
 export function nextCar(s: GameState): CarClass | null {
-  return ENABLED_CARS.find((c) => !s.owned.includes(c.id)) ?? null;
+  const list = chaseableCars(s);
+  const pick = s.goalPick ? list.find((c) => c.id === s.goalPick) : undefined;
+  return pick ?? recommendedCar(s) ?? ENABLED_CARS.find((c) => !s.owned.includes(c.id)) ?? null;
+}
+/** The car the game recommends when you have not picked one: the first chaseable car in ladder order, unless the
+ *  other car at a branch is clearly closer (a quarter of the way further along). */
+export function recommendedCar(s: GameState): CarClass | null {
+  const list = chaseableCars(s);
+  if (list.length <= 1) return list[0] ?? null;
+  const pr = list.map((c) => goalStatus(s, c)?.progress ?? 0);
+  let best = 0;
+  for (let i = 1; i < list.length; i++) if (pr[i] >= pr[best] + 0.25) best = i;
+  return list[best];
+}
+
+/** All of a car's requirements met (Rep, crafted keystone, its event, Downtown stars). */
+export function carReady(s: GameState, c: CarClass): boolean {
+  const u = c.unlock;
+  if (!u) return false;
+  return s.rep >= u.rep && craftedTier(s, u.family) >= u.tier && (!u.event || unlockEventDone(s, u.event)) && starsIn(s) >= (u.stars ?? 0);
+}
+
+/** 1.9 Persistence route: a car's unlock race also counts as done after this many live podiums there without a win
+ *  (a Main Event run counts when it reaches the final). The rival's own reward still needs the win. */
+export const PERSIST_PODIUMS = 3;
+/** The unlock race of a car is done: won, or PERSIST_PODIUMS live podiums there. */
+export const unlockEventDone = (s: GameState, eventId: string) => (s.events[eventId]?.wins ?? 0) > 0 || (s.events[eventId]?.podiums ?? 0) >= PERSIST_PODIUMS;
+/** "Win X" with the persistence route spelled out when it has started. */
+export function unlockEventText(s: GameState, eventId: string): string {
+  const e = eventById(eventId);
+  const n = s.events[eventId]?.podiums ?? 0;
+  const name = e.name.startsWith('The ') ? e.name : `the ${e.name}`;
+  return n > 0 ? `Win ${name} (or ${PERSIST_PODIUMS - n} more podium${PERSIST_PODIUMS - n > 1 ? 's' : ''} there)` : `Win ${name}`;
+}
+
+// ---------------- Unlock stages (1.9) ----------------
+// Every car from the Vexa GTi on is unlocked in stages that each pay something you can use at once:
+//   half    reach the halfway Rep -> a part toward the keystone (two tiers under it)
+//   key     craft the keystone   -> a free Tune-up stage for the car you drive (cash of equal value if it is fully tuned)
+//   podium  a top 3 in the car's unlock race -> scrap worth two race-day kits at that class
+//   + STAGE_LINKS: a win elsewhere that hands over a big ingredient (the Ardent's track day -> a T8 Turbo for the
+//     Halcyon; the Meridian's autoroute -> a T9 Engine for the Sovereign; ...)
+// Paid stages are saved in `s.stagesPaid` as `${car}:${id}`; each pays once. Stages pay only while their car is
+// chaseable (or in the transaction that unlocks it), so an older save is not back-paid for cars it already owns.
+
+export type StageTest = { rep: number } | { craft: { family: Family; tier: number } } | { podium: string } | { win: string };
+export interface StageReward { part?: { family: Family; tier: number }; tune?: true; scrap?: number; cash?: number }
+export interface StageDef { key: string; id: string; car: CarId; label: string; test: StageTest; reward: StageReward }
+
+const STAGES_FROM_REP = 500;
+const stageCache = new Map<CarId, StageDef[]>();
+/** The stages of one car's unlock, in order (empty for the first two cars). */
+export function carStages(c: CarClass): StageDef[] {
+  const hit = stageCache.get(c.id);
+  if (hit) return hit;
+  const out: StageDef[] = [];
+  const u = c.unlock;
+  if (u && u.rep >= STAGES_FROM_REP) {
+    const prev = carAfter(c);
+    const prevRep = prev ? carById(prev).unlock?.rep ?? 0 : 0;
+    const half = roundRep(prevRep + (u.rep - prevRep) / 2);
+    const fam = FAMILIES[u.family].name;
+    const add = (id: string, label: string, test: StageTest, reward: StageReward) => out.push({ key: `${c.id}:${id}`, id, car: c.id, label, test, reward });
+    add('half', `Reach ${half.toLocaleString('en-US')} Rep`, { rep: half }, { part: { family: u.family, tier: Math.max(1, u.tier - 2) } });
+    add('key', `Craft a T${u.tier} ${fam}`, { craft: { family: u.family, tier: u.tier } }, { tune: true });
+    if (u.event) add('podium', `A top 3 in ${eventById(u.event).name}`, { podium: u.event }, { scrap: SCRAP_VALUE[c.cap] ?? 0 });
+    for (const l of STAGE_LINKS[c.id] ?? []) add(l.id, l.label, { win: l.win }, l.reward);
+  }
+  stageCache.set(c.id, out);
+  return out;
+}
+const roundRep = (x: number) => (x >= 2000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10);
+
+export const stagePaid = (s: GameState, key: string) => (s.stagesPaid ?? []).includes(key);
+export function stageMet(s: GameState, d: StageDef): boolean {
+  const t = d.test;
+  if ('rep' in t) return s.rep >= t.rep;
+  if ('craft' in t) return craftedTier(s, t.craft.family) >= t.craft.tier;
+  if ('podium' in t) return (s.events[t.podium]?.bestPlace ?? 4) <= 3 && (s.events[t.podium]?.starts ?? 0) > 0;
+  return (s.events[t.win]?.wins ?? 0) > 0;
+}
+/** One line for a stage's payout, from the same data that pays it. */
+export function stageRewardText(s: GameState, r: StageReward): string {
+  const out: string[] = [];
+  if (r.part) out.push(`a T${r.part.tier} ${FAMILIES[r.part.family].name}`);
+  if (r.tune) {
+    const car = carById(s.activeCar);
+    const st = s.tune?.[s.activeCar] ?? 0;
+    out.push(st < TUNE_STAGES ? `a free Tune-up stage for your ${car.model} (worth $${tunePrice(s.activeCar, st).toLocaleString('en-US')})` : `$${tunePrice(s.activeCar, TUNE_STAGES - 1).toLocaleString('en-US')} (your ${car.model} is fully tuned)`);
+  }
+  if (r.scrap) out.push(`${r.scrap.toLocaleString('en-US')} scrap`);
+  if (r.cash) out.push(`$${r.cash.toLocaleString('en-US')}`);
+  return out.join(' + ');
+}
+export interface StageView { key: string; label: string; done: boolean; paid: boolean; reward: string }
+export function stageViews(s: GameState, c: CarClass): StageView[] {
+  return carStages(c).map((d) => ({ key: d.key, label: d.label, done: stagePaid(s, d.key) || stageMet(s, d), paid: stagePaid(s, d.key), reward: stageRewardText(s, d.reward) }));
+}
+
+function payStage(s: GameState, d: StageDef, events: GameEvent[]) {
+  (s.stagesPaid ??= []).push(d.key);
+  const r = d.reward;
+  if (r.part) {
+    // the bench, else the shelf when auto-shelving is on, else first in the crate queue: never lost
+    s.crates.unshift({ kind: 'targeted', family: r.part.family, tier: r.part.tier, source: 'shop' });
+    events.push(...openCrates(s, 1));
+  }
+  if (r.tune) {
+    const st = s.tune?.[s.activeCar] ?? 0;
+    if (st < TUNE_STAGES) (s.tune ??= {})[s.activeCar] = st + 1;
+    else { const c = tunePrice(s.activeCar, TUNE_STAGES - 1); s.cash += c; s.stats.earned = (s.stats.earned ?? 0) + c; events.push({ type: 'cash', amount: c, reason: 'stage' }); }
+  }
+  if (r.scrap) s.scrap += r.scrap;
+  if (r.cash) { s.cash += r.cash; s.stats.earned = (s.stats.earned ?? 0) + r.cash; events.push({ type: 'cash', amount: r.cash, reason: 'stage' }); }
+}
+
+/** Pay every stage met by a chaseable car (or by `extra`, a car unlocking in this transaction). Returns the keys paid. */
+export function payStages(s: GameState, events: GameEvent[], extra?: CarClass): string[] {
+  const paid: string[] = [];
+  const cars = chaseableCars(s);
+  if (extra && !cars.includes(extra)) cars.push(extra);
+  for (const c of cars) for (const d of carStages(c)) {
+    if (stagePaid(s, d.key) || !stageMet(s, d)) continue;
+    payStage(s, d, events);
+    paid.push(d.key);
+  }
+  return paid;
 }
 
 export interface GoalStatus {
@@ -52,8 +197,8 @@ export interface GoalStatus {
   line: string;
 }
 
-export function goalStatus(s: GameState): GoalStatus | null {
-  const car = nextCar(s);
+export function goalStatus(s: GameState, forCar?: CarClass): GoalStatus | null {
+  const car = forCar ?? nextCar(s);
   if (!car || !car.unlock) return null;
   const u = car.unlock;
   const keystoneDone = craftedTier(s, u.family) >= u.tier;
@@ -64,7 +209,7 @@ export function goalStatus(s: GameState): GoalStatus | null {
   // Count ingredients usable in the recipe, including lower tiers that can merge into it.
   const units = ingredients.reduce((sum, p) => sum + (p.t < u.tier ? 2 ** (p.t - 1) : 0), 0);
   const keyFrac = keystoneDone ? 1 : Math.min(1, units / 2 ** (u.tier - 1));
-  const eventDone = !u.event || (s.events[u.event]?.wins ?? 0) > 0;
+  const eventDone = !u.event || unlockEventDone(s, u.event);
   const starsHave = Math.min(starsIn(s), u.stars ?? 0);
   const starsDone = starsHave >= (u.stars ?? 0);
   const keyPart = keystoneDone ? 1 : Math.min(0.95, craftedTier(s, u.family) / u.tier);
@@ -73,7 +218,7 @@ export function goalStatus(s: GameState): GoalStatus | null {
   const fam = FAMILIES[u.family];
   const parts: string[] = [];
   if (!keystoneDone) parts.push(`Craft T${u.tier} ${fam.name}`);
-  if (!eventDone) parts.push(`Win ${eventById(u.event!).name.startsWith('The ') ? '' : 'the '}${eventById(u.event!).name}`);
+  if (!eventDone) parts.push(unlockEventText(s, u.event!));
   if (!starsDone) parts.push(`${u.stars! - starsHave} more star${u.stars! - starsHave > 1 ? 's' : ''}`);
   if (s.rep < u.rep) parts.push(`${u.rep - s.rep} more Rep`);
   const line = parts.length ? `${parts.join(' · ')} to unlock the ${car.model}` : `The ${car.model} is ready`;
@@ -81,13 +226,15 @@ export function goalStatus(s: GameState): GoalStatus | null {
 }
 
 /** Grant any newly satisfied cars. Ownership is committed before any reveal animation. */
-export function checkUnlocks(s: GameState, events: GameEvent[]) {
+export function checkUnlocks(s: GameState, events: GameEvent[], stages = true) {
   for (;;) {
-    const car = nextCar(s);
-    if (!car || !car.unlock) return;
-    const ev = car.unlock.event;
-    if (s.rep >= car.unlock.rep && craftedTier(s, car.unlock.family) >= car.unlock.tier && (!ev || (s.events[ev]?.wins ?? 0) > 0) && starsIn(s) >= (car.unlock.stars ?? 0)) {
+    if (stages) payStages(s, events);
+    const car = chaseableCars(s).find((c) => carReady(s, c));
+    if (!car) return;
+    {
+      if (stages) payStages(s, events, car); // stages met in the same transaction still pay
       s.owned.push(car.id);
+      if (s.goalPick === car.id) s.goalPick = null; // the picked goal is reached: back to the recommendation
       s.activeCar = car.id;
       s.pendingReveal ??= car.id;
       s.stats.milestones[car.id] = Math.round(s.activeS);
@@ -97,7 +244,7 @@ export function checkUnlocks(s: GameState, events: GameEvent[]) {
       events.push(...fitRecommended(s, car.id));
       // a car that gave up a part gets the best bench part back in that slot, so older cars stay raceable
       for (const other of s.owned) if (other !== car.id) events.push(...fillEmptyFromBench(s, other));
-    } else return;
+    }
   }
 }
 
@@ -154,19 +301,43 @@ export const mergeAllUnlocked = (s: GameState) => s.stats.races >= MERGE_ALL_UNL
 
 // ---------------- Upgrades ----------------
 
-export function upgradeCost(s: GameState, id: UpgradeId): number | null {
+/** The next rank's list price (null when maxed). */
+export function upgradeListCost(s: GameState, id: UpgradeId): number | null {
   const def = UPGRADES.find((u) => u.id === id)!;
-  const lvl = s.upgrades[id];
+  const lvl = s.upgrades[id] ?? 0;
   return lvl < def.levels.length ? def.levels[lvl].cost : null;
 }
+/** Cash credit from parts contributed toward this upgrade's next rank (core/shelf.contributeParts), never more than
+ *  the rank's share cap; it always leaves the price on a cash step. */
+export const upgradeCreditOf = (s: GameState, id: UpgradeId): number => {
+  const list = upgradeListCost(s, id);
+  return list === null ? 0 : Math.max(0, Math.min(s.upgradeCredit?.[id] ?? 0, list));
+};
+/** What the next rank costs now: list price less contributed credit (null when maxed). */
+export function upgradeCost(s: GameState, id: UpgradeId): number | null {
+  const list = upgradeListCost(s, id);
+  return list === null ? null : list - upgradeCreditOf(s, id);
+}
+/** Why the next rank is not on sale yet (null when it is): the upgrade opens later, or this rank opens with a car. */
+export function upgradeLock(s: GameState, id: UpgradeId): string | null {
+  const def = UPGRADES.find((u) => u.id === id)!;
+  if (!upgradeShown(s, def)) return SHOWS_TEXT[def.shows ?? 'always'];
+  const next = def.levels[s.upgrades[id] ?? 0];
+  if (next?.opens && !s.owned.includes(next.opens)) return `Opens with the ${carById(next.opens).model}`;
+  return null;
+}
+const SHOWS_TEXT = { always: '', quick: 'Opens after your first race win', cars3: 'Opens with your third car', cars4: 'Opens with your fourth car', cars7: 'Opens with your seventh car' } as const;
 
 export function buyUpgrade(s: GameState, id: UpgradeId): GameEvent[] {
   const cost = upgradeCost(s, id);
   if (cost === null) return [{ type: 'invalid', reason: 'Maxed' }];
+  const lock = upgradeLock(s, id);
+  if (lock) return [{ type: 'invalid', reason: lock }];
   if (s.cash < cost) return [{ type: 'invalid', reason: `Need $${cost - s.cash} more` }];
   s.cash -= cost;
   s.stats.spent = (s.stats.spent ?? 0) + cost;
-  s.upgrades[id]++;
+  s.upgrades[id] = (s.upgrades[id] ?? 0) + 1;
+  if (s.upgradeCredit && s.upgradeCredit[id]) s.upgradeCredit[id] = 0; // the credit was spent on this rank
   if (id === 'grid') expandBoard(s);
   return openCrates(s);
 }
@@ -303,7 +474,6 @@ export function upgradeEffect(s: GameState, id: UpgradeId): { now: string; next:
   const lvl = s.upgrades[id] ?? 0;
   const odds = (l: number) => CRATE_TIER_ODDS[Math.min(l, CRATE_TIER_ODDS.length - 1)].map((w, i) => (w > 0 ? `${Math.round(w * 100)}% T${i + 1}` : '')).filter(Boolean).join(' · ');
   switch (id) {
-    case 'grid': return { now: lvl ? 'Board 6×7' : 'Board 5×6', next: 'Board 6×7 (+12 slots)' };
     case 'printer': return { now: `Crate every ${PRINTER_INTERVAL_S[lvl]} s`, next: `every ${PRINTER_INTERVAL_S[lvl + 1] ?? PRINTER_INTERVAL_S[lvl]} s` };
     case 'crateTier': return { now: odds(lvl), next: odds(lvl + 1) };
     case 'crew': return { now: `Quick Races pay ${Math.round(QUICK_PAY_SHARE[Math.min(lvl, QUICK_PAY_SHARE.length - 1)] * 100)}%`, next: `${Math.round(QUICK_PAY_SHARE[Math.min(lvl + 1, QUICK_PAY_SHARE.length - 1)] * 100)}% of the live purse` };
@@ -313,6 +483,22 @@ export function upgradeEffect(s: GameState, id: UpgradeId): { now: string; next:
       const usd = (x: number) => `$${x.toLocaleString('en-US')}`;
       return { now: `Away: up to ${usd(offlineBudget(s, lvl))} over ${hrs(lvl)} h`, next: `up to ${usd(offlineBudget(s, lvl + 1))} over ${hrs(lvl + 1)} h` };
     }
+    // 1.9 Garage paths: what each rank does, from the same constants the rules read
+    case 'storage': {
+      const at = (l: number) => [`Shelf holds ${SHELF_SLOTS[Math.min(l, SHELF_SLOTS.length - 1)]} parts`, l >= AUTO_SHELF_RANK ? 'reward parts overflow onto it' : '', l >= SHELF_SORT_RANK ? 'one-tap store over-cap' : ''].filter(Boolean).join(' · ');
+      return { now: at(lvl), next: at(lvl + 1) };
+    }
+    case 'workshop': {
+      const disc = (l: number) => ORDER_DISCOUNT[Math.min(l, ORDER_DISCOUNT.length - 1)];
+      const at = (l: number) => [disc(l) ? `Orders ${Math.round(disc(l) * 100)}% off` : 'Orders at list price',
+        l >= POLISHED_ORDER_RANK ? `Polished orders (×${POLISHED_ORDER_MUL})` : '', `trade-ins ×${TRADE_RATE[Math.min(l, TRADE_RATE.length - 1)]}`].filter(Boolean).join(' · ');
+      return { now: at(lvl), next: at(lvl + 1) };
+    }
+    case 'grid': {
+      const at = (l: number) => [l >= 1 ? 'Board 6×7' : 'Board 5×6', l >= BATCH_MERGE_RANK ? 'Merge All by family' : '', l >= CHAIN_BENCH_RANK ? 'Merge All banks up to 2 nitro' : ''].filter(Boolean).join(' · ');
+      return { now: at(lvl), next: at(lvl + 1) };
+    }
+    default: return { now: '', next: '' };
   }
 }
 
@@ -497,6 +683,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   rec.starts++;
   rec.bestPlace = Math.min(rec.bestPlace, o.place);
   if (o.place === 1) rec.wins++;
+  if (input.mode === 'live' && o.place <= 3 && !e.heatOf) rec.podiums = (rec.podiums ?? 0) + 1; // 1.9 persistence route
   const liveTime = input.mode === 'live' ? o.playerTime : null;
   const personalBest = liveTime !== null && rec.bestTime !== null && liveTime < rec.bestTime;
   if (liveTime !== null && rec.bestTime === null) rec.bestTime = liveTime;
@@ -578,6 +765,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     const prec = (s.events[parent.id] ??= { wins: 0, starts: 0, bestPlace: 4, bestTime: null });
     if (idx === 0) prec.starts++;
     const champion = advanced && last;
+    if (last) prec.podiums = (prec.podiums ?? 0) + 1; // 1.9 persistence route: reaching and finishing the final
     if (champion) { prec.wins++; prec.bestPlace = 1; s.knockout = null; }
     else if (advanced) s.knockout = { heat: idx + 1 };
     else s.knockout = null;
@@ -668,7 +856,7 @@ export function recommendedEvent(s: GameState): RaceEvent {
   // After the main route, bring an earlier car back for a class meet it hasn't won yet.
   if (s.owned.includes('muscle')) {
     const meet = EVENTS.find((e) => e.carOnly && e.carOnly !== s.activeCar && s.owned.includes(e.carOnly) && !(s.events[e.id]?.wins)
-      && eventUnlocked({ ...s, activeCar: e.carOnly }, e).ok);
+      && eventUnlocked({ ...s, activeCar: e.carOnly }, e).ok && !struggling(e)); // a meet you keep losing is spaced out too
     if (meet) return meet;
   }
   // Downtown Nights: goals not yet met are worth more than repeat Rep, and they open the next car.

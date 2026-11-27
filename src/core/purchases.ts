@@ -6,11 +6,11 @@ import {
   scrapOrderCost, styleItem, tunePrice,
 } from '../data/tables';
 import { KITS, KIT_SHELF_MAX, KitId, kitById } from '../data/fabrication';
-import { orderMaxTier } from './board';
+import { orderMaxTier, orderPrice } from './board';
 import { fabOpen, kitCount, kitPrice } from './fabrication';
 import { fitted } from './install';
 import { loadoutWith } from './loadout';
-import { upgradeCost, upgradeEffect, upgradeShown } from './progression';
+import { upgradeCost, upgradeEffect, upgradeLock, upgradeShown } from './progression';
 import { restoreInfo } from './projects';
 import type { GameState, Part } from './state';
 import { owned as styleOwned, shopItems } from './style';
@@ -76,14 +76,14 @@ export function purchaseInfo(s: GameState, id: string): PurchaseInfo | null {
       const cost = upgradeCost(s, def.id);
       const eff = upgradeEffect(s, def.id);
       return finish(s, { id, kind: 'upgrade', name: def.name, price: cost ?? 0, currency: 'cash', maxed: cost === null,
-        benefit: cost === null ? `Maxed: ${eff.now}` : `${eff.now} → ${eff.next}`, locked: upgradeShown(s, def) ? null : 'Opens later in the ladder' });
+        benefit: cost === null ? `Maxed: ${eff.now}` : `${eff.now} → ${eff.next}`, locked: cost === null ? null : upgradeShown(s, def) ? upgradeLock(s, def.id) : 'Opens later in the ladder' });
     }
     case 'order': case 'scrapOrder': {
       const f = a as Family, t = Number(b);
       if (!ACTIVE_FAMILIES.includes(f) || !Number.isInteger(t) || t < 1 || !PART_ORDER_PRICE[t]) return null;
       const max = orderMaxTier(s);
       const cash = kind === 'order';
-      return finish(s, { id, kind, name: `T${t} ${FAMILIES[f].name}`, price: cash ? PART_ORDER_PRICE[t] : scrapOrderCost(t), currency: cash ? 'cash' : 'scrap', maxed: false,
+      return finish(s, { id, kind, name: `T${t} ${FAMILIES[f].name}`, price: cash ? orderPrice(s, t) : scrapOrderCost(t), currency: cash ? 'cash' : 'scrap', maxed: false,
         benefit: partBenefit(s, f, t), locked: t > max ? `T${t} sells once you own a car that runs T${t + 1} or chase one (now up to T${max})` : null });
     }
     case 'polish': {

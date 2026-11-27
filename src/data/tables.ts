@@ -1,5 +1,6 @@
 // Rev Up — data tables. All tuning knobs live here so rules stay data-driven.
 // Values marked "tunable" are referenced by the playthrough test and README.
+import { CIRCUIT_EVENTS, CIRCUIT_RIVALS, CIRCUIT_TRACKS } from './circuit'; // 1.9 Circuit (Racing workstream; data/circuit.ts imports only types from here)
 
 export type Family = 'engine' | 'tires' | 'turbo' | 'transmission' | 'aero';
 export type Quality = 'std' | 'polished' | 'mint';
@@ -84,15 +85,23 @@ export const BOARD_BASE = { cols: 5, rows: 6 };
 export const BOARD_EXPANDED = { cols: 6, rows: 7 };
 export const TRAY_SLOTS = 4;
 
-export type UpgradeId = 'grid' | 'printer' | 'crateTier' | 'nitroTank' | 'crew' | 'lockup';
+export type UpgradeId = 'grid' | 'printer' | 'crateTier' | 'nitroTank' | 'crew' | 'lockup' | 'storage' | 'workshop';
+export interface UpgradeLevel {
+  cost: number;
+  label: string;
+  /** 1.9: this rank goes on sale once you own this car (later ranks are staggered through the campaign). */
+  opens?: CarId;
+}
 export interface UpgradeDef {
   id: UpgradeId;
   name: string;
   /** One line on what it is for, shown above the next level's exact effect. */
   about: string;
-  levels: { cost: number; label: string }[];
+  levels: UpgradeLevel[];
   /** Shown in the Workshop once this is true, so the early catalogue stays short. */
   shows?: 'always' | 'quick' | 'cars3' | 'cars4' | 'cars7';
+  /** 1.9 Garage paths: the three multi-rank paths shown first in the Shop's Garage tab. */
+  path?: 'bench' | 'storage' | 'workshop';
 }
 
 export const PRINTER_INTERVAL_S = [20, 16, 13, 10, 8]; // by printer level
@@ -105,8 +114,53 @@ export const CRATE_TIER_ODDS: number[][] = [
   [0.15, 0.5, 0.35], // late: a third T3 parts
 ];
 
+// ---- 1.9 Garage paths: the Parts Shelf (storage), the bench and the workshop counter
+/** Parts Shelf slots by Storage rank (rank 0 is the free starter shelf). */
+export const SHELF_SLOTS = [4, 10, 16, 24, 36];
+/** Storage rank from which reward parts that find no room on the bench or rack go onto the shelf. */
+export const AUTO_SHELF_RANK = 2;
+/** Storage rank from which one tap shelves every over-cap part on the bench. */
+export const SHELF_SORT_RANK = 3;
+/** Bench rank for Merge All by family, and for Merge All banking up to two nitro from long chains. */
+export const BATCH_MERGE_RANK = 2;
+export const CHAIN_BENCH_RANK = 3;
+/** Cash part orders: discount by Workshop rank (rank 4 replaces rank 1's 10% with 20%). */
+export const ORDER_DISCOUNT = [0, 0.1, 0.1, 0.1, 0.2];
+/** Workshop rank that sells Polished parts (+15%) for this multiple of the order price. */
+export const POLISHED_ORDER_RANK = 2;
+export const POLISHED_ORDER_MUL = 1.5;
+/** Trade-ins: surplus parts count their recycle value × this toward a chosen part (by Workshop rank). Always < 2
+ *  (an ordered part costs 2× its recycle value), so trading a part back can never buy itself again. */
+export const TRADE_RATE = [1, 1, 1, 1.25, 1.25];
+/** Contributing parts to a Garage upgrade: cash credit per scrap of recycle value, at most half the rank's price.
+ *  The cheapest cash part (a $40 T1, recycle 1) credits $6, so buying parts to fund upgrades always loses. */
+export const CONTRIBUTE_CASH_PER_SCRAP = 6;
+export const CONTRIBUTE_MAX_SHARE = 0.5;
+
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'grid', name: 'Bigger bench', about: 'More room to line up merges.', levels: [{ cost: 600, label: 'Board grows from 5×6 to 6×7 (+12 slots)' }] },
+  {
+    id: 'grid', name: 'Bench', about: 'More room, and better tools for lining up merges.', path: 'bench', levels: [
+      { cost: 600, label: 'Board grows from 5×6 to 6×7 (+12 slots)' },
+      { cost: 2800, label: 'Batch merge: Merge All one family at a time (Engines, Tires or Turbos only)', opens: 'muscle' },
+      { cost: 12000, label: 'Chain bench: Merge All banks up to 2 nitro from long chains (was 1)', opens: 'rally' },
+    ],
+  },
+  {
+    id: 'storage', name: 'Parts Shelf', about: 'Storage off the merge board for over-cap and surplus parts.', path: 'storage', levels: [
+      { cost: 400, label: 'Shelf holds 10 parts (was 4)' },
+      { cost: 2500, label: 'Shelf holds 16, and reward parts that find no room on the bench go onto the shelf instead of waiting', opens: 'muscle' },
+      { cost: 9000, label: 'Shelf holds 24, and one tap stores every over-cap part on the bench', opens: 'super' },
+      { cost: 24000, label: 'Shelf holds 36 parts', opens: 'vireo' },
+    ],
+  },
+  {
+    id: 'workshop', name: 'Workshop counter', about: 'Targeted part orders: cheaper, better quality, better trade-ins.', path: 'workshop', shows: 'cars3', levels: [
+      { cost: 1200, label: 'Order desk: cash part orders 10% off', opens: 'hothatch' },
+      { cost: 4500, label: 'Quality orders: order any part Polished (+15%) for 1.5× its price', opens: 'tourer' },
+      { cost: 14000, label: 'Trade counter: surplus trade-ins count 1.25× toward a chosen part (was 1×)', opens: 'rally' },
+      { cost: 30000, label: 'Specialist desk: cash part orders 20% off', opens: 'vireo' },
+    ],
+  },
   {
     id: 'printer', name: 'Faster printer', about: 'The free crate printer in your garage.', levels: [
       { cost: 250, label: 'Crate every 16 s' },
@@ -167,7 +221,7 @@ export const nitroCapFor = (tankLevel: number) => NITRO_CAP + tankLevel;
  *  car for players who don't land Perfect boosts; skilled players can save the money. Not used in the Stock Cup. */
 export const TUNE_STAGES = 3;
 export const TUNE_STEP = 0.02;
-export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600, rally: 4500, gt: 5500, proto: 7000, vireo: 8000, mako: 9000, sovereign: 11000 };
+export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600, rally: 4500, gt: 5500, proto: 7000, vireo: 8000, mako: 9000, sovereign: 11000, ardent: 7000, meridian: 9500, tempest: 12000 };
 /** Stage 0→1, 1→2, 2→3: ×1, ×1.6, ×2.2 of the car's base, on a cash step (Tapeback $120 / $190 / $260). */
 export const tunePrice = (car: CarId, stage: number) => roundCash((TUNE_PRICE[car] ?? 1000) * (1 + stage * 0.6));
 
@@ -218,7 +272,11 @@ export interface CarClass {
   cap: number;
   base: { top: number; accel: number; grip: number };
   /** Rep + a crafted keystone, and optionally a won event (e.g. a rival series final). */
-  unlock: null | { rep: number; family: Family; tier: number; event?: string; stars?: number };
+  unlock: null | { rep: number; family: Family; tier: number; event?: string; stars?: number;
+    /** 1.9: the car you must own before chasing this one (default: the car before it in CARS). Two cars with the
+     *  same `after` are a branch: both can be chased at once (the Ardent beside the Halcyon, the Meridian beside the
+     *  Sovereign). */
+    after?: CarId };
   /** Perfect boosts on this car hit harder than the usual 1.5× (the Lumen RS's Surge). */
   perfectMul?: number;
   enabled: boolean;
@@ -261,13 +319,13 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'hothatch', name: 'Hot hatch', model: 'Vexa GTi', district: 'suburbs', cap: 4,
-    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 600, family: 'turbo', tier: 4 }, enabled: true,
+    base: { top: 36, accel: 5.0, grip: 0.84 }, unlock: { rep: 520, family: 'turbo', tier: 4 }, enabled: true,
     paint: '#e9e4d8', trim: '#d7262e', blurb: 'Short, sharp, and loud. A red pinstripe and a roof spoiler that means it.',
     offlineRate: 3, rev: { base: 80, peak: 260 },
   },
   {
     id: 'muscle', name: 'Muscle', model: 'Ironhorse 455', district: 'suburbs', cap: 5,
-    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1850, family: 'engine', tier: 5 }, enabled: true,
+    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1650, family: 'engine', tier: 5 }, enabled: true,
     paint: '#1f3a5f', trim: '#f2b33d', blurb: 'A restored long-hood coupe with twin stripes and a V8 you can feel in your chest.',
     offlineRate: 4, rev: { base: 45, peak: 160 },
   },
@@ -298,13 +356,20 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'gt', name: 'Endurance GT', model: 'Strata GTR', district: 'summit', cap: 8,
-    base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 9500, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
+    base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 8800, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
     paint: '#d5dade', trim: '#d6202a', blurb: 'A wide endurance racer with a splitter, a swan-neck wing and race numbers. Built to run flat out for hours.',
     offlineRate: 13, rev: { base: 70, peak: 260 }, handling: 'Aero grip: the fastest car through fast sweepers, strong at speed (~200 mph on a long straight, fully built). Softer off the line than the Corvo.',
   },
+  // ---- 1.9 Circuit: the Ardent Spyder is a branch beside the Halcyon X (both open with the Strata GTR)
+  {
+    id: 'ardent', name: 'Track car', model: 'Ardent Spyder', district: 'summit', cap: 8,
+    base: { top: 47, accel: 7.6, grip: 1.5 }, unlock: { rep: 11000, family: 'turbo', tier: 8, event: 'glacier-pass', after: 'gt' }, enabled: true,
+    paint: '#f26a1b', trim: '#20242b', blurb: 'A featherweight open-top track car: carbon tub, roll hoops, no roof, no carpet. Every corner is a chance.',
+    offlineRate: 14, rev: { base: 100, peak: 360 }, handling: 'The lightest car in the game: unbeatable through tight, technical bends; gives up top speed on long straights.',
+  },
   {
     id: 'proto', name: 'Prototype', model: 'Halcyon X', district: 'summit', cap: 9,
-    base: { top: 54, accel: 7.4, grip: 1.36 }, unlock: { rep: 14000, family: 'turbo', tier: 9, event: 'summit-1000' }, enabled: true,
+    base: { top: 54, accel: 7.4, grip: 1.36 }, unlock: { rep: 13500, family: 'turbo', tier: 9, event: 'summit-1000', after: 'gt' }, enabled: true,
     paint: '#1d4e6b', trim: '#36f0d0', blurb: 'A closed-cockpit prototype with a shark fin and a light blade. The fastest thing in the game, and the hardest to drive well.',
     offlineRate: 16, rev: { base: 90, peak: 340 }, handling: 'The highest top speed (~225 mph on a long straight, fully built) and strong everywhere, with the narrowest shift light in the game: missed shifts cost it the most.',
   },
@@ -319,32 +384,27 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'mako', name: 'Supercar', model: 'Mako TT', district: 'riviera', cap: 9,
-    base: { top: 51, accel: 8.6, grip: 1.24 }, unlock: { rep: 18500, family: 'engine', tier: 9, event: 'corniche' }, enabled: true,
+    base: { top: 51, accel: 8.6, grip: 1.24 }, unlock: { rep: 18000, family: 'engine', tier: 9, event: 'corniche' }, enabled: true,
     paint: '#1c2a24', trim: '#c7f23a', blurb: 'A wide, angry twin-turbo coupe with side gills and quad exits. All shove, all the time.',
     offlineRate: 17, rev: { base: 70, peak: 280 }, handling: 'Twin-turbo punch: the hardest launch and pull out of slow corners and short straights; heavier through long sweepers.',
   },
-  {
-    id: 'sovereign', name: 'Flagship', model: 'Sovereign', district: 'riviera', cap: 10,
-    base: { top: 58, accel: 8.4, grip: 1.36 }, unlock: { rep: 23000, family: 'engine', tier: 10, event: 'port-sprint' }, enabled: true,
-    paint: '#f1ece2', trim: '#c9a24a', blurb: 'The flagship: a long, low V12 hybrid with a blade of light front and rear. The car the whole garage builds toward.',
-    offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The only car that runs T10 parts: the fastest in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
-  },
-  // ---- 1.9 Circuit supercars (placeholders: the Progression agent places them on the ladder and enables them)
-  {
-    id: 'ardent', name: 'Track car', model: 'Ardent Spyder', district: 'summit', cap: 8,
-    base: { top: 47, accel: 7.6, grip: 1.5 }, unlock: { rep: 11000, family: 'tires', tier: 8 }, enabled: false,
-    paint: '#f26a1b', trim: '#20242b', blurb: 'A featherweight open-top track car: carbon tub, roll hoops, no roof, no carpet. Every corner is a chance.',
-    offlineRate: 14, rev: { base: 100, peak: 360 }, handling: 'The lightest car in the game: unbeatable through tight, technical bends; gives up top speed on long straights.',
-  },
+  // ---- 1.9 Circuit: the Meridian LT is a branch beside the Sovereign (both open with the Mako TT)
   {
     id: 'meridian', name: 'Highway supercar', model: 'Meridian LT', district: 'riviera', cap: 9,
-    base: { top: 57, accel: 7.2, grip: 1.28 }, unlock: { rep: 16500, family: 'engine', tier: 9 }, enabled: false,
+    base: { top: 57, accel: 7.2, grip: 1.28 }, unlock: { rep: 20000, family: 'engine', tier: 9, event: 'port-sprint', after: 'mako' }, enabled: true,
     paint: '#2f6fe0', trim: '#e8edf3', blurb: 'A long-tail highway supercar with a glass canopy and a light bar the width of the car. Built for the longest straight you can find.',
     offlineRate: 17, rev: { base: 75, peak: 300 }, handling: 'The fastest car of its tier on long, open roads; calm and stable at speed, slower to change direction.',
   },
   {
+    id: 'sovereign', name: 'Flagship', model: 'Sovereign', district: 'riviera', cap: 10,
+    base: { top: 58, accel: 8.4, grip: 1.36 }, unlock: { rep: 22500, family: 'engine', tier: 10, event: 'port-sprint', after: 'mako' }, enabled: true,
+    paint: '#f1ece2', trim: '#c9a24a', blurb: 'The flagship: a long, low V12 hybrid with a blade of light front and rear. The car the whole garage builds toward.',
+    offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The only car that runs T10 parts: the fastest in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
+  },
+  // ---- 1.9 Circuit: the Tempest E4, the last car (after the Sovereign beats Aurelia Stern)
+  {
     id: 'tempest', name: 'Electric flagship', model: 'Tempest E4', district: 'riviera', cap: 10,
-    base: { top: 59, accel: 9.0, grip: 1.42 }, unlock: { rep: 30000, family: 'turbo', tier: 10 }, enabled: false,
+    base: { top: 59, accel: 9.0, grip: 1.42 }, unlock: { rep: 27000, family: 'turbo', tier: 10, event: 'grand-riviera', after: 'sovereign' }, enabled: true,
     paint: '#101418', trim: '#5ef2ff', blurb: 'A four-motor electric flagship with a light-blade face and a launch that pins you to the seat. The last word in the garage.',
     offlineRate: 19, rev: { base: 120, peak: 420 }, handling: 'The hardest launch in the game and a silent, endless pull; heavy, so it needs grip parts for tight bends.',
   },
@@ -352,6 +412,15 @@ export const CARS: CarClass[] = [
 ];
 
 export const ENABLED_CARS = CARS.filter((c) => c.enabled);
+/** 1.9 Unlock stages beyond the standard three (halfway Rep, keystone, a top 3 in the unlock race; see
+ *  progression.carStages): a win elsewhere that hands over a big ingredient for this car. */
+export const STAGE_LINKS: Partial<Record<CarId, { id: string; label: string; win: string; reward: { part?: { family: Family; tier: number }; cash?: number; scrap?: number } }[]>> = {
+  gt: [{ id: 'revival', label: 'Win the Ironhorse Revival', win: 'ironhorse-revival', reward: { part: { family: 'engine', tier: 7 } } }],
+  // the Ardent's and the Meridian's own races (data/circuit.ts) hand over an ingredient for the car beside them
+  proto: [{ id: 'esplanade', label: 'Win the Esplanade Grand Prix (Ardent Spyder)', win: 'esplanade-gp', reward: { part: { family: 'turbo', tier: 8 } } }],
+  sovereign: [{ id: 'causeway', label: 'Win the Causeway Run (Meridian LT)', win: 'causeway-run', reward: { part: { family: 'engine', tier: 9 } } }],
+  tempest: [{ id: 'causeway', label: 'Win the Causeway Run (Meridian LT)', win: 'causeway-run', reward: { part: { family: 'turbo', tier: 9 } } }],
+};
 export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: string; stripe: string }>> = {
   junker: { name: 'Petrol Blue', paint: '#237481', stripe: '#e6b366' },
   beater: { name: 'Creamline', paint: '#d2b58b', stripe: '#394252' },
@@ -366,6 +435,9 @@ export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: st
   vireo: { name: 'Rosso Lacets', paint: '#9e1b22', stripe: '#f4f1ea' },
   mako: { name: 'Deep Reef', paint: '#0f4a52', stripe: '#c7f23a' },
   sovereign: { name: 'Royal Ink', paint: '#141a3a', stripe: '#d8b45a' },
+  ardent: { name: 'Graphite Flare', paint: '#2b2f36', stripe: '#f26a1b' },
+  meridian: { name: 'Midnight Meridian', paint: '#13254a', stripe: '#e8edf3' },
+  tempest: { name: 'Glacier Volt', paint: '#e9eef2', stripe: '#5ef2ff' },
 };
 
 export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
@@ -379,8 +451,10 @@ export const RALLY_FINISH = { name: 'Canyon Ochre', paint: '#c2652a' };
 export const SUMMIT_FINISH = { name: 'Summit Ice', paint: '#bfe6f2' };
 /** Won from Aurelia Stern in the Grand Riviera, the flagship final; usable on any car. */
 export const RIVIERA_FINISH = { name: 'Riviera Gold', paint: '#c9a24a' };
+/** Won from Vesna Kade in Launch Control, the Tempest final; usable on any car. */
+export const LAUNCH_FINISH = { name: 'Storm Cyan', paint: '#38d6e8' };
 /** Blueprint finishes that any owned car can wear, by blueprint name. */
-export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH, MAIN_EVENT_FINISH, RALLY_FINISH, SUMMIT_FINISH, RIVIERA_FINISH];
+export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH, MAIN_EVENT_FINISH, RALLY_FINISH, SUMMIT_FINISH, RIVIERA_FINISH, LAUNCH_FINISH];
 
 export function finishStripe(car: CarId, paint: string | undefined): string | undefined {
   const finish = SIGNATURE_FINISHES[car];
@@ -611,6 +685,7 @@ export const TRACKS: Record<Track['id'], Track> = {
       { type: 'highway', length: 400, window: [0.08, 0.36] },
     ],
   },
+  ...CIRCUIT_TRACKS, // 1.9 Circuit courses (src/data/circuit.ts)
 };
 
 export const trackLength = (t: Track) => t.segments.reduce((a, s) => a + s.length, 0);
@@ -679,6 +754,9 @@ export const RIVALS: Record<string, Rival> = {
   kenji: { id: 'kenji', name: 'Kenji Mori', car: 'gt', paint: '#f2f2f2', line: 'Aero engineer. Talks about downforce at dinner.', stats: { top: 69.0, accel: 11.8, grip: 2.25 } },
   nova3: { id: 'nova3', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Came up the mountain for one more race against you.', stats: { top: 70.0, accel: 12.4, grip: 1.85 } },
   bex: { id: 'bex', name: 'Bex Ardent', car: 'gt', paint: '#ff9e1b', line: 'Team orange. Never pits, never smiles.', stats: { top: 70.5, accel: 12.6, grip: 2.3 } },
+  // 1.9 Circuit rivals
+  sorin: { id: 'sorin', name: 'Sorin Vale', car: 'proto', paint: '#20304a', line: 'Drives the autoroute at night with the lights off. Says it helps him think.', stats: { top: 84.0, accel: 15.2, grip: 2.5 } },
+  vesna: { id: 'vesna', name: 'Vesna Kade', car: 'sovereign', paint: '#e6f6f8', line: 'Builds four-motor launch cars in a harbour shed. Has never lost a start.', stats: { top: 92.0, accel: 18.5, grip: 2.9 }, boss: true },
   iver: { id: 'iver', name: 'Iver Kaas', car: 'proto', paint: '#f4f4f4', line: 'Built the Halcyon’s twin. Hosts the Summit Gala and has never lost it.', stats: { top: 78.0, accel: 14.6, grip: 2.5 }, boss: true },
   // ---- Azure Riviera
   ilse: { id: 'ilse', name: 'Ilse Brandvold', car: 'proto', paint: '#2f8fd6', line: 'Brought her Halcyon down from the Summit. Hates hairpins, wins them anyway.', stats: { top: 80.0, accel: 15.0, grip: 2.55 } },
@@ -688,6 +766,7 @@ export const RIVALS: Record<string, Rival> = {
   teo: { id: 'teo', name: 'Teo Marchand', car: 'mako', paint: '#3a3f47', line: 'Twin turbos, twin exhausts, one speed: all of it.', stats: { top: 82.5, accel: 16.0, grip: 2.55 } },
   iver2: { id: 'iver2', name: 'Iver Kaas', car: 'proto', paint: '#f4f4f4', line: 'Lost the Gala to you. Followed you down to the sea for a rematch.', stats: { top: 82.0, accel: 15.3, grip: 2.6 } },
   aurelia: { id: 'aurelia', name: 'Aurelia Stern', car: 'sovereign', paint: '#0d0d12', line: 'Hosts the Grand Riviera from the only other Sovereign. Has never seen anyone’s tail lights.', stats: { top: 90.0, accel: 17.0, grip: 2.85 }, boss: true },
+  ...CIRCUIT_RIVALS, // 1.9 Circuit rivals (src/data/circuit.ts)
 };
 
 export interface RaceEvent {
@@ -968,6 +1047,14 @@ export const EVENTS: RaceEvent[] = [
     boss: { rival: 'aurelia', reward: { cash: 8000, crates: 8, blueprint: 'Riviera Gold', badge: 'Riviera Champion' } },
     blurb: 'The flagship final: three long straights and two fast sweepers along the sea, against Aurelia Stern in the other Sovereign. Bring the T10 engine and clean shifts.',
   },
+  {
+    id: 'launch-final', name: 'Launch Control', district: 'riviera', track: 'harbor', rivals: ['dario', 'sorin', 'vesna'],
+    payout: { cash: [2000, 1400, 1000, 760], rep: [180, 120, 86, 64], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
+    requires: { car: 'tempest' },
+    boss: { rival: 'vesna', reward: { cash: 10000, crates: 8, blueprint: 'Storm Cyan', badge: 'Launch Control Champion' } },
+    blurb: 'The last race: a long launch off the quay, one bend, one sprint, against Vesna Kade. Four electric motors and a perfect start beat everything else here.',
+  },
+  ...CIRCUIT_EVENTS, // 1.9 Circuit events (src/data/circuit.ts)
 ];
 
 /** Medal rewards for time attack, each paid once per event. */
@@ -1018,6 +1105,7 @@ export const RIVAL_PACE: Record<string, number> = {
   'riviera-night': 0.985,
   'port-sprint': 0.926,
   'grand-riviera': 0.949,
+  'launch-final': 1.03,
 };
 const scaleStats = (st: Rival['stats'], k: number) => ({ top: +(st.top * k).toFixed(3), accel: +(st.accel * k).toFixed(3), grip: +(st.grip * k).toFixed(4) });
 for (const e of EVENTS) {

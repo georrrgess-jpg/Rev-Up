@@ -129,14 +129,14 @@
 .garage .garage-body {
   --cell-js: var(--cell); --board-min: calc(6 * 40px + 5 * var(--gap) + 10px);
   display: grid; grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: max-content max-content max-content minmax(var(--board-min), auto) max-content max-content;
+  grid-template-rows: max-content minmax(var(--board-min), auto) max-content max-content max-content max-content;
   padding: 2px 2px 0;
 }
 .garage .garage-body:has(.board > .cell:nth-child(31)) { --board-min: calc(7 * 40px + 6 * var(--gap) + 10px); }
 .garage .garage-body > .goal-row { grid-row: 1; }
-.garage .garage-body > .carrow { grid-row: 2; }
-.garage .garage-body > .capnote { grid-row: 3; }
-.garage .garage-body > .boardwrap { grid-row: 4; container-type: size; align-items: flex-start; }
+.garage .garage-body > .boardwrap { grid-row: 2; container-type: size; align-items: flex-start; }
+.garage .garage-body > .carrow { grid-row: 3; margin: 6px 0 0; }
+.garage .garage-body > .capnote { grid-row: 4; }
 .garage .garage-body > .hint { grid-row: 5; }
 .garage .garage-body > .trayrow { grid-row: 6; }
 .garage .boardwrap .board {
@@ -303,3 +303,59 @@
 .garage .actions .btn.race small { display: block; -webkit-line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .garage .actions .btn.race .stack { min-width: 0; max-width: 100%; }
 @media (max-height: 700px) and (max-width: 359px) { .garage .goal canvas { display: none; } }
+
+/* ================================================================ Circuit update: Next Goal first, board second
+   The goal card is one row: the goal's car, what it is and the one thing still missing, then the one action that
+   goes to where it is earned. Your car and its slots sit under the board, next to the spare rack and in thumb
+   reach for drag-to-fit; while a part is picked up the action bar offers Fit · Store · Recycle for it. */
+.garage .goal { display: flex; align-items: stretch; gap: 6px; padding: 4px 4px 4px 8px; }
+.garage .goal .goal-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0; text-align: left; color: inherit; min-height: 44px; }
+.garage .goal .goal-open canvas { width: 76px; height: 40px; flex: none; }
+.garage .goal .gtxt { flex: 1; min-width: 0; }
+.garage .goal .gt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.garage .goal .gl { display: block; max-height: none; margin-top: 2px; }
+.garage .goal .gl span, .garage .goal .gl span + span { display: inline; padding: 0; border: 0; background: none; }
+.garage .goal .gl .need { display: block; font-size: var(--fs-sm); font-weight: var(--w-heavy); color: var(--amber2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.garage .goal .gl span.gm { display: none; }
+.garage .goal .goal-act { flex: none; align-self: center; min-height: 44px; max-width: 42%; padding: 4px 10px; border-radius: 10px; font-size: var(--fs-sm);
+  background: linear-gradient(180deg, #ffcf86, #ec9f4c); color: var(--amber-ink); border: 0; box-shadow: 0 2px 0 #9c5d22; }
+.garage .goal .goal-act .stack { align-items: center; line-height: 1.1; }
+.garage .goal .goal-act small { display: block; font-size: var(--fs-2xs); font-weight: var(--w-strong); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .85; }
+.garage .goal .goal-act[hidden] { display: none; }
+.garage .goal.ready .goal-act { animation: glow 1.6s ease-in-out infinite; }
+@media (max-height: 700px) {
+  .garage .goal .goal-open canvas { width: 54px; height: 28px; }
+  .garage .goal .gt { display: block; font-size: 0.6875rem; }
+  .garage .goal .gl { max-height: none; }
+  .garage .goal .gl .need { font-size: var(--fs-xs); }
+  .garage .goal .bar { display: none; }
+}
+@media (max-width: 359px) { .garage .goal .goal-open canvas { display: none; } .garage .goal .goal-act { padding-inline: 8px; } }
+
+/* selection actions: Fit · Store · Recycle take the place of Crates · Shop · Merge All while a part is picked up */
+.garage .actions .selbar { display: none; grid-column: 1 / 4; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.garage .actions.sel-on .selbar { display: grid; animation: selIn .14s ease-out; }
+.garage .actions.sel-on > .btn:not(.race) { display: none; }
+.garage .actions .selbar .btn { min-height: 48px; min-width: 0; padding-inline: 3px; font-size: var(--fs-sm); }
+.garage .actions .selbar .btn small { display: block; font-size: var(--fs-2xs); font-weight: var(--w-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; opacity: .85; }
+.garage .actions .selbar .sel-fit { border-color: #3e6a3a; background: #1f3320; color: #d9f5d3; }
+.garage .actions .selbar .sel-store { border-color: #4a6a8a; background: #1a2a3a; color: #cfe6ff; }
+.garage .actions .selbar .sel-store.hot { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(142,211,250,.3); }
+.garage .actions .selbar .sel-recycle { border-color: #7a5b44; background: #2a2220; color: #f0c8b4; }
+@keyframes selIn { from { opacity: 0; transform: translateY(4px); } }
+.reduced .garage .actions.sel-on .selbar { animation: none; }
+/* short phones (320×568): the board needs every pixel and the body may scroll under the docked spare rack, so the
+   car row goes back above the board, where scrolling never hides it */
+@media (max-height: 660px) {
+  .garage .garage-body { grid-template-rows: max-content max-content max-content minmax(var(--board-min), auto) max-content max-content; }
+  .garage .garage-body > .carrow { grid-row: 2; margin: 0 0 4px; }
+  .garage .garage-body > .capnote { grid-row: 3; }
+  .garage .garage-body > .boardwrap { grid-row: 4; }
+  .garage .goal .gt { display: none; }
+  .garage .goal .goal-open { min-height: 40px; }
+  .garage .goal .gl .need::before { content: attr(data-car); color: var(--text); margin-right: .35em; }
+}
+.garage .goal .goal-act small { color: inherit; opacity: .78; }
+.garage .goal .gt::before { content: 'Goal · '; color: var(--dim); }
+.garage .goal.ready .gt::before { content: none; }
+@media (max-width: 359px) { .garage .goal .gl .need::before { content: none; } }

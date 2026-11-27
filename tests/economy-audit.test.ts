@@ -10,13 +10,14 @@ import { CarId, EVENTS, PART_ORDER_PRICE, carById, roundCash, styleItem, tunePri
 import { PLAYERS, fmtMin, runBot } from './bot';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-const LADDER: CarId[] = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign'];
+const LADDER: CarId[] = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'ardent', 'proto', 'vireo', 'mako', 'meridian', 'sovereign', 'tempest'];
 /** A representative purchase for each stage (the best car owned). */
 const BUYS: Partial<Record<CarId, [string, number]>> = {
   junker: ['T2 part', PART_ORDER_PRICE[2]], beater: ['Bigger bench', 600], hothatch: ['Pit crew', 900], muscle: ['Metallic paint', styleItem('material:metallic')!.price],
   tourer: ['T6 part', PART_ORDER_PRICE[6]], tuner: ['Flames livery', styleItem('livery:flames')!.price], super: ['Candy paint', styleItem('material:candy')!.price],
   rally: ['Chrome paint', styleItem('material:chrome')!.price], gt: ['T8 part', PART_ORDER_PRICE[8]], proto: ['Halcyon Tune-up 3', tunePrice('proto', 2)],
   vireo: ['Vireo Tune-up 1', tunePrice('vireo', 0)], mako: ['T9 part', PART_ORDER_PRICE[9]], sovereign: ['Sovereign Tune-up 3', tunePrice('sovereign', 2)],
+  ardent: ['Parts Shelf rank 3', 9000], meridian: ['Specialist desk', 30000], tempest: ['Tempest Tune-up 3', tunePrice('tempest', 2)],
 };
 
 describe('economy audit (simulation)', () => {
@@ -30,7 +31,7 @@ describe('economy audit (simulation)', () => {
       const saves = new Set<string>();
       const save = (name: string, data: string) => { if (!process.env.AUDIT_SAVES || saves.has(name)) return; saves.add(name); writeFileSync(`${process.env.AUDIT_SAVES}/${name}-${kind}.txt`, data); };
       const L = runBot({
-        ...PLAYERS[kind], seed: 1, untilCar: 'sovereign', maxS: 4 * 3600,
+        ...PLAYERS[kind], seed: 1, untilCar: 'tempest', maxS: 4 * 3600,
         onStep: (g, t) => {
           const s = g.state;
           const best = LADDER.filter((c) => s.owned.includes(c)).pop()!;
@@ -41,7 +42,7 @@ describe('economy audit (simulation)', () => {
           const r = s.lastResult;
           if (r && r.mode === 'live' && r.raceId !== lastRace) { lastRace = r.raceId; st.live.push(r.cash); }
           // a reward: a car, upgrade, finish, paint, badge, medal, Paint shop item, Tune-up, star or Garage Level (each named)
-          const sig = [s.owned.length, Object.values(s.upgrades).join(','), s.livePodiums.length, s.blueprints.length, s.badges.length, Object.values(s.medals).join(','), s.owns.length, Object.values(s.tune).join(','), Object.values(s.stars ?? {}).join(','), J.readJobs(s).level].join('|');
+          const sig = [s.owned.length, Object.values(s.upgrades).join(','), s.livePodiums.length, s.blueprints.length, s.badges.length, Object.values(s.medals).join(','), s.owns.length, Object.values(s.tune).join(','), Object.values(s.stars ?? {}).join(','), J.readJobs(s).level, (s.stagesPaid ?? []).length].join('|'); // + 1.9 unlock stages (each pays a part, a Tune-up or scrap)
           if (sig !== lastSig) { if (lastSig) rewards.push(t); lastSig = sig; }
           if (idleAt60 < 0 && t >= 3600) idleAt60 = s.cash;
           if (t > 300) save('early', encodeSave(s));
@@ -50,7 +51,7 @@ describe('economy audit (simulation)', () => {
         },
       });
       const gaps = rewards.map((r, i) => r - (rewards[i - 1] ?? 0)).sort((a, b) => a - b);
-      lines.push(`\n== ${kind} — Halcyon at ${fmtMin(L.milestones.proto)}, Sovereign at ${fmtMin(L.milestones.sovereign)}, ${L.races} races (${L.quick} quick), longest run of one race ${L.maxRepeat}, longest losing run ${L.maxLossStreak}`);
+      lines.push(`\n== ${kind} — Halcyon at ${fmtMin(L.milestones.proto)}, Sovereign at ${fmtMin(L.milestones.sovereign)}, Tempest at ${fmtMin(L.milestones.tempest)}, ${L.races} races (${L.quick} quick), longest run of one race ${L.maxRepeat}, longest losing run ${L.maxLossStreak}`);
       lines.push(`races to each car: ${LADDER.slice(1).map((c) => `${carById(c).model} ${L.racesAt[c] ?? '—'}`).join(' · ')}`);
       lines.push(`rewards ${rewards.length}: median gap ${mmss(gaps[Math.floor(gaps.length / 2)] ?? 0)}, longest ${mmss(gaps[gaps.length - 1] ?? 0)}; cash in hand at 60 min ${idleAt60 < 0 ? '(finished)' : `$${idleAt60}`}`);
       lines.push('stage (best car)        minutes  live $/race  quick $/race  representative buy → races');

@@ -150,3 +150,11 @@ html.reduced .mech-bay, html.reduced .mech-outline { transition: none; }
 .mech-kits summary::before { content: '▸'; color: var(--amber2); font-size: 1.1em; transition: transform .15s; }
 .mech-kits[open] summary::before { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .mech-kits summary::before { transition: none; } }
+
+/* ---- Circuit update: a taller, lit service bay (drawn on the canvas) and icon tabs on one line */
+.mech-bay { height: clamp(150px, 30dvh, 280px); background: #10141b; }
+.mech-bay::after { display: none; }
+.mech-areas .seg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 3px 2px; }
+.mech-areas .seg .ai { font-size: var(--fs-md); line-height: 1; }
+.mech-areas .seg .al { font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+@media (max-height: 640px) { .mech-bay { height: clamp(124px, 26dvh, 200px); } .mech-areas .seg .ai { display: none; } }

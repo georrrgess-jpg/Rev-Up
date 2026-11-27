@@ -11,6 +11,8 @@ import * as RR from './rivalRuns';
 import * as F from './fabrication'; // Scrap & surplus
 import * as PJ from './projects'; // Scrap & surplus
 import * as J from './jobs'; // Job Board (New mechanic)
+import * as G from './goals'; // 1.9 Next Goal
+import * as SH from './shelf'; // 1.9 Parts Shelf
 import { settleTutorialForExistingSave } from './tutorial';
 import { RaceOutcome, RaceSetup, RaceSim, leanOutcome } from './race';
 import { KV, LoadResult, loadGame, writeGame } from './save';
@@ -41,7 +43,7 @@ export class Game {
     J.settleJobs(this.state, now, []); // Job Board: refills due while away (one job per slot, clock clamped)
     settleTutorialForExistingSave(this.state);
     const ev: GameEvent[] = [];
-    P.checkUnlocks(this.state, ev);
+    P.checkUnlocks(this.state, ev, false); // 1.9: unlock stages pay in the next transaction, never on load
     this.persist(now);
     this.settleQuick(now);
   }
@@ -115,20 +117,65 @@ export class Game {
     this.input(now);
     return this.transact((d) => B.buyCrate(d, kind, family), now);
   }
-  mergeAll(now = Date.now()) {
+  /** Merge every pair; `family` (Bench rank 2, Batch merge) merges that family only. */
+  mergeAll(now = Date.now(), family?: Family) {
     this.input(now);
     if (!P.mergeAllUnlocked(this.state)) return [{ type: 'invalid', reason: 'Finish five races to unlock Merge All' } as GameEvent];
     return this.transact((d) => {
-      const ev = B.mergeAll(d);
+      const ev = B.mergeAll(d, family);
       J.onMerges(d, ev.filter((e) => e.type === 'fuse').length, now, ev); // Job Board
       ev.push(...B.openCrates(d));
       return ev;
     }, now);
   }
-  orderPart(family: Family, tier: number, now = Date.now()) {
+  /** Order a part for cash; `polished` (Workshop rank 2) delivers it Polished for 1.5× (price: B.orderPrice). */
+  orderPart(family: Family, tier: number, now = Date.now(), polished = false) {
     this.input(now);
-    return this.transact((d) => B.orderPart(d, family, tier), now);
+    return this.transact((d) => B.orderPart(d, family, tier, polished), now);
   }
+  // ---- 1.9 Next Goal (core/goals.ts) and the Parts Shelf (core/shelf.ts)
+  /** Pick the goal to chase (a key from goals.goalOptions: a car id or 'challenge:<event>'), or null for the
+   *  recommendation. An unknown key changes nothing. */
+  pickGoal(key: string | null, now = Date.now()) {
+    if (key !== null && !G.canPickGoal(this.state, key)) return [{ type: 'invalid', reason: 'That goal is not open yet' } as GameEvent];
+    return this.transact((d) => { d.goalPick = key; return []; }, now);
+  }
+  /** Move a bench / rack part onto the shelf (refused when the shelf is full). */
+  storePart(from: SlotRef, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => { const ev = SH.storePart(d, from); if (!(ev.length === 1 && ev[0].type === 'invalid')) ev.push(...B.openCrates(d)); return ev; }, now);
+  }
+  /** Store several bench / rack parts by id (as many as fit). */
+  storeParts(ids: number[], now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => { const ev = SH.storeParts(d, ids); if (!(ev.length === 1 && ev[0].type === 'invalid')) ev.push(...B.openCrates(d)); return ev; }, now);
+  }
+  /** Parts Shelf rank 3: every over-cap bench part onto the shelf. */
+  storeOverCap(now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => { const ev = SH.storeOverCap(d); if (!(ev.length === 1 && ev[0].type === 'invalid')) ev.push(...B.openCrates(d)); return ev; }, now);
+  }
+  /** Move a shelf part back to the bench (first free cell, or `to`). Refused when there is no room. */
+  unstorePart(id: number, to?: SlotRef, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => SH.unstorePart(d, id, to), now);
+  }
+  /** Trade surplus parts (shelf, bench or rack; never fitted or starred) for one part of a known family and tier. */
+  tradeParts(ids: number[], family: Family, tier: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => { const ev = SH.tradeParts(d, ids, family, tier); if (!(ev.length === 1 && ev[0].type === 'invalid')) ev.push(...B.openCrates(d)); return ev; }, now);
+  }
+  /** Contribute surplus parts as credit toward a Garage upgrade's next rank. */
+  contributeParts(ids: number[], id: UpgradeId, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => { const ev = SH.contributeParts(d, ids, id); if (!(ev.length === 1 && ev[0].type === 'invalid')) ev.push(...B.openCrates(d)); return ev; }, now);
+  }
+  /** Recycle surplus parts and place the chosen scrap order once the scrap covers it (one transaction). */
+  recycleToward(ids: number[], family: Family, tier: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => { const ev = SH.recycleToward(d, ids, family, tier); if (!(ev.length === 1 && ev[0].type === 'invalid')) ev.push(...B.openCrates(d)); return ev; }, now);
+  }
+  // ---- end 1.9
   // ---------- Workshop: scrap (Pit Stop) ----------
   /** Order a chosen family and tier for scrap (exact cost: scrapOrderCost). */
   scrapOrder(family: Family, tier: number, now = Date.now()) {
