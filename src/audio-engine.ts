@@ -350,12 +350,14 @@ export class EngineVoice {
 
   /** Fade out and stop every source (nothing keeps sounding). */
   stop(t = this.c.currentTime, release = 0.2) {
-    if (this.stopped) return;
-    this.stopped = true;
     const end = t + release + 0.05;
+    if (this.stopped && end >= this.endAt) return; // an earlier stop (e.g. stopPreview cutting a scripted rev) wins
+    const again = this.stopped;
+    this.stopped = true;
     this.endAt = end;
     for (const g of [this.out.gain, this.squealG.gain]) { g.cancelScheduledValues(t); g.setTargetAtTime(0, t, Math.max(0.01, release / 4)); }
     for (const s of this.srcs) { try { s.stop(end); } catch { /* not started or already stopped */ } }
+    if (again) return;
     this.main.addEventListener('ended', () => { try { this.out.disconnect(); this.squealG.disconnect(); } catch { /* gone */ } });
     this.onStop?.();
   }

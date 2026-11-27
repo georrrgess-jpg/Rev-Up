@@ -84,3 +84,11 @@
 
 /* The race clock sits over bright sky and clouds: a soft dark halo keeps it legible on any scene. */
 .racescreen .hud .time { text-shadow: 0 0 4px rgba(0,0,0,.85), 0 0 1px #000, 0 2px 0 #000; }
+
+/* Course shape on the progress bar: bends as a thin strip under the boost zones (hairpins red). */
+.racescreen .prog .b { position: absolute; bottom: 0; height: 3px; background: rgba(255,196,87,.85); border-radius: 2px; pointer-events: none; }
+.racescreen .prog .b.hp { background: #ff5a3c; }
+/* Standings never push past their corner: long rival names are cut with an ellipsis (the full name is in the result). */
+.racescreen .hud .row1 > div:first-child { min-width: 0; flex: 1 1 auto; }
+.racescreen .hud .stand { max-width: min(62vw, 260px); }
+.racescreen .hud .stand > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -11,6 +11,7 @@ export type { MusicScene } from './audio-music';
 let player: MusicPlayer | null = null;
 let pending: { scene: MusicScene; won?: boolean } | null = null;
 let intensity = 0.4;
+const sceneLog: string[] = [];
 
 function ensurePlayer(): MusicPlayer | null {
   if (player) return player;
@@ -39,6 +40,7 @@ onAudioReady(() => {
 export const music = {
   /** Switch arrangement (cross-fades; calling with the current scene is a no-op). `won` picks the results sting. */
   play(scene: MusicScene, opts: { won?: boolean } = {}) {
+    if (import.meta.env.DEV) sceneLog.push(scene);
     const p = ensurePlayer();
     if (!p) { pending = { scene, won: opts.won }; return; }
     p.play(scene, undefined, opts);
@@ -108,7 +110,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
   void import('./audio').then((A) => {
     (window as unknown as { __revAudio?: unknown }).__revAudio = () => {
       const l = A.live();
-      return { ctx: l ? l.ctx.state : 'none', scene: music.scene, engines: A.liveEngineCount(), vols: A.busVolumes(), muted: A.isMuted(), musicNotes: player?.liveSources ?? 0 };
+      return { ctx: l ? l.ctx.state : 'none', scene: music.scene, engines: A.liveEngineCount(), vols: A.busVolumes(), muted: A.isMuted(), musicNotes: player?.liveSources ?? 0, log: sceneLog.slice(-6), pscene: player?.scene };
     };
   });
 }

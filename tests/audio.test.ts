@@ -137,6 +137,11 @@ describe('engine voices', () => {
     expect(end).toBeCloseTo(2.6);
     v.stop(end, 0.3);
     for (const s of c.sources) expect(s.stopAt!).toBeLessThanOrEqual(2.6 + 0.35 + 1e-9);
+    // stopPreview: an earlier stop cuts the scripted rev short
+    v.stop(1, 0.1);
+    for (const s of c.sources) expect(s.stopAt!).toBeLessThanOrEqual(1 + 0.15 + 1e-9);
+    v.stop(2, 0.1); // a later stop never extends it
+    for (const s of c.sources) expect(s.stopAt!).toBeLessThanOrEqual(1 + 0.15 + 1e-9);
   });
 });
 

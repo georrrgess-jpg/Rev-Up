@@ -119,7 +119,7 @@ export class RaceAudio {
 
   /** Race over, left or paused for good: nothing keeps sounding. */
   stop() {
-    this.v?.stop(undefined, 0.15);
+    this.v?.stop(undefined, 0.3);
     this.v = null;
   }
 }

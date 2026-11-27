@@ -139,6 +139,15 @@ export class RaceScreen {
       m.style.width = `${((w.end - w.start) / L) * 100}%`;
       this.progEl.append(m);
     }
+    // bends on the progress bar (red: hairpins, amber: bends and sweepers) so the shape of the course reads at a glance
+    for (let s0 = 0, i = 0; i < this.sim.track.segments.length; s0 += this.sim.track.segments[i].length, i++) {
+      const sg = this.sim.track.segments[i];
+      if (!sg.radius) continue;
+      const m = h('div', { class: `b${sg.radius <= 30 ? ' hp' : ''}` });
+      m.style.left = `${(s0 / L) * 100}%`;
+      m.style.width = `${(sg.length / L) * 100}%`;
+      this.progEl.append(m);
+    }
     this.dots = this.sim.racers.map((r) => {
       const d = h('div', { class: `dot${r.isPlayer ? ' me' : ''}` });
       if (!r.isPlayer) d.style.background = r.paint;

@@ -119,7 +119,10 @@ export function unlockAudio() {
   // watchdog: an engine nobody drives any more (a screen that crashed or forgot to stop it) fades out
   setInterval(() => {
     if (!ctx || ctx.state !== 'running') return;
-    for (const v of voices) if (v.watched && ctx.currentTime - v.lastSet > 1.5) v.stop(ctx.currentTime, 0.4);
+    for (const v of voices) {
+      if (v.watched && !v.stopped && ctx.currentTime - v.lastSet > 1.5) v.stop(ctx.currentTime, 0.4);
+      if (v.stopped && v.liveSources === 0) voices.delete(v);
+    }
   }, 500);
   for (const fn of readyHooks.splice(0)) { try { fn(); } catch { /* a hook failing never blocks sound */ } }
 }
@@ -133,11 +136,12 @@ export function newEngine(car: string, engine?: PartLike | null, turbo?: PartLik
   if (!ctx || !mix || !noiseBuf || muted) return null;
   const v = new EngineVoice(ctx, mix.engine, noiseBuf, resolveEngine(car, engine, turbo));
   voices.add(v);
-  v.onStop = () => setTimeout(() => voices.delete(v), 1000);
+  v.onStop = () => { /* removed once its sources have ended (see sweep) */ };
   return v;
 }
 export function stopAllEngines() { if (ctx) for (const v of voices) v.stop(ctx.currentTime, 0.1); }
-export const liveEngineCount = () => [...voices].filter((v) => !v.stopped).length;
+/** Engines with sources still sounding (a scripted rev counts until its scheduled stop has ended). */
+export const liveEngineCount = () => [...voices].filter((v) => v.liveSources > 0).length;
 /** Duck the engine under a timing cue. */
 export function duckEngine(depth?: number, hold?: number) { if (ctx && mix) mix.duck(ctx.currentTime, depth, hold); }
 
