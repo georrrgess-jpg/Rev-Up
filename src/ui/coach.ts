@@ -304,7 +304,7 @@ export class GuideCoach {
       case 'overflow':
         return sheet || route !== 'garage' ? null : one(this.find(SEL.tray), 'The spare rack holds parts when the bench is full. Drag them back onto the bench or onto a match any time.', true);
       case 'scrap':
-        return sheet || route !== 'garage' ? null : one(this.find(SEL.press), 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap buys crates of the family you need.', true);
+        return sheet || route !== 'garage' ? null : one(this.find(SEL.press), 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap orders the exact part you pick in the Workshop.', true);
       case 'mergeAll':
         return sheet || route !== 'garage' ? null : one(this.find(SEL.mergeAll) ?? this.find('.view.on .actions button', /merge all/i), 'Merge All is unlocked: one tap merges every pair on the bench. Quick manual merges still bank nitro.', true);
       case 'cap':

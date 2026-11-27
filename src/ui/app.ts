@@ -127,6 +127,8 @@ export class App {
     for (const v of Object.values(this.views)) v.onEvents(ev);
     for (const e of ev) {
       if (e.type === 'unlock' && !this.reveal) setTimeout(() => this.promptReveal(), 450);
+      // a tab that slept while visible: the gap became one bounded away claim (Game.tick); offer it when safe
+      if (e.type === 'offline' && !this.busy) setTimeout(() => maybeOfflineClaim(this), 0);
       // fitting a part by hand is the lesson the 'fit' beat teaches: once done, it never shows again
       if ((e.type === 'install' || e.type === 'move-fit') && !this.game.state.tips.fit) setTimeout(() => this.game.markTip('fit'), 0);
       if (e.type === 'invalid') {

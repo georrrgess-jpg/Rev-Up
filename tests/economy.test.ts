@@ -299,7 +299,9 @@ describe('cash steps: $5 up to $100, $10 up to $1,000, $50 above', () => {
     s.owned = ['junker', 'beater'];
     s.offline.lastSeenAt = T0;
     P.accrueOffline(s, T0 + 37 * 60_000);
-    expect(s.offline.pendingCash).toBe(110); // 37 min × $3/min = $111 → $110
+    // Pit Stop: 37 min of the 8 h garage budget (1.5 × the $120 Tapeback Trophy purse = $180): $13.88 → $10 on the step below
+    expect(P.offlineBudget(s)).toBe(180);
+    expect(s.offline.pendingCash).toBe(10);
     expect(onCashStep(P.claimOffline(s))).toBe(true);
   });
   it('the first race plus its merges affords a useful part (a T2 order)', () => {

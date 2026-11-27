@@ -243,3 +243,36 @@
   .fitstrip .eq .eqt { flex-basis: 100%; align-items: center; text-align: center; }
   .fitstrip .eq .eqn { display: none; }
 }
+
+/* ---- Pit Stop: Keep / Recycle sheet and the Workshop scrap tab ---- */
+.benchhead .bh-r { display: inline-flex; align-items: center; gap: 8px; }
+.benchhead .sort-spares { min-height: 32px; padding: 2px 10px; font-size: var(--fs-2xs); }
+.spares .wallet { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 8px; }
+.spares .wallet .d { flex-basis: 100%; font-size: var(--fs-2xs); color: var(--muted); }
+.spares .bulk { display: grid; gap: 4px; margin: 4px 0 6px; }
+.spares .bulk .btn { min-height: 48px; }
+.spare-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line, #3c3026); }
+.spare-row .grow { flex: 1; min-width: 0; }
+.spare-row .t { font-weight: var(--w-heavy); font-size: var(--fs-sm); }
+.spare-row .t .where { color: var(--muted); font-weight: var(--w-strong, 600); font-size: var(--fs-2xs); }
+.spare-row .d, .spare-row .uses { font-size: var(--fs-2xs); color: var(--muted); overflow-wrap: anywhere; }
+.spare-row .uses { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 2px; }
+.spare-row .uses b { color: var(--amber2); text-transform: uppercase; letter-spacing: .04em; font-size: .92em; }
+.spare-row .spare-tile { flex: none; --cell: 44px; width: 44px; height: 44px; }
+.spare-row .spare-tile .part { --cell: 44px; width: 44px; height: 44px; }
+.spare-row .spare-btns { flex: none; display: flex; gap: 6px; align-items: center; }
+.spare-row .spare-btns .btn { min-height: 44px; min-width: 44px; padding: 2px 8px; }
+.spare-row .star { font-size: var(--fs-md); }
+.spare-row .star.on { color: var(--amber2); border-color: var(--amber2); }
+.spare-row .recycle small { font-size: var(--fs-2xs); color: #e7b9a2; }
+.spare-row.keep .recycle { opacity: .8; }
+.spare-row.starred .recycle { opacity: .45; }
+@media (max-width: 359px) {
+  .spare-row { flex-wrap: wrap; }
+  .spare-row .grow { flex-basis: calc(100% - 54px); }
+  .spare-row .spare-btns { margin-left: 54px; }
+}
+.workshop .facts li.warn { color: var(--amber2); }
+.workshop .polish-row .d, .workshop .spares-row .d { overflow-wrap: anywhere; }
+.workshop .segs:has(> .seg:nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.workshop .segs .seg { padding-inline: 2px; overflow-wrap: anywhere; }

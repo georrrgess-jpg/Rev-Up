@@ -20,6 +20,9 @@ export interface CarMastery {
   topSpeed: number;
 }
 
+// ---- Rival Runs (Pit Stop): one record per run id. `claimed` is set in the same transaction that grants the prize.
+export interface RivalRunRecord { tries: number; best: number | null; bestGap: number | null; done: boolean; claimed: boolean }
+
 export interface Part {
   id: number;
   f: Family;
@@ -152,7 +155,13 @@ export interface GameState {
   medals: Record<string, number>;
   activeS: number;
   catchup: { goal: CarId | null; effort: number; bestTier: number; claimed: CarId[] };
-  offline: { lastSeenAt: number; pendingCash: number; pendingS: number };
+  /** Away earnings. pendingS: away seconds counted (up to the cap); awayS: real seconds away in this claim;
+   *  capped: the cap stopped the count. One budget for the garage (progression.offlinePayout). */
+  offline: { lastSeenAt: number; pendingCash: number; pendingS: number; awayS?: number; capped?: boolean };
+  /** Parts the player protects from recycling (part ids; a merged part gets a new id, so the star ends there). */
+  favorites?: number[];
+  // ---- Rival Runs (Pit Stop): per-run record; absent in older saves (read via core/rivalRuns.runRecord)
+  rivalRuns?: Record<string, RivalRunRecord>;
   settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean };
   stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number>; earned?: number; spent?: number };
   tips: Record<string, boolean>;
@@ -211,7 +220,8 @@ export function newGame(now: number, seed = (now ^ 0x5eed) >>> 0): GameState {
     medals: {},
     activeS: 0,
     catchup: { goal: null, effort: 0, bestTier: 0, claimed: [] },
-    offline: { lastSeenAt: now, pendingCash: 0, pendingS: 0 },
+    offline: { lastSeenAt: now, pendingCash: 0, pendingS: 0, awayS: 0, capped: false },
+    favorites: [],
     settings: { muted: false, reducedMotion: false, nitroCue: true },
     stats: { fusions: 0, races: 0, wins: 0, mints: 0, polished: 0, scrapped: 0, milestones: {} },
     tips: {},
@@ -267,6 +277,7 @@ export function validateState(s: unknown): string[] {
   if (!Array.isArray(g.crafted)) errs.push('crafted');
   if (!Array.isArray(g.livePodiums) || !Array.isArray(g.owned) || g.livePodiums.some((id) => !g.owned.includes(id))) errs.push('car podiums');
   if (!g.offline || !isNum(g.offline.lastSeenAt) || !isNum(g.offline.pendingCash)) errs.push('offline');
+  if (g.favorites !== undefined && (!Array.isArray(g.favorites) || !g.favorites.every(isNum))) errs.push('favorites');
   if (!g.settings || typeof g.settings.muted !== 'boolean') errs.push('settings');
   if (!g.upgrades || !isNum(g.upgrades.grid)) errs.push('upgrades');
   if (!g.events || typeof g.events !== 'object') errs.push('events');
@@ -301,6 +312,10 @@ export function migrate(raw: unknown): GameState | null {
   merged.tips = { ...(g.tips ?? {}) };
   merged.installed = { ...(g.installed ?? {}) };
   merged.mastery = { ...(g.mastery ?? {}) };
+  merged.favorites = Array.isArray(g.favorites) ? g.favorites.filter(isNum) : [];
+  // ---- Rival Runs: keep a well-formed record map, drop anything else (an older save simply has none)
+  if (g.rivalRuns && typeof g.rivalRuns === 'object' && !Array.isArray(g.rivalRuns)) merged.rivalRuns = { ...g.rivalRuns };
+  else delete merged.rivalRuns;
   if (fromV1) { merged.v = SAVE_VERSION; installLegacyLoadout(merged); }
   return validateState(merged).length === 0 ? merged : null;
 }

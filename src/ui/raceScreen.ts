@@ -101,7 +101,7 @@ export class RaceScreen {
     this.hum = new EngineHum(rev.base, rev.peak, setup.player.car);
     this.reduced = app.game.state.settings.reducedMotion;
     this.countdown = this.reduced ? 1.2 : 2.4;
-    this.eventName = eventById(setup.eventId).name;
+    this.eventName = app.game.rivalRunName ?? eventById(setup.eventId).name;
     this.canvas = h('canvas', { class: 'track', 'aria-hidden': 'true' });
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
     this.posEl = h('div', { class: 'pos num' });

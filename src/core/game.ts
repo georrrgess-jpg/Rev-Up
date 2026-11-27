@@ -2,11 +2,12 @@ import * as I from './install';
 import { eventById } from '../data/tables';
 import * as S from './style';
 import type { UpgradeId } from '../data/tables';
-import { CREW_NITRO, CarId, Family, carById } from '../data/tables';
+import { CREW_NITRO, CarId, Family, OFFLINE_MIN_S, carById } from '../data/tables';
 import * as B from './board';
 import type { GameEvent, SlotRef } from './events';
 import { computeLoadout } from './loadout';
 import * as P from './progression';
+import * as RR from './rivalRuns';
 import { settleTutorialForExistingSave } from './tutorial';
 import { RaceOutcome, RaceSetup, RaceSim, leanOutcome } from './race';
 import { KV, LoadResult, loadGame, writeGame } from './save';
@@ -122,6 +123,30 @@ export class Game {
     this.input(now);
     return this.transact((d) => B.orderPart(d, family, tier), now);
   }
+  // ---------- Workshop: scrap (Pit Stop) ----------
+  /** Order a chosen family and tier for scrap (exact cost: scrapOrderCost). */
+  scrapOrder(family: Family, tier: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => B.scrapOrder(d, family, tier), now);
+  }
+  /** Polish a standard part (bench, rack or fitted) for scrap. */
+  polishPart(id: number, now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => B.polishPart(d, id), now);
+  }
+  /** Recycle several unfitted, unstarred parts in one transaction. */
+  recycleParts(ids: number[], now = Date.now()) {
+    this.input(now);
+    return this.transact((d) => {
+      const ev = B.recycleParts(d, ids);
+      if (ev.length === 1 && ev[0].type === 'invalid') return ev;
+      ev.push(...B.openCrates(d));
+      return ev;
+    }, now);
+  }
+  toggleFavorite(id: number, now = Date.now()) {
+    return this.transact((d) => B.toggleFavorite(d, id), now);
+  }
   buyStyle(itemId: string, car: CarId, now = Date.now()) {
     this.input(now);
     return this.transact((d) => S.buyStyle(d, itemId, car), now);
@@ -158,6 +183,9 @@ export class Game {
     this.settleQuick(now);
     const ev: GameEvent[] = [];
     const draft = structuredClone(this.state);
+    // A visible tab whose timers stopped (the device slept without hiding the page) counts that gap as away time
+    // once, through the same bounded rule as a reload; a running tab keeps lastSeenAt current, so nothing else counts.
+    if (now - draft.offline.lastSeenAt >= OFFLINE_MIN_S * 1000 && P.accrueOffline(draft, now)) ev.push({ type: 'offline', amount: draft.offline.pendingCash });
     P.tick(draft, dtS, now, this.lastInputAt, ev);
     if (ev.some((e) => e.type === "printer")) autoOpen(draft, ev);
     if (ev.length) {
@@ -195,6 +223,7 @@ export class Game {
   }
   get pendingRaceId() { return this.state.pendingRace?.id ?? null; }
   commitRace(raceId: number, outcome: RaceOutcome, now = Date.now()): LastResult | null {
+    if (this.rivalRace?.id === raceId) return this.commitRivalRun(raceId, outcome, now); // Rival Runs hook
     this.input(now);
     let res: LastResult | null = null;
     this.transact((d) => {
@@ -232,7 +261,43 @@ export class Game {
     }, now);
   }
   abandonRace(now = Date.now()) {
+    this.rivalRace = null;
     this.transact((d) => { d.pendingRace = null; return []; }, now);
+  }
+
+  // ---- Rival Runs (Pit Stop; rules in core/rivalRuns.ts) ----
+  /** The Rival Run being driven (in memory only: a race in flight at reload is abandoned anyway). */
+  private rivalRace: { id: number; run: string } | null = null;
+  /** Name of the Rival Run being driven, for the race header (null in an ordinary race). */
+  get rivalRunName(): string | null { return this.rivalRace ? RR.runName(this.rivalRace.run) : null; }
+  /** The last committed Rival Run, for the result card. */
+  rivalRunResult: RR.RivalRunResult | null = null;
+  /** Start a Rival Run with `car`: the run's car rule, part cap and nitro are applied to the setup. */
+  startRivalRun(runId: string, car: CarId, now = Date.now()): RaceSetup | null {
+    this.input(now);
+    let setup: RaceSetup | null = null;
+    this.transact((d) => {
+      const r = RR.startRivalRun(d, runId, car, now);
+      if (!r.ok) return [{ type: 'invalid', reason: r.why }];
+      setup = r.setup;
+      return [];
+    }, now);
+    const st = setup as RaceSetup | null;
+    this.rivalRace = st ? { id: st.seed, run: runId } : null;
+    return st;
+  }
+  private commitRivalRun(raceId: number, outcome: RaceOutcome, now: number): LastResult | null {
+    this.input(now);
+    const run = this.rivalRace!.run;
+    this.rivalRace = null;
+    let last: LastResult | null = null;
+    this.transact((d) => {
+      const ev: GameEvent[] = [];
+      const r = RR.commitRivalRun(d, raceId, run, outcome, ev);
+      if (r) { this.rivalRunResult = r.result; last = r.last; }
+      return ev;
+    }, now);
+    return last;
   }
 
   // ---------- Cars ----------

@@ -1,7 +1,7 @@
 import {
   ACTIVE_FAMILIES, BOARD_EXPANDED, FAMILIES, COMBO_NITRO_EVERY, COMBO_WINDOW_MS, CRATE_SCRAP_COST, CRATE_TIER_ODDS,
   Family, MAX_TIER, MERGE_ALL_NITRO_MIN_CHAIN, MERGE_CASH, QUALITY_ODDS, Quality, SCRAP_VALUE, PART_ORDER_PRICE, nitroCapFor, carById, ENABLED_CARS,
-  TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST,
+  TARGETED_CRATE_CASH_COST, TARGETED_CRATE_SCRAP_COST, polishCost, scrapOrderCost,
 } from '../data/tables';
 import { nextRandom, pickWeighted } from './rng';
 import type { Crate, GameState, Part } from './state';
@@ -291,14 +291,78 @@ export function scrapValue(p: Part): number {
   return SCRAP_VALUE[p.t] ?? 0;
 }
 
+export const isFavorite = (s: GameState, id: number) => (s.favorites ?? []).includes(id);
+
 export function scrapPart(s: GameState, at: SlotRef): GameEvent[] {
   const p = getPart(s, at);
   if (!p) return [{ type: 'invalid', reason: 'empty' }];
+  if (isFavorite(s, p.id)) return [{ type: 'invalid', reason: `Your T${p.t} ${FAMILIES[p.f].name} is starred to keep — unstar it to recycle it` }];
   const value = scrapValue(p);
   setPart(s, at, null);
   s.scrap += value;
   s.stats.scrapped++;
   return [{ type: 'scrap', at, value }];
+}
+
+/** Star / unstar a part to keep. Fitted parts can be starred too (they are never recycled anyway). Stale ids drop. */
+export function toggleFavorite(s: GameState, id: number): GameEvent[] {
+  const live = new Set([...allParts(s), ...Object.values(s.installed ?? {}).flatMap((sl) => Object.values(sl ?? {}))].filter(Boolean).map((p) => (p as Part).id));
+  if (!live.has(id)) return [{ type: 'invalid', reason: 'That part is gone' }];
+  const fav = (s.favorites ?? []).filter((x) => live.has(x));
+  s.favorites = fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id];
+  return [{ type: 'favorite', id, on: s.favorites.includes(id) }];
+}
+
+/**
+ * Recycle several bench / spare-rack parts in one step. Only parts found on the board or rack by id are pressed:
+ * fitted parts are never there, starred parts are skipped, and an id already gone (a second tap) adds nothing.
+ */
+export function recycleParts(s: GameState, ids: number[]): GameEvent[] {
+  const events: GameEvent[] = [];
+  const want = new Set(ids);
+  const refs: SlotRef[] = [
+    ...s.board.map((p, i) => (p && want.has(p.id) ? { zone: 'board' as const, i } : null)),
+    ...s.tray.map((p, i) => (p && want.has(p.id) ? { zone: 'tray' as const, i } : null)),
+  ].filter((r): r is SlotRef => !!r);
+  for (const r of refs) {
+    const p = getPart(s, r)!;
+    if (isFavorite(s, p.id)) continue;
+    events.push(...scrapPart(s, r));
+  }
+  if (!events.length) return [{ type: 'invalid', reason: 'Nothing to recycle: those parts are starred, fitted or already gone' }];
+  return events;
+}
+
+/** Workshop: order a part of the family and tier you pick, paid in scrap. Same tiers as the cash counter (the
+ *  next car's own part must still be merged), charged once, delivered to the bench or first in the crate queue. */
+export function scrapOrder(s: GameState, family: Family, tier: number): GameEvent[] {
+  if (!ACTIVE_FAMILIES.includes(family)) return [{ type: 'invalid', reason: 'Pick a family' }];
+  if (!Number.isInteger(tier) || tier < 1 || tier > orderMaxTier(s)) return [{ type: 'invalid', reason: `T${tier} parts aren't sold yet` }];
+  const cost = scrapOrderCost(tier);
+  if (s.scrap < cost) return [{ type: 'invalid', reason: `Need ${cost - s.scrap} more scrap` }];
+  s.scrap -= cost;
+  s.crates.unshift({ kind: 'targeted', family, tier, source: 'shop' });
+  return openCrates(s, 1);
+}
+
+/** Where a part is: a bench / rack cell, or a car's slot. */
+function findPart(s: GameState, id: number): Part | null {
+  const p = allParts(s).find((x) => x.id === id);
+  if (p) return p;
+  for (const sl of Object.values(s.installed ?? {})) for (const x of Object.values(sl ?? {})) if (x && x.id === id) return x;
+  return null;
+}
+
+/** Workshop: polish a standard part (bench, rack or fitted) to Polished, +15%, for scrap. */
+export function polishPart(s: GameState, id: number): GameEvent[] {
+  const p = findPart(s, id);
+  if (!p) return [{ type: 'invalid', reason: 'That part is gone' }];
+  if (p.q !== 'std') return [{ type: 'invalid', reason: `It is already ${p.q === 'mint' ? 'Mint' : 'Polished'}` }];
+  const cost = polishCost(p.t);
+  if (s.scrap < cost) return [{ type: 'invalid', reason: `Need ${cost - s.scrap} more scrap` }];
+  s.scrap -= cost;
+  p.q = 'polished';
+  return [{ type: 'polish', id, family: p.f, tier: p.t, cost }];
 }
 
 export function buyCrate(s: GameState, kind: 'std' | 'targeted' | 'cash', family?: Family): GameEvent[] {

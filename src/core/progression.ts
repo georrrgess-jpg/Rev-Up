@@ -1,12 +1,12 @@
 import {
-  ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
+  ACTIVE_FAMILIES, ACTIVE_IDLE_CUTOFF_MS, CATCHUP_EFFORT_THRESHOLD, CarClass, CarId, ENABLED_CARS, EVENTS, FAMILIES, Family,
   MAX_TIER, MERGE_ALL_UNLOCK_ACTIVE_S, MERGE_ALL_UNLOCK_RACES, OFFLINE_MIN_S, PRECISION_BONUS_PER_PERFECT,
-  PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
+  PRINTER_INTERVAL_S, RACE_EFFORT, roundCash, floorCash, STYLE_ITEMS, DistrictId, MEDALS, MEDAL_REWARDS, CREW_NITRO, FRESH_ROUTE_AFTER_RACES, FRESH_ROUTE_BONUS, RaceEvent, SIGNATURE_FINISHES, UPGRADES, carById, eventById, UpgradeId, QUICK_PAY_SHARE, PERFECT_BONUS_SHARE, RIVALS, OFFLINE_HOURS, OFFLINE_BUDGET_RACES, SCRAP_VALUE, UpgradeDef, CRATE_TIER_ODDS, nitroCapFor, TUNE_STAGES, tunePrice } from '../data/tables';
 import { allParts, craftedTier, expandBoard, openCrates } from './board';
-import { fillEmptyFromBench, fitRecommended } from './install';
+import { fillEmptyFromBench, fitRecommended, fitted } from './install';
 import type { GameEvent } from './events';
-import { computeLoadout } from './loadout';
-import type { CarMastery, EventRecord, GameState, LastResult, LeanOutcome } from './state';
+import { computeLoadout, contributionOn } from './loadout';
+import type { CarMastery, EventRecord, GameState, LastResult, LeanOutcome, Part } from './state';
 import { mph } from './units';
 
 export const PRINTER_BANK_CAP = 10; // printer pauses with this many unopened printer crates
@@ -308,7 +308,11 @@ export function upgradeEffect(s: GameState, id: UpgradeId): { now: string; next:
     case 'crateTier': return { now: odds(lvl), next: odds(lvl + 1) };
     case 'crew': return { now: `Quick Races pay ${Math.round(QUICK_PAY_SHARE[Math.min(lvl, QUICK_PAY_SHARE.length - 1)] * 100)}%`, next: `${Math.round(QUICK_PAY_SHARE[Math.min(lvl + 1, QUICK_PAY_SHARE.length - 1)] * 100)}% of the live purse` };
     case 'nitroTank': return { now: `Bank ${nitroCapFor(lvl)} nitro`, next: `${nitroCapFor(lvl + 1)} nitro` };
-    case 'lockup': return { now: `Away earnings for ${OFFLINE_HOURS[Math.min(lvl, OFFLINE_HOURS.length - 1)]} h`, next: `${OFFLINE_HOURS[Math.min(lvl + 1, OFFLINE_HOURS.length - 1)]} h` };
+    case 'lockup': {
+      const hrs = (l: number) => OFFLINE_HOURS[Math.min(l, OFFLINE_HOURS.length - 1)];
+      const usd = (x: number) => `$${x.toLocaleString('en-US')}`;
+      return { now: `Away: up to ${usd(offlineBudget(s, lvl))} over ${hrs(lvl)} h`, next: `up to ${usd(offlineBudget(s, lvl + 1))} over ${hrs(lvl + 1)} h` };
+    }
   }
 }
 
@@ -684,21 +688,56 @@ const ordinalShort = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n =
 /** How long away earnings can build up (seconds), by Lock-up level. */
 export const offlineMaxS = (s: GameState) => OFFLINE_HOURS[Math.min(s.upgrades.lockup ?? 0, OFFLINE_HOURS.length - 1)] * 3600;
 
-export const offlineRate = (s: GameState) => s.owned.reduce((a, id) => a + carById(id).offlineRate, 0);
+/** An ordinary race: one you can enter and repeat, not a rival boss, knockout, heat, time trial or speed trap. */
+const ordinaryEvent = (e: RaceEvent) => !e.heatOf && !e.knockout && !e.boss && !e.timeAttack && !e.speedTrap;
+
+/** The win purse of your best open ordinary race: the yardstick for away earnings at your stage. */
+export function stagePurse(s: GameState): { cash: number; event: RaceEvent } {
+  let best: RaceEvent = EVENTS[0];
+  for (const e of EVENTS) {
+    if (!ordinaryEvent(e)) continue;
+    const u = eventUnlocked(s, e);
+    if ((u.ok || u.switchCar) && e.payout.cash[0] > best.payout.cash[0]) best = e;
+  }
+  return { cash: roundCash(best.payout.cash[0]), event: best };
+}
+
+/** A full away claim (cash), by Lock-up level: one budget for the whole garage, never per car. */
+export function offlineBudget(s: GameState, lockup = s.upgrades.lockup ?? 0): number {
+  const races = OFFLINE_BUDGET_RACES[Math.min(lockup, OFFLINE_BUDGET_RACES.length - 1)];
+  return floorCash(stagePurse(s).cash * races);
+}
+
+/** The one payout rule for away time: cash for `seconds` counted (linear up to the cap), on a cash step, never more
+ *  than accrued. Used by accrual, the claim sheet, the Shop and the Lock-up text, so they always agree. */
+export function offlinePayout(s: GameState, seconds: number): { cash: number; counted: number; capped: boolean; budget: number; maxS: number } {
+  const maxS = offlineMaxS(s);
+  const budget = offlineBudget(s);
+  const counted = Math.max(0, Math.min(seconds, maxS));
+  return { cash: floorCash(budget * (counted / maxS)), counted, capped: seconds > maxS, budget, maxS };
+}
+
+/** Average away earnings per minute (display only; payouts come from offlinePayout). */
+export const offlineRate = (s: GameState) => Math.round((offlineBudget(s) / (offlineMaxS(s) / 60)) * 10) / 10;
 
 /**
- * Accrue offline cash for the time since lastSeenAt. Clamps negative elapsed time (clock rollback),
- * caps the total pending claim at 8 hours, and stores timestamp and pending claim together.
+ * Accrue away time since lastSeenAt. Clamps negative elapsed time (clock rollback), caps the counted time at the
+ * Lock-up hours, and stores timestamp and pending claim together, so repeated reloads, a second tab or a resumed
+ * idle tab never count the same time twice. The pending cash never goes down: a claim accrued by an older build
+ * is honoured as it stands (and only grows again once the shared rule pays more).
  */
-export function accrueOffline(s: GameState, now: number) {
+export function accrueOffline(s: GameState, now: number): boolean {
   const elapsed = Math.max(0, (now - s.offline.lastSeenAt) / 1000);
-  const room = Math.max(0, offlineMaxS(s) - s.offline.pendingS);
-  const counted = Math.min(elapsed, room);
+  const before = s.offline.pendingCash;
   if (elapsed >= OFFLINE_MIN_S || s.offline.pendingS > 0) {
-    s.offline.pendingS += counted;
-    s.offline.pendingCash = floorCash((s.offline.pendingS / 60) * offlineRate(s)); // on a cash step, never more than accrued
+    const room = Math.max(0, offlineMaxS(s) - s.offline.pendingS);
+    s.offline.awayS = (s.offline.awayS ?? s.offline.pendingS) + elapsed;
+    s.offline.pendingS += Math.min(elapsed, room);
+    s.offline.capped = !!s.offline.capped || elapsed > room;
+    s.offline.pendingCash = Math.max(s.offline.pendingCash, offlinePayout(s, s.offline.pendingS).cash);
   }
   s.offline.lastSeenAt = Math.max(s.offline.lastSeenAt, now);
+  return s.offline.pendingCash > before;
 }
 
 export function claimOffline(s: GameState): number {
@@ -706,12 +745,112 @@ export function claimOffline(s: GameState): number {
   s.cash += c;
   s.offline.pendingCash = 0;
   s.offline.pendingS = 0;
+  s.offline.awayS = 0;
+  s.offline.capped = false;
   return c;
 }
 
 /** Called regularly while playing so active time is not counted as "away". */
 export function heartbeat(s: GameState, now: number) {
   s.offline.lastSeenAt = Math.max(s.offline.lastSeenAt, now);
+}
+
+// ---------------- Spare parts: keep or recycle (Pit Stop) ----------------
+
+export type PartUseKind = 'fit' | 'craft' | 'pair' | 'spare';
+export interface PartUses {
+  part: Part;
+  where: 'bench' | 'rack';
+  uses: { kind: PartUseKind; text: string }[];
+  scrap: number;
+  starred: boolean;
+  /** keep: it has a use (or is starred); recycle: nothing in the garage needs it. */
+  verdict: 'keep' | 'recycle';
+}
+
+/** A part is a worthwhile ingredient when it is at least an eighth of the craft (three tiers below or closer). */
+const INGREDIENT_SPAN = 3;
+
+function craftUse(s: GameState, f: Family, t: number): string | null {
+  for (const c of ENABLED_CARS) {
+    if (s.owned.includes(c.id) || !c.unlock || c.unlock.family !== f) continue;
+    if (craftedTier(s, f) >= c.unlock.tier) continue; // already crafted: the ledger keeps it
+    if (t < c.unlock.tier && t >= c.unlock.tier - INGREDIENT_SPAN) {
+      const next = nextCar(s)?.id === c.id;
+      return `${next ? 'Ingredient' : 'Toward a later craft'}: the T${c.unlock.tier} ${FAMILIES[f].name} for the ${c.model}${next ? '' : ` (${2 ** (t - 1)} of ${2 ** (c.unlock.tier - 1)} parts' worth)`}`;
+    }
+  }
+  return null;
+}
+
+/** Does this part beat what a car has fitted in its family (at the car's cap)? */
+const beatsFitted = (s: GameState, car: CarId, p: Pick<Part, 'f' | 't' | 'q'>) => {
+  const cap = carById(car).cap;
+  const have = fitted(s, car)[p.f];
+  return contributionOn({ id: -1, ...p }, cap) > (have ? contributionOn(have, cap) : 0) + 1e-9;
+};
+
+/** For each owned car and family, the one bench part that is its best upgrade (ties go to the lower tier, so a
+ *  high-tier part is not spent on a capped car). Returns part id → the cars it is the pick for. */
+function upgradePicks(s: GameState, bench: Part[]): Map<number, CarId[]> {
+  const out = new Map<number, CarId[]>();
+  // the active car first, then the higher-cap cars, so a strong spare goes where it runs at full strength
+  const cars = [s.activeCar, ...s.owned.filter((c) => c !== s.activeCar).sort((a, b) => carById(b).cap - carById(a).cap)];
+  const taken = new Set<number>();
+  for (const car of cars) {
+    const cap = carById(car).cap;
+    for (const f of ACTIVE_FAMILIES) {
+      let best: Part | null = null;
+      for (const p of bench) {
+        if (p.f !== f || taken.has(p.id) || !beatsFitted(s, car, p)) continue;
+        const a = contributionOn(p, cap), b = best ? contributionOn(best, cap) : -1;
+        if (!best || a > b + 1e-9 || (Math.abs(a - b) < 1e-9 && p.t < best.t)) best = p;
+      }
+      if (best) { taken.add(best.id); out.set(best.id, [...(out.get(best.id) ?? []), car]); }
+    }
+  }
+  return out;
+}
+
+function fitText(s: GameState, p: Part, car: CarId): string {
+  const have = fitted(s, car)[p.f];
+  const capped = p.t > carById(car).cap ? ` (runs at T${carById(car).cap})` : '';
+  return `${have ? `Beats the T${have.t} ${FAMILIES[p.f].name}` : `Fills the empty ${FAMILIES[p.f].name} slot`} on your ${carById(car).model}${capped}`;
+}
+
+/** What each unfitted part is good for and what recycling it pays: a better fit for an owned car, an ingredient
+ *  toward the next or a later craft, a pair whose merge would be useful, or the one spare that matches your best
+ *  fitted part (an alternate build to swap between cars). Anything else is suggested for recycling. */
+export function spareParts(s: GameState): PartUses[] {
+  const bench = [
+    ...s.board.map((p) => (p ? { p, where: 'bench' as const } : null)),
+    ...s.tray.map((p) => (p ? { p, where: 'rack' as const } : null)),
+  ].filter((x): x is { p: Part; where: 'bench' | 'rack' } => !!x);
+  const fav = new Set(s.favorites ?? []);
+  const bestFitted = (f: Family) => Math.max(0, ...s.owned.map((c) => fitted(s, c)[f]?.t ?? 0));
+  const spareTaken = new Set<Family>();
+  // the spare tag goes to the highest-quality match first, one per family
+  const order = [...bench].sort((a, b) => b.p.t - a.p.t || (b.p.q === 'std' ? 0 : 1) - (a.p.q === 'std' ? 0 : 1));
+  const spareIds = new Set<number>();
+  for (const { p } of order) {
+    if (!spareTaken.has(p.f) && p.t === bestFitted(p.f) && p.t > 0) { spareTaken.add(p.f); spareIds.add(p.id); }
+  }
+  const picks = upgradePicks(s, bench.map((b) => b.p));
+  return bench.map(({ p, where }) => {
+    const uses: PartUses['uses'] = [];
+    const cars = picks.get(p.id) ?? [];
+    const fit = cars.length ? fitText(s, p, cars[0]) + (cars.length > 1 ? ` (and ${cars.length - 1} more car${cars.length > 2 ? 's' : ''})` : '') : null;
+    if (fit) uses.push({ kind: 'fit', text: fit });
+    const craft = craftUse(s, p.f, p.t);
+    if (craft) uses.push({ kind: 'craft', text: craft });
+    const partner = bench.some((o) => o.p.id !== p.id && o.p.f === p.f && o.p.t === p.t) && p.t < MAX_TIER;
+    const merged = { f: p.f, t: p.t + 1, q: 'std' as const };
+    if (partner && !fit && !craft && (s.owned.some((c) => beatsFitted(s, c, merged)) || craftUse(s, p.f, p.t + 1)))
+      uses.push({ kind: 'pair', text: `Merge it with your other T${p.t} ${FAMILIES[p.f].name}: the T${p.t + 1} is useful` });
+    if (!uses.length && spareIds.has(p.id)) uses.push({ kind: 'spare', text: `Alternate build: matches your best fitted ${FAMILIES[p.f].name} (T${p.t}) — a swap that needs no unfitting` });
+    const starred = fav.has(p.id);
+    return { part: p, where, uses, scrap: SCRAP_VALUE[p.t] ?? 0, starred, verdict: uses.length || starred ? 'keep' : 'recycle' };
+  });
 }
 
 export function equipCapNote(s: GameState): string | null {

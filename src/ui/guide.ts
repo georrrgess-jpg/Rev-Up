@@ -28,7 +28,7 @@ export function openGuide(app: App) {
         'Tap NITRO inside a boost zone (amber on the road) for a Perfect boost — 1.5× stronger. A tap anywhere else still helps a little.',
         'Quick Race lets your crew repeat an event you have won while you keep merging. It pays the base reward.'),
       sec('Cash, Rep and scrap',
-        'Cash is spending money: parts from the Shop (a known family and tier), tune-ups, garage upgrades, and looks in the Paint shop. Rep is earned progress: every race adds it, nothing spends it, and thresholds open races and cars (tap Rep in the top bar to see the next one). Scrap, from parts you press, buys crates.',
+        'Cash is spending money: parts from the Shop (a known family and tier), tune-ups, garage upgrades, and looks in the Paint shop. Rep is earned progress: every race adds it, nothing spends it, and thresholds open races and cars (tap Rep in the top bar to see the next one). Scrap, from parts you recycle, orders the exact part you pick in the Workshop, or polishes one.',
         'Every live place pays. Before a race you see each place’s purse, the Perfect bonus and any first-win money; after it, where every dollar came from. Quick Races pay your crew 70% of the purse (85% with the Pit crew).',
         'Paint shop (Showroom → a car): colours and wheel sets fit every car once bought; premium paint is per car; the Tapeback can be restored in three stages. Looks only — never performance.'),
       sec('Words',

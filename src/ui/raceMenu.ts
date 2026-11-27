@@ -15,6 +15,9 @@ import { difficulty, fitStatus } from './benefit';
 import { h, ordinal } from './dom';
 import { openFitParts } from './fit';
 import { RaceScreen } from './raceScreen';
+import { openPitSetup } from './pitSetup';
+import { rivalRunsSection } from './rivalRuns';
+import type { CarId } from '../data/tables';
 
 /** Speed-trap thresholds and records are stored in km/h until the stage-2 tables move to mph: show them in mph. */
 
@@ -26,6 +29,8 @@ export class RaceView implements View {
   private list: HTMLElement;
   private visible = false;
   private timer = 0;
+  /** Pit Setup sent the player to the Garage to merge: reopen it for this event when the Race menu shows again. */
+  private pitReturn: string | null = null;
 
   constructor(private app: App) {
     this.headCanvas = h('canvas', { 'aria-hidden': 'true' });
@@ -42,6 +47,11 @@ export class RaceView implements View {
   show() {
     this.visible = true;
     this.render();
+    if (this.pitReturn && !this.app.busy) {
+      const id = this.pitReturn;
+      this.pitReturn = null;
+      this.openPit(id);
+    }
     clearInterval(this.timer);
     this.timer = window.setInterval(() => { if (this.app.game.state.pendingQuick) this.render(); }, 1000);
   }
@@ -138,6 +148,7 @@ export class RaceView implements View {
       rec.goals ? goalList(s, rec) : null,
       rec.knockout ? heatList(s, rec) : null,
       h('div', { class: 'btns' },
+        h('button', { class: 'btn pit-btn', 'data-pit': rec.id, onclick: () => this.openPit(rec.id) }, h('span', { class: 'stack' }, 'Pit Setup', h('small', {}, 'fit, then race'))),
         h('button', { class: `btn primary race-live${q && q.eventId === rec.id ? ' off' : ''}`, 'data-coach': 'race-live', onclick: () => this.startLive(rec.id) },
           h('span', { class: 'stack' }, 'Race live', h('small', {}, `you drive · full purse · ${nitroNote}`)))),
       quickPart(rec, false),
@@ -148,8 +159,11 @@ export class RaceView implements View {
     const alts = P.alternatives(s, rec);
     const altBox = alts.length ? h('section', { class: 'alts', 'aria-label': 'Also worth racing' }, h('div', { class: 'feat-label' }, 'Or try'),
       ...alts.map(({ e }) => h('div', { class: 'alt' }, h('div', { class: 'grow' }, h('b', {}, e.name), ' ', diffTag(e), h('div', { class: 'd' }, reasonFor(e))),
+        h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'),
         h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
     const out: HTMLElement[] = altBox ? [featured, altBox] : [featured];
+    const runs = rivalRunsSection(this.app, (id, car) => this.startRivalRun(id, car));
+    if (runs) out.push(runs);
     if (q && q.eventId !== rec.id) out.push(h('p', { class: 'crew-note' }, `Your crew is racing ${eventById(q.eventId).name} · ${Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000))} s left`));
 
     // Catalogue: districts you can race in first (open), locked districts after (closed, with what opens them).
@@ -185,9 +199,9 @@ export class RaceView implements View {
           : r?.wins ? `✓ Won · win pays $${e.payout.cash[0]} and ${e.payout.rep[0]} Rep`
           : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : e.boss ? `Rival race · ${e.boss.reward.blueprint} paint` : `Win: $${e.payout.cash[0] + e.firstClear.cash} and ${e.payout.rep[0]} Rep the first time`;
         const action = u.ok
-          ? h('div', { class: 'row-btns' }, quickPart(e, true), h('button', { class: `btn sm primary-lite${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
+          ? h('div', { class: 'row-btns' }, quickPart(e, true), h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'), h('button', { class: `btn sm primary-lite${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
           : u.switchCar && s.owned.includes(u.switchCar)
-            ? h('button', { class: 'btn sm', onclick: () => this.startLive(e.id) }, `Race · ${carById(u.switchCar).model.split(' ')[0]}`)
+            ? h('div', { class: 'row-btns' }, h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'), h('button', { class: 'btn sm', onclick: () => this.startLive(e.id) }, `Race · ${carById(u.switchCar).model.split(' ')[0]}`))
             : null;
         const tags = [
           e.series ? h('span', { class: 'tag' }, `Round ${e.series.round}/${e.series.of}`) : null,
@@ -219,6 +233,34 @@ export class RaceView implements View {
     const scroll = this.list.scrollTop;
     this.list.replaceChildren(...out);
     this.list.scrollTop = scroll;
+  }
+
+  /** Pit Setup for an event: fit the car that will race it, then start (or come back here after a merge/order). */
+  openPit(id: string) {
+    if (this.app.busy) return;
+    openPitSetup(this.app, id, {
+      onStart: (eid) => this.startLive(eid),
+      onAwayToMerge: (eid) => {
+        this.pitReturn = eid;
+        this.app.go('garage');
+        this.app.toast(`Merge the pair, then tap Race — Pit Setup for ${eventById(eid).name} will be waiting`, undefined, 5000);
+      },
+    });
+  }
+
+  /** A Rival Run: the run's car rule, cap and nitro are applied by the game; the result card offers a fast retry. */
+  startRivalRun(runId: string, car: CarId) {
+    if (this.app.busy) return;
+    const setup = this.app.game.startRivalRun(runId, car);
+    if (!setup) return;
+    this.app.busy = true;
+    const rs = new RaceScreen(this.app, setup, this.app.game.pendingRaceId!, () => {
+      this.app.busy = false;
+      rs.el.remove();
+      this.app.views[this.app.route].show();
+      this.app.guide?.update();
+    });
+    this.app.root.append(rs.el);
   }
 
   startQuick(id: string) {

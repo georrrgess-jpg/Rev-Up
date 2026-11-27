@@ -15,6 +15,7 @@ import { tutorialStep } from '../core/tutorial';
 import { Coach, CoachStep } from './coach';
 import { h } from './dom';
 import { openShop } from './shop';
+import { openSpares } from './spares';
 import { openFitParts } from './fit';
 import { GoalCard } from './goalCard';
 
@@ -65,7 +66,7 @@ export class GarageView implements View {
     this.benchStatus = h('span', { class: 'num' });
     this.boardEl = h('div', { class: 'board', role: 'grid', 'aria-label': 'Parts board' });
     this.trayEl = h('div', { class: 'tray', role: 'grid', 'aria-label': 'Spare rack' });
-    this.pressEl = h('button', { class: 'press', 'data-press': '1', 'aria-label': 'Scrap press: drop or select a part, then tap here to scrap it' },
+    this.pressEl = h('button', { class: 'press', 'data-press': '1', 'aria-label': 'Scrap press: drop or select a part, then tap here to scrap it. Tap with nothing selected to sort spares.' },
       h('span', { class: 'pi', 'aria-hidden': 'true' }, '♻'), 'SCRAP');
     this.pressEl.addEventListener('click', () => this.onPressTap());
     this.hintEl = h('div', { class: 'hint', role: 'status' });
@@ -79,7 +80,8 @@ export class GarageView implements View {
     this.el = h('section', { class: 'view garage', 'aria-label': 'Garage' },
       h('div', { class: 'garage-body scroll' },
         this.goal.el, this.equipEl, this.capEl,
-        h('div', { class: 'benchhead' }, h('strong', {}, 'Workbench'), this.benchStatus),
+        h('div', { class: 'benchhead' }, h('strong', {}, 'Workbench'), h('span', { class: 'bh-r' }, this.benchStatus,
+          h('button', { class: 'btn sm sort-spares', 'aria-label': 'Keep or recycle spare parts', onclick: () => openSpares(this.app) }, 'Keep / Recycle'))),
         h('div', { class: 'boardwrap' }, this.boardEl),
         h('div', { class: 'trayrow' }, h('span', { class: 'traycaption' }, 'Spare rack'), this.trayEl, this.pressEl),
         this.hintEl),
@@ -304,7 +306,7 @@ export class GarageView implements View {
       case 'overflow':
         return { id: step, targets: [this.trayEl], ack: true, text: 'The spare rack holds parts when the bench is full. Drag them back onto the bench or onto a match any time.' };
       case 'scrap':
-        return { id: step, targets: [this.pressEl], ack: true, text: 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap buys crates of the family you need.' };
+        return { id: step, targets: [this.pressEl], ack: true, text: 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap orders the exact part you pick in the Shop.' };
       case 'mergeAll':
         return { id: step, targets: [this.mergeAllBtn], ack: true, text: 'Merge All is unlocked: one tap merges every pair on the bench. Quick manual merges still bank nitro.' };
       case 'cap':
@@ -837,7 +839,7 @@ export class GarageView implements View {
       const from = this.sel;
       this.setSel(null);
       this.requestScrap(from);
-    } else this.app.toast('Select a part, then tap Scrap — or drag a part here.');
+    } else openSpares(this.app); // nothing selected: the Keep / Recycle list (what each spare is for, its scrap)
   }
 
   private setSel(r: SlotRef | null) {
@@ -907,7 +909,7 @@ export class GarageView implements View {
         h('h2', {}, `Scrap T${p.t} ${fam.name}?`),
         car
           ? h('p', {}, `It's better than the ${fam.name} fitted to your ${car.model}`, gain.length ? ` (${gain.join(', ')})` : '', '. Fit it instead, or scrap it for ', h('b', {}, `${value} scrap`), '.')
-          : h('p', {}, `You'll get ${value} scrap. Every 10 scrap buys a crate.`),
+          : h('p', {}, `You'll get ${value} scrap. Spend scrap in the Shop's Scrap tab: order a chosen part or polish one.`),
         h('div', { class: 'fams' },
           car ? h('button', { class: 'btn', onclick: () => { close(); this.app.game.installPart(ups[0], ref); } }, `Fit to ${car.model}`) : h('button', { class: 'btn', onclick: close }, 'Keep it'),
           h('button', { class: 'btn danger', onclick: () => { close(); this.app.game.scrap(ref); } }, `Scrap for ${value}`)),

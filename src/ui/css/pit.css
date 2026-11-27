@@ -1,0 +1,82 @@
+/* Pit Setup and Rival Runs (Pit Stop update). Owned by the Pit Setup & Rival Runs workstream.
+   Loaded after style.css (imported by src/ui/pitSetup.ts and src/ui/rivalRuns.ts). */
+
+/* ---- Race menu: Pit buttons ---- */
+.featured .btns .btn.pit-btn { flex: 1; }
+.evt-row .row-btns .btn.pit-btn, .alts .btn.pit-btn { min-width: 48px; padding: 6px 10px; }
+.alts .alt { flex-wrap: wrap; }
+.alts .alt .grow { flex: 1 1 140px; min-width: 0; }
+
+/* ---- Pit Setup sheet ---- */
+.pit h2 { overflow-wrap: anywhere; }
+.pit .pit-sub { margin: 0 0 8px; }
+.pit-demands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.pit-demands .pd { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-width: 0; }
+.pit-demands .pd-top { display: flex; justify-content: space-between; gap: 4px; font-weight: var(--w-heavy); font-size: var(--fs-xs); flex-wrap: wrap; }
+.pit-demands .pd-top small { color: var(--muted); font-weight: var(--w-strong); font-size: var(--fs-2xs); }
+.pit-demands .bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); margin: 5px 0 3px; overflow: hidden; }
+.pit-demands .bar i { display: block; height: 100%; background: var(--amber); border-radius: 3px; }
+.pit-demands .pd-lv { font-size: var(--fs-2xs); color: var(--muted); }
+.pit-demands .pd-lv.high, .pit-slot .ps-need.high { color: var(--amber2); }
+.pit-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.pit-stat { text-align: center; min-width: 0; }
+.pit-stat small { display: block; font-size: var(--fs-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.pit-stat b { font-size: var(--fs-md); }
+.pit .pit-note { min-height: 0; margin: 4px 0 6px; color: var(--green); font-size: var(--fs-xs); }
+.pit .pit-note:empty { display: none; }
+.pit .pit-note.bad { color: var(--red, #f08a7a); }
+.pit-slots { display: grid; gap: 8px; }
+.pit-slot { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--panel); }
+.pit-slot.can { border-color: var(--amber); }
+.pit-slot .ps-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.pit-slot .ps-head b { font-size: var(--fs-md); }
+.pit-slot .ps-need { font-size: var(--fs-2xs); font-weight: var(--w-heavy); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.pit-slot .ps-cur { flex-basis: 100%; font-size: var(--fs-xs); color: var(--muted); }
+.pit-slot .ps-opt, .pit-slot .ps-hint { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.06); }
+.pit-slot .grow { flex: 1; min-width: 0; }
+.pit-slot .ps-part { font-weight: var(--w-heavy); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.pit-slot .ps-gain { font-size: var(--fs-xs); color: var(--green); overflow-wrap: anywhere; }
+.pit-slot .ps-hint { font-size: var(--fs-xs); color: var(--muted); }
+.pit-slot .ps-hint .grow { overflow-wrap: anywhere; }
+.pit-slot .btn { flex: none; min-height: 44px; min-width: 64px; }
+.pit-actions { display: flex; gap: 8px; margin-top: 12px; position: sticky; bottom: calc(-1 * (var(--safe-b) + 16px)); padding: 8px 0 calc(var(--safe-b) + 4px); background: var(--panel); }
+.pit-actions .btn { flex: 1; min-height: 52px; min-width: 0; }
+.pit-actions .btn.primary { flex: 1.5; }
+.pit-actions .btn small { white-space: normal; text-align: center; }
+
+/* ---- Race menu: Rival Runs section ---- */
+.rival-runs { margin: 10px 0 4px; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.rival-runs .feat-label { font-size: var(--fs-2xs); font-weight: var(--w-heavy); letter-spacing: .08em; text-transform: uppercase; color: var(--amber2); }
+.rival-runs .rr-count { color: var(--muted); letter-spacing: 0; text-transform: none; }
+.rival-runs .rr-intro { margin: 2px 0 6px; font-size: var(--fs-xs); color: var(--muted); }
+.rr-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.06); }
+.rr-card:first-of-type { border-top: 0; }
+.rr-card.locked { opacity: .72; }
+.rr-card .rr-name { font-size: var(--fs-md); overflow-wrap: anywhere; }
+.rr-card .rr-goal { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.rr-card .rr-meta, .rr-card .rr-prize { font-size: var(--fs-2xs); color: var(--muted); overflow-wrap: anywhere; }
+.rr-card.done .rr-prize { color: var(--green); }
+.rr-card .rr-btns { display: flex; flex-direction: column; gap: 6px; }
+.rr-card .rr-btns .btn { min-height: 44px; min-width: 76px; }
+@media (max-width: 340px) { .rr-card { grid-template-columns: 1fr; } .rr-card .rr-btns { flex-direction: row; } .rr-card .rr-btns .btn { flex: 1; } }
+
+/* ---- Rival Run brief ---- */
+.rr-brief .rr-taunt { font-style: italic; }
+.rr-facts { display: grid; gap: 6px; margin: 6px 0; }
+.rr-facts .fact { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: var(--fs-sm); }
+.rr-facts .fact > small { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: var(--w-heavy); }
+.rr-facts .fact > span { min-width: 0; overflow-wrap: anywhere; }
+.rr-cars { display: grid; gap: 6px; }
+.rr-car { text-align: left; min-height: 48px; padding: 6px 10px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); color: inherit; font: inherit; }
+.rr-car b { display: block; font-size: var(--fs-sm); }
+.rr-car small { display: block; font-size: var(--fs-2xs); color: var(--muted); }
+.rr-car.on { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber) inset; }
+.rr-car.off { opacity: .55; }
+
+/* ---- Rival Run result ---- */
+.rr-result .rr-facts-line { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.rr-result .rr-facts-line .chip { white-space: normal; }
+.rr-result .rr-suggest { margin: 6px 0 10px; }
+.rr-result .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.rr-result .btns .btn { flex: 1 1 90px; }
+.result .rr-result .place { font-size: var(--fs-2xl, 1.75rem); }

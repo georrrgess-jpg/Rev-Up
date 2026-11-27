@@ -74,7 +74,8 @@ export function describeFitEvents(app: App, ev: GameEvent[]): string {
  * Open the Fit Parts view for a car (default: the active car), optionally on one family's slot.
  * Contract: other workstreams call only this.
  */
-export function openFitParts(app: App, car: CarId = app.game.state.activeCar, focus?: Family) {
+/** `opts.onClose` runs when the sheet closes (Pit Setup and Rival Runs return to where they came from). */
+export function openFitParts(app: App, car: CarId = app.game.state.activeCar, focus?: Family, opts: { onClose?: () => void } = {}) {
   let curCar: CarId = app.game.state.owned.includes(car) ? car : app.game.state.activeCar;
   let fam: Family = focus && ACTIVE_FAMILIES.includes(focus) ? focus : defaultFamily(app, curCar);
   let pick: I.PartSource | null = null;
@@ -262,7 +263,7 @@ export function openFitParts(app: App, car: CarId = app.game.state.activeCar, fo
     };
     build();
     return body;
-  });
+  }, opts.onClose);
 }
 
 /** Start on the slot that most needs attention: empty with a part ready, then improvable, then engine. */

@@ -5,7 +5,7 @@ import * as P from '../src/core/progression';
 import { RaceSim, runRace } from '../src/core/race';
 import { MemoryKV, decodeSave, encodeSave, exportText, importText, loadGame, saveKey, writeGame } from '../src/core/save';
 import { migrate, newGame, validateState } from '../src/core/state';
-import { CATCHUP_EFFORT_THRESHOLD, OFFLINE_MAX_S, SIGNATURE_FINISHES, carById, eventById } from '../src/data/tables';
+import { CATCHUP_EFFORT_THRESHOLD, OFFLINE_MAX_S, SIGNATURE_FINISHES, eventById } from '../src/data/tables';
 import { statsFor } from '../src/core/loadout';
 import { at, emptyGame, put } from './helpers';
 
@@ -381,14 +381,15 @@ describe('saves', () => {
 });
 
 describe('offline claims', () => {
-  const rate = carById('junker').offlineRate;
   it('awards one bounded claim for up to eight hours', () => {
     const kv = new MemoryKV();
     const g = mkGame(kv);
     g.saveNow(T0);
     const g2 = new Game(kv, '/Rev-Up/', T0 + 20 * 3600_000);
     expect(g2.state.offline.pendingS).toBe(OFFLINE_MAX_S);
-    expect(g2.state.offline.pendingCash).toBe(Math.floor((OFFLINE_MAX_S / 60) * rate));
+    // Pit Stop: one garage budget (1.5 win purses of the best open race), not a per-car rate × hours
+    expect(g2.state.offline.pendingCash).toBe(P.offlineBudget(g2.state));
+    expect(g2.state.offline.capped).toBe(true);
   });
   it('repeat reloads never multiply the same claim', () => {
     const kv = new MemoryKV();

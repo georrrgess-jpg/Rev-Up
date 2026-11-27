@@ -17,6 +17,9 @@ export type GameEvent =
   | { type: 'place'; at: SlotRef; family: Family; tier: number; source: string }
   | { type: 'crateBlocked' }
   | { type: 'scrap'; at: SlotRef; value: number }
+  | { type: 'favorite'; id: number; on: boolean }
+  | { type: 'polish'; id: number; family: Family; tier: number; cost: number }
+  | { type: 'offline'; amount: number }
   | { type: 'unlock'; car: CarId }
   | { type: 'catchup'; family: Family; tier: number }
   | { type: 'printer' }

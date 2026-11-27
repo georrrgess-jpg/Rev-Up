@@ -9,6 +9,9 @@ import { repMilestones } from './app';
 import { fitStatus } from './benefit';
 import { fmt, h, ordinal } from './dom';
 import { openFitParts } from './fit';
+import * as RR from '../core/rivalRuns';
+import type { RaceView } from './raceMenu';
+import { openRivalBrief } from './rivalRuns';
 
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
@@ -22,6 +25,8 @@ export interface ResultOpts {
 }
 
 export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement {
+  const rr = app.game.rivalRunResult;
+  if (rr && rr.raceId === r.raceId) return rivalRunCard(app, r, rr, o);
   const game = app.game;
   const s = game.state;
   const ev = eventById(r.eventId);
@@ -90,4 +95,36 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
       !s.pendingReveal ? h('button', { class: 'btn', onclick: () => o.onRetry(r.eventId) }, 'Race again') : null),
   );
   return card;
+}
+
+/** Rival Run result: objective met or not (with the numbers that decided it), the prize the first time, best
+ *  results, the one suggestion the race data supports, and a one-tap retry with the same car. */
+function rivalRunCard(app: App, r: LastResult, rr: RR.RivalRunResult, o: ResultOpts): HTMLElement {
+  const run = RR.rivalRunById(rr.runId)!;
+  const rec = RR.runRecord(app.game.state, run.id);
+  const j = rr.judgement;
+  const who = RR.rivalName(run).split(' ')[0];
+  const facts: string[] = [];
+  if (j.gap !== null) facts.push(j.gap >= 0 ? `Beat ${who} by ${RR.secs(j.gap)} s` : `${RR.secs(j.gap)} s behind ${who}`);
+  if (run.objective.kind === 'launch' && j.launchGap !== null) facts.push(j.launchGap > 0 ? `Led the launch by ${RR.secs(j.launchGap)} s` : j.launchGap > -run.objective.within ? `Level out of the launch (${RR.secs(j.launchGap)} s)` : `${RR.secs(j.launchGap)} s behind out of the launch`);
+  if (run.objective.kind === 'shift') facts.push(`${j.clean} clean shift${j.clean === 1 ? '' : 's'} (${run.objective.clean} needed)${j.missed ? ` · ${j.missed} missed` : ''}`);
+  const race = app.views.race as RaceView;
+  const retry = () => { o.onClose(); race.startRivalRun(run.id, rr.car); };
+  return h('div', { class: `card rr-result${j.met ? ' reward' : ''}`, role: 'dialog', 'aria-label': 'Rival Run result' },
+    h('div', { class: `place${j.met ? ' p1' : ''}` }, j.met ? 'Objective met!' : 'Not this time'),
+    h('div', { class: 'gap' }, h('span', { class: 'gap-main' }, `${run.name} · ${RR.rivalName(run)}`), h('span', { class: 'gap-sub' }, `${run.goal}${r.time ? ` · ${r.time.toFixed(2)} s` : ''}`)),
+    h('div', { class: 'rr-facts-line' }, ...facts.map((t) => h('span', { class: 'chip' }, t)), rr.newBest && !rr.firstTry ? h('span', { class: 'chip best' }, 'Personal best') : null),
+    // buttons right under the verdict so a retry is one tap without scrolling, even on a small phone
+    h('div', { class: 'btns' },
+      h('button', { class: 'btn primary', onclick: retry }, 'Retry'),
+      h('button', { class: 'btn', onclick: () => { o.onClose(); openRivalBrief(app, run.id, (id, car) => race.startRivalRun(id, car), rr.car); } }, 'Car & parts'),
+      h('button', { class: 'btn', onclick: () => o.onClose() }, 'Done')),
+    rr.prized ? h('div', { class: 'finish-earned' }, h('span', { 'aria-hidden': 'true' }, run.prize.kind === 'part' ? '🔧' : '🎨'), h('div', {}, h('strong', {}, RR.prizeText(run.prize)), h('div', {}, RR.prizeDetail(run.prize))))
+      : rec.claimed ? h('p', { class: 'explain' }, `Prize already won (${RR.prizeText(run.prize)}). Replay for a better time.`)
+      : h('p', { class: 'explain' }, `Prize waiting: ${RR.prizeText(run.prize)} — paid once, the first time you meet the objective.`),
+    h('p', { class: 'explain rr-best' }, `Best ${rec.best !== null ? `${rec.best.toFixed(2)} s` : '—'}${rec.bestGap !== null ? ` · best margin ${rec.bestGap >= 0 ? '+' : '−'}${Math.abs(rec.bestGap).toFixed(2)} s` : ''} · ${rec.tries} ${rec.tries === 1 ? 'try' : 'tries'}`),
+    rr.suggestion ? h('p', { class: 'race-coach rr-suggest' }, h('b', {}, 'Try · '), rr.suggestion) : null,
+    o.extras?.length ? h('div', { class: 'extras' }, ...o.extras) : null,
+    h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),
+  );
 }

@@ -130,7 +130,7 @@ export const UPGRADES: UpgradeDef[] = [
   },
   {
     id: 'lockup', name: 'Lock-up', about: 'Your cars earn while you are away.', shows: 'cars4', levels: [
-      { cost: 2500, label: 'Away earnings build for 12 h (was 8 h)' },
+      { cost: 2500, label: 'Away earnings: a full claim is 2 race purses over 12 h (was 1.5 over 8 h)' },
     ],
   },
 ];
@@ -146,6 +146,16 @@ export const QUICK_PAY_SHARE = [0.7, 0.85]; // live stays worth playing: the cre
 export const PERFECT_BONUS_SHARE = 0.1;
 /** Hours of away earnings that can build up, by Lock-up level. */
 export const OFFLINE_HOURS = [8, 12];
+/** Away earnings: one budget for the whole garage (owning more cars never adds to it). A full claim is worth this
+ *  many win purses of your best open ordinary race, by Lock-up level, building evenly over OFFLINE_HOURS.
+ *  1.5 purses funds the next part order or two without skipping the next car (README "Away earnings"). */
+export const OFFLINE_BUDGET_RACES = [1.5, 2];
+/** Workshop scrap orders: a part of the family and tier you pick, for scrap. Twice its recycle value, so
+ *  buy → recycle always loses and merging stays the cheaper route (two T(n) make a T(n+1)). */
+export const scrapOrderCost = (tier: number) => (SCRAP_VALUE[tier] ?? 0) * 2;
+/** Workshop polish: a standard part becomes Polished (+15%, the same bonus as a lucky merge) for scrap.
+ *  1.5× its recycle value (rounded up); the polish is lost when the part is merged, recycling pays the same. */
+export const polishCost = (tier: number) => Math.ceil((SCRAP_VALUE[tier] ?? 0) * 1.5);
 export const nitroCapFor = (tankLevel: number) => NITRO_CAP + tankLevel;
 /** Tune-up: up to three stages per car, each +2% top speed, acceleration and grip. The cash route to a competitive
  *  car for players who don't land Perfect boosts; skilled players can save the money. Not used in the Stock Cup. */
@@ -209,7 +219,7 @@ export interface CarClass {
   paint: string;
   trim: string;
   blurb: string;
-  offlineRate: number; // cash per minute while away
+  offlineRate: number; // legacy (1.4–1.5 per-car away rate); away earnings now use one garage budget (OFFLINE_BUDGET_RACES)
   rev: { base: number; peak: number }; // reveal sound
   /** One line on how it drives, shown in the Showroom. */
   handling?: string;
