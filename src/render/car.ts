@@ -417,7 +417,11 @@ export type PaintMaterial = 'metallic' | 'pearl' | 'candy' | 'matte' | 'chrome' 
  * restore: Tapeback restoration stage — 1 rust and tape fixed, 2 straight panels and one colour, 3 brightwork.
  * livery: a graphic from LIVERIES drawn over the paint (stripes, numbers, flames …); fits every car.
  */
-export interface CarStyle { wheel?: WheelSetId; material?: PaintMaterial; restore?: number; livery?: string }
+export interface CarStyle {
+  wheel?: WheelSetId; material?: PaintMaterial; restore?: number; livery?: string;
+  /** Concours restoration stage 0..3: 1 deeper gloss, 2 detailed engine bay + brighter brightwork, 3 show finish. */
+  concours?: number;
+}
 
 /** Liveries: graphics drawn over any car's paint, coloured to contrast with it. Catalogue/prices live in STYLE_ITEMS. */
 export const LIVERIES: readonly { id: string; name: string; blurb: string }[] = [
@@ -452,7 +456,7 @@ function styledDef(id: string, st?: CarStyle): CarDef {
   if (!v) { v = { ...d, wheel: { ...d.wheel, ...WHEEL_SETS[st.wheel] } }; styledDefs.set(key, v); }
   return v;
 }
-const styleKey = (st?: CarStyle) => (st ? `${st.wheel ?? ''}.${st.material ?? ''}.${st.restore ?? 0}.${st.livery ?? ''}` : '');
+const styleKey = (st?: CarStyle) => (st ? `${st.wheel ?? ''}.${st.material ?? ''}.${st.restore ?? 0}.${st.livery ?? ''}.${st.concours ?? 0}` : '');
 
 // ---------------------------------------------------------------- wheels
 

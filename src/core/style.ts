@@ -7,7 +7,10 @@ import type { CarStyle, PaintMaterial, WheelSetId } from '../render/car';
 /** The cosmetic style a car is drawn with, everywhere it appears. */
 export function carStyle(s: GameState, car: CarId): CarStyle {
   const st = s.style?.[car];
-  return st ? { wheel: st.wheel as WheelSetId | undefined, material: st.material as PaintMaterial | undefined, restore: st.restore, livery: st.livery } : {};
+  const out: CarStyle = st ? { wheel: st.wheel as WheelSetId | undefined, material: st.material as PaintMaterial | undefined, restore: st.restore, livery: st.livery } : {};
+  const cc = s.concours?.[car];
+  if (cc) out.concours = cc; // Concours restoration stage: drawn by the car renderer
+  return out;
 }
 
 /** Premium paint is bought per car; colours, wheels and liveries are bought (or earned) once and fit every car. */
