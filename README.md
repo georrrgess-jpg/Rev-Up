@@ -4,7 +4,16 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio. No backend, no account, no runtime dependencies.
-- **Size:** ~116 KB JS + 15 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~130 KB JS + 17 KB CSS gzipped, plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.6 · Pit Stop
+
+- **Spare parts and scrap have a use.** **Keep / Recycle** (tap the scrap press with nothing selected) lists every spare with what it is good for — a better part for one of your cars, an ingredient for a craft, an alternate build — and the scrap it gives; star a part to protect it; bulk recycle never touches fitted or starred parts. The Workshop's **Scrap** tab orders a chosen family and tier for scrap with the price shown up front (T1 2 · T3 14 · T5 64 · T7 256; recycling returns half), or **polishes** a part. An ordered part can feed a craft, but the next car's keystone is still a merge you make yourself. Rapid taps charge once; a full bench queues the part.
+- **Away cash no longer skips the game.** It used to add every owned car's rate (late game: $72 a minute, $34,550 for a night). Now it is one budget: a full night pays 1.5× the win purse of your best open ordinary race (2× over 12 h with the Lock-up) — about one live race. Measured: early $25 / $210 / $210 for 1 h / 8 h / 24 h away, mid $90 / $720 / $720, late $180 / $1,500 / $1,500. The claim shows the exact bonus and whether the cap applied; claims don't stack across cars, tabs or reloads; a claim earned before the update is paid in full.
+- **Signs fit their boxes.** Track signs (Ray's Yard, Maple, Summit Gala, Bend) are sized from the measured text; the race gauge and clock no longer clip.
+- **Steady downshifts.** The shift light and the tap judgment now read one shift-attempt state with a fixed window; braking shows no cue (a tap says "Braking — wait"), and the needle no longer lags the revs.
+- **Pit Setup** on every race card: the car, the track's demands, fitted parts and the best parts you own with what each swap changes; keep the build, swap, or apply the recommended setup and start. Missing a useful part? It points at the exact merge or Workshop order and brings you back to the same race.
+- **Rival Runs:** short replayable challenges with a one-time prize — **Launch Duel** (Tapeback only vs Pip Marlowe; a T3 Turbo), **Fifth Gear** (Vexa GTi, no nitro, clean shifts vs Sol Ortega; the Checker fade livery), **Apex Duel** (Ironhorse with every part at T3 vs Kit Navarro; Kit's Apex Red paint). Each shows eligible cars, objective and prize first, keeps your best result, and suggests a specific part or technique after a run.
 
 ## Update 1.5 · Garage and Racing Overhaul
 
@@ -48,7 +57,7 @@ Built from an audit of a fresh, a mid-game and a last-event save on the producti
 
 ### Cash as a game system
 
-One tuning table in `src/data/tables.ts` (Economy block) holds prices, payout shares, rates. Cash buys things; Rep marks progress; scrap buys crates; the UI labels which.
+One tuning table in `src/data/tables.ts` (Economy block) holds prices, payout shares, rates. Cash buys things; Rep marks progress; scrap orders chosen parts and polishes them (1.6); the UI labels which.
 
 - **Earn:** every live place pays; before a race you see each place's purse, the Perfect bonus (now 10% of the win purse per Perfect, max two — $36 a Perfect at the Coastal Crown, was $8) and any first-win money; after it, a breakdown (purse · skill · one-time). Quick Races pay the crew **70%** of the live purse (85% with the Pit crew; never 100%, so live stays worth it), with the amount on the button. Away earnings show their rate and cap in the Shop.
 - **Spend at every price:** **Order a part** (a known family and tier, T1 $45 … T6 $3,200; each tier costs more than two of the tier below, and the next car's keystone is always reachable by buying two of the tier below — the deterministic route past bad crate luck). **Upgrades** with exact now → next effects (new: Pit crew $900, Nitro tank $1,500/$4,800, Lock-up $2,500). **Tune-up** per car (three stages, +2% speed/acceleration/grip each, from $120 for the Tapeback's first stage to $7,920 for the Lumen's third): the cash route for players who don't land Perfect boosts. **Paint shop** (Showroom → a car): six colours $250, five wheel sets $300–$2,400 (bought once, fit every car), premium paint per car — Metallic $1,200, Pearl $3,000, Candy $6,000 — and a three-stage **Tapeback restoration** ($1,500 / $3,000 / $4,500). Live preview before buying; looks never change performance.
@@ -143,7 +152,7 @@ Invalid drops return the part to where it was. The page never scrolls while drag
 - **Garage.** A 5×6 board (6×7 with the *Bigger bench* upgrade) and a 4-slot overflow tray. Two parts of the same family and tier merge into the next tier in the destination slot; the new part then cascades with orthogonal matches (up, right, down, left). Three families through T5: **Engines** → top speed, **Tires** → grip (launch traction and bends), **Turbos** → acceleration (strongest off the launch).
 - **Quality.** One roll per fusion: 2% **Mint** (skips a tier when room exists; at the ceiling it stays at the ceiling and keeps the Mint tag), 10% **Polished** (+15% stat), 88% standard. Quality never blocks a match.
 - **Combo → nitro.** Each fusion refreshes a 2 s combo timer; every 3rd fusion in a combo banks a nitro charge (cap 3).
-- **Crates.** A free printer makes a crate every 20 s while the game is open (pauses at 10 waiting). Crates open themselves when there is room (board first, then tray) and wait unopened when both are full. The **Scrap** press works on board and tray parts; 10 scrap buys a random crate and 15 buys a crate of a family you pick. Parts can also be ordered for $70. Scrap values are set so recycling crates always loses scrap.
+- **Crates.** A free printer makes a crate every 20 s while the game is open (pauses at 10 waiting). Crates open themselves when there is room (board first, then tray) and wait unopened when both are full. The **Scrap** press works on board and tray parts (tap it with nothing selected for **Keep / Recycle**). Scrap orders a chosen family and tier in the Workshop at twice the part's recycle value, polishes a part, or buys crates; buying and recycling always loses scrap.
 - **Equip.** The active car auto-equips the strongest part per family up to its equip cap. Stronger parts above the cap stay on the bench and are flagged. Scrapping an equipped part asks first and names what equips next.
 - **Racing.** Three rivals, a fixed-timestep (60 Hz) simulation on segmented tracks (launch, straights or highway, a bend). Amber **nitro windows** on the two straights are telegraphed on the road, on the progress bar and with an optional beep; a tap inside a window is a **Perfect** (1.5× effect), outside it still boosts. Every finish pays cash, Rep and crates scaled by place, with the real time gap and one next step. Rewards are committed at the finish line, so closing the page cannot lose or double them.
 - **Quick Race.** After a live win, an ordinary event can be raced by your crew in the background: same simulation without nitro, the placement's base payout, finished after the race's real duration while you keep merging. First-win bonuses, precision bonuses and rival rewards need a live race.
@@ -152,7 +161,7 @@ Invalid drops return the part to where it was. The page never scrolls while drag
 - **Reveal.** Ownership is saved before the unveil. Drag the cover off (or tap), then a headlight sweep, a camera move and a per-car rev. Skip is always available; an interrupted reveal resumes on next launch.
 - **Catch-up.** After ~150 s of active play (and race finishes) without progress on the current keystone, one free crate of that family arrives (once per car). Idle time and reloads earn nothing toward it.
 - **Merge All** unlocks after five race finishes or 10 active minutes. It resolves every pair deterministically with normal rules in one transaction, counts toward keystones, and banks at most one nitro (if its longest chain is ≥ 3).
-- **Offline cash.** While away, owned cars earn $1–4/min each, as one claim covering up to 8 hours. The board is left alone.
+- **Away cash.** One garage budget, not per car: a full claim is 1.5× (2× with the Lock-up) the win purse of your best open ordinary race, building over 8 h (12 h). The board is left alone.
 
 ## Code map
 
@@ -194,7 +203,8 @@ All in `src/data/tables.ts`:
 | `MERGE_ALL_UNLOCK_RACES` / `MERGE_ALL_UNLOCK_ACTIVE_S` | 5 / 600 | Merge All unlock |
 | `FRESH_ROUTE_BONUS` / `FRESH_ROUTE_AFTER_RACES` | 0.75 / 3 | Rep bonus for varying events |
 | `TRACKS[].course` / `favours` | per track | Course type shown on the Race tab |
-| `OFFLINE_MAX_S`, `CARS[].offlineRate` | 8 h, $1–4/min | Offline claim |
+| `OFFLINE_HOURS`, `OFFLINE_BUDGET_RACES` | 8/12 h, 1.5/2 purses | Away claim (one budget per garage) |
+| `scrapOrderCost`, `polishCost` | 2× / 1.5× recycle value | Workshop scrap prices |
 
 The data model already carries Transmission and Aero, T6–T10, all ten classes and the later districts (disabled). The full campaign's hypercar is gated by Rep, a crafted T10 keystone and a Summit Gala rival win — not by a Mint roll.
 
@@ -223,6 +233,13 @@ Source lives on the development branch; the compiled site is published to a dedi
 ## Verification results
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
+
+### 1.6 · Pit Stop
+
+- **Tests:** 187 passing, 3 probes skipped. New: `pitstop-economy` (17: buy → recycle loses scrap, rapid taps charge once, full bench queues, starred/fitted parts never recycled, keystone still needs the merge, away pay at 1 h / 8 h / 24 h for early, mid and late saves, extra cars don't stack, reloads, two tabs, a sleeping tab, a late save's big old claim paid once), `pit-stop` (13: swap changes the race setup and the sim, no duplicate equipment, merge/order hints, Rival Run rules applied in the sim, prize paid once and kept after reload, old and malformed saves), `shift-attempt` (8: a tap on the visible green is clean on 5 events, 4 cars, at 60 and 8 fps; no cue while braking; fixed window per attempt; duplicate taps shift once).
+- **Release checks:** smoke 22/22, input 24/24.
+- **Browser walk-through** (late save past its keystone, 390×844): Keep / Recycle listed 18 spares with their uses; three rapid taps on a 64-scrap order bought one part (100 → 36 scrap); a Pit Setup swap shown as "+11 mph" raised the loaded race build by 11.3 mph; a Rival Run started with its own car rule and the result named the gap off the line; away 1 h paid $45, 8 h and 24 h both $360 with "Cap reached", and reloads showed the same claim, never a second one. No page errors.
+- **Downshift trace** (4× CPU slowdown): green-while-braking frames 387 → 0 (Canyon Stage), needle-vs-judgment disagreements 27 → 0; at ~11 fps, taps on green 10/10 clean, on amber 11/11 "Early".
 
 ### 1.5 · Garage and Racing Overhaul
 
