@@ -3,7 +3,7 @@
    area tabs), the scrolling panel, and a sticky foot (stat preview, status, the one action with its price). */
 
 .sheet:has(> .mech) { height: calc(100dvh - var(--safe-t) - 8px); max-height: calc(100dvh - var(--safe-t) - 8px); padding-top: 0; padding-bottom: 0; display: flex; flex-direction: column; }
-.mech { display: flex; flex-direction: column; min-height: 100%; }
+.mech { display: flex; flex-direction: column; min-height: 100%; flex-shrink: 0; }
 .mech > * { flex-shrink: 0; }
 
 /* ---- sticky top ---- */
@@ -138,3 +138,9 @@
   .sheet:has(> .mech) { width: min(680px, 100%); }
 }
 html.reduced .mech-bay, html.reduced .mech-outline { transition: none; }
+
+/* Concours restoration stages */
+.mech .pips { display: inline-flex; gap: 3px; vertical-align: middle; }
+.mech .pips i { width: 14px; height: 7px; border-radius: 2px; border: 1px solid var(--line); background: rgba(255,255,255,.08); }
+.mech .pips i.done { background: var(--gold); border-color: var(--gold); }
+.mech-fitted.locked { opacity: .7; border-style: dashed; }

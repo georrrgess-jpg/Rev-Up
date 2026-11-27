@@ -148,6 +148,25 @@ describe('steady shift target', () => {
     }
   });
 
+  it('a tap between sim steps moves the HUD to the new gear at once (no frame with the new gear and the old window)', () => {
+    for (const [ev, car] of CASES.slice(0, 6)) {
+      const sim = new RaceSim(setup(ev, car, 'manual'));
+      let taps = 0;
+      while (!sim.done && sim.player.finishTime === null) {
+        sim.step();
+        if (sim.attempt.cue === 'green') {
+          const g = sim.player.gear;
+          expect(sim.tapShift()).toBe('clean');
+          taps++;
+          expect(sim.attempt.gear).toBe(g + 1);
+          expect(sim.attempt.band.join('-')).toBe(sim.shiftWindow().join('-'));
+          expect(sim.attempt.cue).not.toBe('green');
+        }
+      }
+      expect(taps).toBeGreaterThan(2);
+    }
+  });
+
   it('a hold always ends with a fresh attempt for the gear the car is in (SHIFT rules unchanged)', () => {
     expect(SHIFT.downPerZone).toBeGreaterThanOrEqual(1);
     const { frames } = drive('canyon-stage', 'rally', 60, 0);

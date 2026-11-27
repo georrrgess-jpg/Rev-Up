@@ -321,6 +321,17 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       onclick: () => { fam = f; pending = null; note = ''; stopPreview(); build(); },
     }, h('span', { class: 'fi', html: familyIcon(f), 'aria-hidden': 'true' }), FAMILIES[f].name, h('small', {}, FAMILIES[f].statLabel)))) : null;
 
+    /** Rev the car with the engine and turbo being previewed (else the fitted ones), so turbo cars whistle. */
+    const hear = () => {
+      const s = game.state;
+      const fit = I.fitted(s, car);
+      const p = pending;
+      const pv = p?.k === 'part' ? p.src.part : p?.k === 'order' ? { f: p.f, t: p.t, q: 'std' as const } : null;
+      const eng = pv?.f === 'engine' ? pv : fit.engine;
+      const tur = pv?.f === 'turbo' ? pv : fit.turbo;
+      previewEngine(car, eng?.t ?? 0, { quality: eng?.q ?? 'std', turboTier: tur?.t ?? 0 });
+    };
+
     const partsPanel = (s: GameState): (HTMLElement | null)[] => {
       const cls = carById(car);
       const lo = computeLoadout(s, car);
@@ -334,7 +345,7 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
         h('div', { class: 'grow' },
           h('div', { class: 't' }, cur ? `${partName(cur)} fitted` : `No ${FAMILIES[fam].name} fitted`),
           h('div', { class: 'd' }, cur ? `On the car, off the merge board${cur.t > cls.cap ? ` · runs at T${cls.cap}, the ${cls.model}'s limit` : ''}` : `Fit one for more ${FAMILIES[fam].statLabel.toLowerCase()}.`)),
-        h('div', { class: 'btns' }, fam === 'engine' ? h('button', { class: 'btn sm hear', 'aria-label': `Hear the ${cur ? partName(cur) : 'stock engine'}`, onclick: () => previewEngine(car, cur?.t ?? 0, { quality: cur?.q ?? 'std' }) }, '▶ Hear') : null,
+        h('div', { class: 'btns' }, fam === 'engine' || fam === 'turbo' ? h('button', { class: 'btn sm hear', 'aria-label': 'Hear this engine, with the part you are previewing', onclick: () => hear() }, '▶ Hear') : null,
         cur ? h('button', {
           class: `btn sm${room ? '' : ' off'}`, 'aria-disabled': String(!room),
           onclick: () => {

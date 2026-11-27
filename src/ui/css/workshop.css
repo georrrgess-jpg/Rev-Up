@@ -76,3 +76,5 @@
   .workshop .segs.five .seg { font-size: var(--fs-2xs); }
 }
 .workshop > .btn.close { margin-right: 0; }
+.spares > .btn.close { margin-right: 0; }
+.workshop .concours-row .lvl { color: var(--muted); font-weight: var(--w-body); }

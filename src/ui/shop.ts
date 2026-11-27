@@ -238,7 +238,7 @@ export function openShop(app: App, focusFamily?: Family, opts: ShopTab | ShopOpt
             const r = restoreInfo(s, s.activeCar);
             return h('div', { class: 'row concours-row' }, h('span', { class: 'up-ico', 'aria-hidden': 'true' }, '✦'),
               h('div', { class: 'grow' }, h('div', { class: 't' }, `Concours restoration · ${car.model}`, h('span', { class: 'lvl' }, ` ${r.stage}/${r.of}`)),
-                h('div', { class: 'd' }, r.locked ? `🔒 ${r.locked}` : r.maxed ? r.benefit : `${r.name}: ${fmt(r.cost)} scrap · ${r.benefit}`)),
+                h('div', { class: 'd' }, r.locked ? `🔒 ${r.locked}` : r.maxed ? r.benefit : `${fmt(r.cost)} scrap · ${r.benefit}`)),
               r.locked ? null : h('button', { class: 'btn sm', onclick: () => { close(); openMechanic(app, { area: 'body', returnTo: () => openShop(app, undefined, 'scrap') }); } }, r.maxed ? 'View' : 'Preview'));
           })(),
           // ---- end Scrap & surplus

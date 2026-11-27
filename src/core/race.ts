@@ -481,6 +481,9 @@ export class RaceSim {
     // the green the player sees is clean to tap (including a green caught by braking, inside its grace)
     const grade: ShiftGrade = a.cue === 'green' || (f >= lo && f <= hi) ? 'clean' : f < lo ? 'early' : 'late';
     this.upshift(p, grade);
+    // the new gear's attempt opens now, not at the next step: a frame drawn before the sim steps again never shows the
+    // new gear with the old window (or a stale green)
+    this.refreshAttempt();
     return grade;
   }
 
