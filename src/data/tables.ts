@@ -1,6 +1,7 @@
 // Rev Up — data tables. All tuning knobs live here so rules stay data-driven.
 // Values marked "tunable" are referenced by the playthrough test and README.
 import { CIRCUIT_EVENTS, CIRCUIT_RIVALS, CIRCUIT_TRACKS } from './circuit'; // 1.9 Circuit (Racing workstream; data/circuit.ts imports only types from here)
+import { REDLINE_EVENTS, REDLINE_RIVALS } from './redline'; // 1.10 Redline Series fields (type-only imports back)
 
 export type Family = 'engine' | 'tires' | 'turbo' | 'transmission' | 'aero';
 export type Quality = 'std' | 'polished' | 'mint';
@@ -10,6 +11,8 @@ export type CarId =
   | 'vireo' | 'mako' | 'sovereign'
   // 1.9 Circuit supercars: lightweight technical, fast highway, late-game flagship with a signature launch
   | 'ardent' | 'meridian' | 'tempest'
+  // 1.10 Redline: the Kestrel 1600 R, an earned variant (finish the Redline Series; never on the Rep ladder)
+  | 'kestrelr'
   // Legacy placeholder id (never enabled; kept so old data still type-checks):
   | 'hyper';
 
@@ -221,7 +224,7 @@ export const nitroCapFor = (tankLevel: number) => NITRO_CAP + tankLevel;
  *  car for players who don't land Perfect boosts; skilled players can save the money. Not used in the Stock Cup. */
 export const TUNE_STAGES = 3;
 export const TUNE_STEP = 0.02;
-export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600, rally: 4500, gt: 5500, proto: 7000, vireo: 8000, mako: 9000, sovereign: 11000, ardent: 7000, meridian: 9500, tempest: 12000 };
+export const TUNE_PRICE: Partial<Record<CarId, number>> = { junker: 120, beater: 260, hothatch: 600, muscle: 1300, tourer: 2200, tuner: 2200, super: 3600, rally: 4500, gt: 5500, proto: 7000, vireo: 8000, mako: 9000, sovereign: 11000, ardent: 7000, meridian: 9500, tempest: 12000, kestrelr: 8500 };
 /** Stage 0→1, 1→2, 2→3: ×1, ×1.6, ×2.2 of the car's base, on a cash step (Tapeback $120 / $190 / $260). */
 export const tunePrice = (car: CarId, stage: number) => roundCash((TUNE_PRICE[car] ?? 1000) * (1 + stage * 0.6));
 
@@ -287,6 +290,10 @@ export interface CarClass {
   rev: { base: number; peak: number }; // reveal sound
   /** One line on how it drives, shown in the Showroom. */
   handling?: string;
+  /** 1.10: earned by a challenge chain instead of the Rep ladder (`unlock` is null): the chain's id. */
+  earnedBy?: 'redline';
+  /** 1.10: the roster car this one is a variant of (Showroom: "an R version of the Kestrel 1600"). */
+  variantOf?: CarId;
 }
 
 export type DistrictId = 'scrapyard' | 'suburbs' | 'meets' | 'trials' | 'downtown' | 'coastal' | 'riviera' | 'neon' | 'desert' | 'summit';
@@ -325,7 +332,7 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'muscle', name: 'Muscle', model: 'Ironhorse 455', district: 'suburbs', cap: 5,
-    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1650, family: 'engine', tier: 5 }, enabled: true,
+    base: { top: 41, accel: 5.6, grip: 0.88 }, unlock: { rep: 1500, family: 'engine', tier: 5 }, enabled: true,
     paint: '#1f3a5f', trim: '#f2b33d', blurb: 'A restored long-hood coupe with twin stripes and a V8 you can feel in your chest.',
     offlineRate: 4, rev: { base: 45, peak: 160 },
   },
@@ -337,7 +344,7 @@ export const CARS: CarClass[] = [
   },
   {
     id: 'tuner', name: 'Lightweight', model: 'Kestrel 1600', district: 'downtown', cap: 6,
-    base: { top: 40, accel: 7.0, grip: 1.25 }, unlock: { rep: 2700, family: 'tires', tier: 6, stars: 3 }, enabled: true,
+    base: { top: 40, accel: 7.0, grip: 1.25 }, unlock: { rep: 2700, family: 'tires', tier: 6, stars: 2 }, enabled: true,
     paint: '#efc12c', trim: '#1b1d21', blurb: 'A stripped, high-revving coupe built for the city. Thin glass, no carpet, all corner.',
     offlineRate: 7, rev: { base: 95, peak: 320 }, handling: 'Best off the line and through tight corners; runs out of top end on highways.',
   },
@@ -350,20 +357,20 @@ export const CARS: CarClass[] = [
   // ---- Endgame: the Desert Proving Ground and the Summit (Rep + a crafted keystone + a won series or event each)
   {
     id: 'rally', name: 'Rally', model: 'Corvo Rally', district: 'desert', cap: 8,
-    base: { top: 41, accel: 8.4, grip: 1.25 }, unlock: { rep: 6000, family: 'tires', tier: 8, event: 'canyon-qualifier' }, enabled: true,
+    base: { top: 41, accel: 8.4, grip: 1.25 }, unlock: { rep: 5400, family: 'tires', tier: 8, event: 'canyon-qualifier' }, enabled: true,
     paint: '#1f62c9', trim: '#f5c518', blurb: 'A short, tough AWD rally coupe: roof scoop, a four-lamp light pod, mud flaps. Built to be thrown at gravel.',
     offlineRate: 11, rev: { base: 75, peak: 270 }, handling: 'All-wheel drive: the hardest launches and the best grip on loose, tight bends. Quick to its top speed, then it tops out (~150 mph).',
   },
   {
     id: 'gt', name: 'Endurance GT', model: 'Strata GTR', district: 'summit', cap: 8,
-    base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 8800, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
+    base: { top: 50, accel: 6.6, grip: 1.45 }, unlock: { rep: 8400, family: 'engine', tier: 8, event: 'rally-final' }, enabled: true,
     paint: '#d5dade', trim: '#d6202a', blurb: 'A wide endurance racer with a splitter, a swan-neck wing and race numbers. Built to run flat out for hours.',
     offlineRate: 13, rev: { base: 70, peak: 260 }, handling: 'Aero grip: the fastest car through fast sweepers, strong at speed (~200 mph on a long straight, fully built). Softer off the line than the Corvo.',
   },
   // ---- 1.9 Circuit: the Ardent Spyder is a branch beside the Halcyon X (both open with the Strata GTR)
   {
     id: 'ardent', name: 'Track car', model: 'Ardent Spyder', district: 'summit', cap: 8,
-    base: { top: 47, accel: 7.6, grip: 1.66 }, unlock: { rep: 11000, family: 'turbo', tier: 8, event: 'glacier-pass', after: 'gt' }, enabled: true,
+    base: { top: 47, accel: 7.6, grip: 1.66 }, unlock: { rep: 10500, family: 'turbo', tier: 8, event: 'glacier-pass', after: 'gt' }, enabled: true,
     paint: '#f26a1b', trim: '#20242b', blurb: 'A featherweight open-top track car: carbon tub, roll hoops, no roof, no carpet. Every corner is a chance.',
     offlineRate: 14, rev: { base: 100, peak: 360 }, handling: 'The lightest car in the game: unbeatable through tight, technical bends; gives up top speed on long straights.',
   },
@@ -408,13 +415,27 @@ export const CARS: CarClass[] = [
     paint: '#101418', trim: '#5ef2ff', blurb: 'A four-motor electric flagship with a light-blade face and a launch that pins you to the seat. The last word in the garage.',
     offlineRate: 19, rev: { base: 120, peak: 420 }, handling: 'The hardest launch in the game and a silent, endless pull; heavy, so it needs grip parts for tight bends.',
   },
+  // ---- 1.10 Redline: the Kestrel 1600 R. Not on the Rep ladder: finishing the five-step Redline Series (data/rivalRuns.ts)
+  // hands it over. A stripped, caged, winged Kestrel on a T9 cap: the most grip and the sharpest launch of any car,
+  // the lowest top speed of the late cars. Its build role: hairpins, street circuits and capped (stock-class) races,
+  // where its base car beats everything; on a long straight a Halcyon or a Meridian walks away from it.
+  {
+    id: 'kestrelr', name: 'Lightweight R', model: 'Kestrel 1600 R', district: 'summit', cap: 9,
+    base: { top: 45, accel: 7.8, grip: 1.84 }, unlock: null, earnedBy: 'redline', variantOf: 'tuner', enabled: true,
+    paint: '#f2efe6', trim: '#e0202e', blurb: 'The Kestrel, rebuilt for the Redline Series: seam-welded shell, a cage, a carbon bonnet, a swan wing and a 10,500 rpm four. Earned, never sold.',
+    offlineRate: 15, rev: { base: 105, peak: 390 },
+    handling: 'The most grip and the sharpest launch in the game; the lowest top speed of the late cars. Wins hairpins, street circuits and stock-class races; loses long straights.',
+  },
   { id: 'hyper', name: 'Hypercar', model: 'One-of-one', district: 'summit', cap: 10, base: { top: 64, accel: 8.5, grip: 1.15 }, unlock: { rep: 99999, family: 'engine', tier: 10 }, enabled: false, paint: '#555', trim: '#999', blurb: 'Legacy placeholder (never enabled).', offlineRate: 10, rev: { base: 60, peak: 200 } },
 ];
 
 export const ENABLED_CARS = CARS.filter((c) => c.enabled);
 /** 1.9 Unlock stages beyond the standard three (halfway Rep, keystone, a top 3 in the unlock race; see
  *  progression.carStages): a win elsewhere that hands over a big ingredient for this car. */
-export const STAGE_LINKS: Partial<Record<CarId, { id: string; label: string; win: string; reward: { part?: { family: Family; tier: number }; cash?: number; scrap?: number } }[]>> = {
+export const STAGE_LINKS: Partial<Record<CarId, { id: string; label: string; win: string; reward: { part?: { family: Family; tier: number }; cash?: number; scrap?: number; tune?: true } }[]>> = {
+  // 1.10: the two longest Rep stretches get a milestone in the middle: a race of their own that pays something usable
+  muscle: [{ id: 'sprint', label: 'Win the Foundry Sprint (Vexa GTi)', win: 'foundry-sprint', reward: { part: { family: 'engine', tier: 4 } } }],
+  rally: [{ id: 'midnight', label: 'Win the Midnight Run (Lumen RS)', win: 'midnight-run', reward: { tune: true } }],
   gt: [{ id: 'revival', label: 'Win the Ironhorse Revival', win: 'ironhorse-revival', reward: { part: { family: 'engine', tier: 7 } } }],
   // the Ardent's and the Meridian's own races (data/circuit.ts) hand over an ingredient for the car beside them
   proto: [{ id: 'esplanade', label: 'Win the Esplanade Grand Prix (Ardent Spyder)', win: 'esplanade-gp', reward: { part: { family: 'turbo', tier: 8 } } }],
@@ -438,6 +459,7 @@ export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: st
   ardent: { name: 'Graphite Flare', paint: '#2b2f36', stripe: '#f26a1b' },
   meridian: { name: 'Midnight Meridian', paint: '#13254a', stripe: '#e8edf3' },
   tempest: { name: 'Glacier Volt', paint: '#e9eef2', stripe: '#5ef2ff' },
+  kestrelr: { name: 'Redline Graphite', paint: '#2a2d33', stripe: '#e0202e' },
 };
 
 export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
@@ -834,6 +856,14 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [200, 140, 100, 80], rep: [32, 22, 16, 12], crates: [1, 1, 1, 0] }, firstClear: { cash: 180, crates: 3 },
     requires: { beatBoss: 'ray', rep: 330 }, blurb: 'Top-speed country. Engines rule the highway.',
   },
+  // 1.10: the long Vexa GTi stretch (to the Ironhorse's 1,650 Rep) had only the Cul-de-sac and the Maple Mile to
+  // repeat. The Foundry Sprint opens with the Vexa on the tight Foundry Circuit (grip, not top speed), pays a little
+  // more, and its first win is an Ironhorse unlock stage (a T4 Engine: two of them make the T5 keystone).
+  {
+    id: 'foundry-sprint', name: 'Foundry Sprint', district: 'suburbs', track: 'foundry', rivals: ['june', 'priya', 'sol'],
+    payout: { cash: [220, 160, 120, 90], rep: [40, 28, 20, 15], crates: [2, 1, 1, 0] }, firstClear: { cash: 220, crates: 3 },
+    requires: { car: 'hothatch' }, blurb: 'The Foundry’s tight bends at night shift. A hot hatch’s grip beats a big engine here.',
+  },
   {
     id: 'tapeback-trophy', name: 'Tapeback Trophy', district: 'scrapyard', track: 'scrapyard', rivals: ['nell', 'oz', 'pip'], carOnly: 'junker',
     payout: { cash: [120, 85, 60, 45], rep: [14, 10, 8, 6], crates: [2, 1, 1, 0] }, firstClear: { cash: 150, crates: 3 },
@@ -921,7 +951,7 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'main-event', name: 'The Main Event', district: 'downtown', track: 'skyline', rivals: ['nova'],
     payout: { cash: [900, 0, 0, 0], rep: [120, 0, 0, 0], crates: [4, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'tuner', stars: 4 }, knockout: { heats: ['main-event:1', 'main-event:2', 'main-event:3'] },
+    requires: { car: 'tuner', stars: 3 }, knockout: { heats: ['main-event:1', 'main-event:2', 'main-event:3'] },
     boss: { rival: 'nova', reward: { cash: 1500, crates: 6, blueprint: 'Main Event Neon', badge: 'Main Event Champion' } },
     blurb: 'Three heats, one night. Top 3 go through the street heat, top 2 through the bridge, then a final against Victor Sandoval. Change cars between heats.',
   },
@@ -1083,6 +1113,7 @@ export const RIVAL_PACE: Record<string, number> = {
   'rusty-ray': 1.031,
   'cul-de-sac': 0.953,
   'maple-mile': 1.020,
+  'foundry-sprint': 1.07, // 1.10: a real test in a T4 Vexa (clean shifts and the right tyres), not a farm
   'foundry-final': 1.330,
   'hatch-attack': 0.986,
   'harbor-launch': 0.949,
@@ -1091,9 +1122,9 @@ export const RIVAL_PACE: Record<string, number> = {
   'neon-mile': 0.952,
   'stock-cup': 1.002,
   'skyline-run': 0.967,
-  'main-event:1': 1.200,
-  'main-event:2': 0.980,
-  'main-event:3': 0.972,
+  'main-event:1': 1.120, // 1.10: was 1.200 — a weak driver (missed shifts, no nitro) lost the top-3 street heat 15 times in a row
+  'main-event:2': 0.955, // 1.10: was 0.980 (with the 1.10 star routes a weak driver reaches the Main Event earlier, on a lighter build)
+  'main-event:3': 0.960, // 1.10: was 0.972
   'midnight-run': 0.932,
   'canyon-qualifier': 0.839,
   'dust-stage': 0.990,
@@ -1123,8 +1154,25 @@ for (const e of EVENTS) {
   });
 }
 
+// ---- 1.10 Redline Series fields (src/data/redline.ts): not in EVENTS (never listed, recommended or paid as races),
+// reachable only through eventById; rivals scaled per step like the events above.
+/** Rival pace per Redline step (tunable; measured in tests/redline.test.ts). */
+export const REDLINE_PACE: Record<string, number> = { 'rl-shakedown': 1.08, 'rl-holeshot': 1.04, 'rl-stock': 1.08, 'rl-apex': 1.16, 'rl-final': 1.03 };
+Object.assign(RIVALS, REDLINE_RIVALS);
+export const SERIES_EVENTS: RaceEvent[] = REDLINE_EVENTS;
+for (const e of SERIES_EVENTS) {
+  const k = REDLINE_PACE[e.id] ?? 1;
+  e.rivals = e.rivals.map((id) => {
+    const r = RIVALS[id];
+    const nid = `${id}@${e.id}`;
+    RIVALS[nid] = { ...r, id: nid, stats: scaleStats(r.stats, k) }; // the base rival keeps its own pace elsewhere
+    return nid;
+  });
+}
+// ---- end 1.10 Redline
+
 export const eventById = (id: string): RaceEvent => {
-  const e = EVENTS.find((x) => x.id === id);
+  const e = EVENTS.find((x) => x.id === id) ?? SERIES_EVENTS.find((x) => x.id === id); // 1.10: + Redline fields
   if (!e) throw new Error(`Unknown event ${id}`);
   return e;
 };

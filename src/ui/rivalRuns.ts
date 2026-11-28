@@ -3,6 +3,7 @@
 // Rival Runs workstream.
 import { rivalCarModel } from '../data/rivalCars';
 import './css/pit.css';
+import './css/redline.css'; // 1.10 Redline Series card (Progression)
 import * as RR from '../core/rivalRuns';
 import type { RivalRun } from '../data/rivalRuns';
 import { computeLoadout } from '../core/loadout';
@@ -21,14 +22,42 @@ const bestLine = (app: App, run: RivalRun) => {
   return `Best ${r.best !== null ? `${r.best.toFixed(2)} s` : '—'}${gap} · ${r.tries} ${r.tries === 1 ? 'try' : 'tries'}`;
 };
 
+/** 1.10 Redline Series (Progression workstream): one connected card — the reward car and its role up front, all five
+ *  steps with their prizes, what is done, and one button for the next step. Shown above the Rival Runs. */
+export function redlineSection(app: App, start: StartRun): HTMLElement | null {
+  const s = app.game.state;
+  const v = RR.redlineView(s);
+  if (!v.visible) return null;
+  const next = v.next;
+  const car = next ? RR.defaultCar(s, next) : null;
+  return h('section', { class: `redline-series${v.reward.owned ? ' done' : ''}`, 'aria-label': 'Redline Series', 'data-series': 'redline' },
+    h('div', { class: 'feat-label' }, 'Redline Series', h('span', { class: 'rr-count' }, ` · ${v.done}/${v.of} steps`)),
+    h('div', { class: 'rl-reward' },
+      h('b', {}, v.reward.owned ? `✓ ${v.reward.model} earned` : `Reward: the ${v.reward.model}`),
+      h('small', {}, `T${v.reward.cap} cap · ${v.reward.role}`)),
+    h('ol', { class: 'rl-steps' }, ...v.steps.map((st) => h('li', { class: `rl-step${st.done ? ' done' : st.current ? ' current' : st.open ? '' : ' locked'}`, 'data-run': st.run.id },
+      h('span', { class: 'rl-n', 'aria-hidden': 'true' }, st.done ? '✓' : String(st.step)),
+      h('span', { class: 'rl-txt' },
+        h('b', {}, st.run.name), ` · ${RR.rivalName(st.run)}`,
+        h('small', {}, st.current || st.open ? st.run.goal : st.why ?? ''),
+        h('small', { class: 'rl-prize' }, `${st.done ? 'Won' : 'Prize'}: ${st.prize}${st.tries && !st.done ? ` · ${st.tries} ${st.tries === 1 ? 'try' : 'tries'}` : ''}`)),
+      st.open ? h('button', { class: 'btn sm', 'aria-label': `${st.run.name} details`, onclick: () => openRivalBrief(app, st.run.id, start) }, st.done ? 'Replay' : 'Details') : null))),
+    v.lockedWhy ? h('p', { class: 'rr-intro' }, `🔒 ${v.lockedWhy}. Optional and at your own pace: every step can be retried, and each prize pays once.`)
+      : next && car ? h('button', { class: 'btn primary rl-go', onclick: () => start(next.id, car) },
+        h('span', { class: 'stack' }, `Step ${next.series!.step} · ${next.name}`, h('small', {}, `${carById(car).model} · ${RR.prizeText(next.prize)}`)))
+        : next ? h('p', { class: 'rr-intro' }, `Step ${next.series!.step} takes the ${next.cars.map((c) => carById(c).model).slice(0, 3).join(', ')}…`) : null);
+}
+
 /** The Race menu section: open runs (unclaimed first), then the next locked one with what opens it. */
 export function rivalRunsSection(app: App, start: StartRun): HTMLElement | null {
   const s = app.game.state;
   const list = RR.runsToShow(s);
-  if (!list.length) return null;
-  const claimed = RR.RIVAL_RUNS.filter((r) => RR.runRecord(s, r.id).claimed).length;
-  return h('section', { class: 'rival-runs', 'aria-label': 'Rival Runs' },
-    h('div', { class: 'feat-label' }, 'Rival Runs', h('span', { class: 'rr-count' }, ` · ${claimed}/${RR.RIVAL_RUNS.length} prizes`)),
+  const series = redlineSection(app, start); // 1.10 Redline: the chain sits above the one-off runs
+  if (!list.length) return series;
+  const solo = RR.RIVAL_RUNS.filter((r) => !r.series);
+  const claimed = solo.filter((r) => RR.runRecord(s, r.id).claimed).length;
+  const sec = h('section', { class: 'rival-runs', 'aria-label': 'Rival Runs' },
+    h('div', { class: 'feat-label' }, 'Rival Runs', h('span', { class: 'rr-count' }, ` · ${claimed}/${solo.length} prizes`)),
     h('p', { class: 'rr-intro' }, 'Short duels with a car rule. Optional, replay any time; each prize pays once.'),
     ...list.map(({ run, open }) => {
       const rec = RR.runRecord(s, run.id);
@@ -43,6 +72,7 @@ export function rivalRunsSection(app: App, start: StartRun): HTMLElement | null 
           h('button', { class: 'btn sm', onclick: () => openRivalBrief(app, run.id, start) }, 'Details'),
           car ? h('button', { class: 'btn sm primary-lite', onclick: () => start(run.id, car) }, rec.tries ? 'Retry' : 'Start') : null) : null);
     }));
+  return series ? h('div', { class: 'rr-wrap' }, series, sec) : sec;
 }
 
 /** Before the run: the rival, the course, eligible cars (pick one), objective, rule, prize and best results. */

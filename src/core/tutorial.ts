@@ -1,9 +1,13 @@
 import { allParts, canFuse, freeSlots, hasAnyPair, orderMaxTier, orderPrice } from './board';
 import { fitted, recommendedFit } from './install';
-import { computeLoadout } from './loadout';
+import { computeLoadout, loadoutWith } from './loadout';
 import { goalStatus, mergeAllUnlocked, upgradeCost, upgradeLock, upgradeShown } from './progression';
-import { ACTIVE_FAMILIES, FAMILIES, Family, TUNE_STAGES, UPGRADES, UpgradeId, carById, tunePrice } from '../data/tables';
-import type { GameState } from './state';
+import { RaceSim, runRace, type RaceSetup } from './race';
+import { mph } from './units';
+import { ACTIVE_FAMILIES, FAMILIES, Family, TUNE_STAGES, UPGRADES, UpgradeId, carById, eventById, tunePrice, type CarId } from '../data/tables';
+import type { GameState, Part } from './state';
+
+type RacerStats = RaceSetup['player']['stats'];
 
 /**
  * Teach-through-play steps, derived purely from game state so finishing actions out of order or reloading
@@ -48,18 +52,154 @@ export function benchUpgradeWaiting(s: GameState): boolean {
   return Object.values(rec).some((src) => !!src && 'at' in src);
 }
 
+// ---------------- Redline first session (1.10): one test run, step by step ----------------
+//
+// merge → fit → race (shift, then nitro, coached on the track) → result (what the new part measurably did, the next
+// car and the one thing to do) → craft (merge toward the next car's part) → done.
+// Each step is derived from play, so finishing out of order or reloading mid-step is safe; `s.onboard.step` records
+// the step last shown (resume, analytics) and `skipped` / `done` end the sequence. Saves that already raced or own a
+// second car never enter it.
+
+export type OnboardStep = 'merge' | 'fit' | 'race' | 'craft';
+
+/** The first session is running (a fresh save that has not finished or skipped it). */
+export function onboardActive(s: GameState): boolean {
+  const o = s.onboard;
+  return !!o && !o.done && !o.skipped && !s.tips.skipGuide;
+}
+
+/** Something on the bench could go in an empty slot of the active car. */
+function fittable(s: GameState): boolean {
+  const slots = fitted(s, s.activeCar);
+  return allParts(s).some((p) => ACTIVE_FAMILIES.includes(p.f) && !slots[p.f]);
+}
+
+/** The step to coach now, or null when the sequence is over (or not running). */
+export function onboardStep(s: GameState): OnboardStep | null {
+  if (!onboardActive(s)) return null;
+  const raced = s.stats.races > 0 || !!s.pendingQuick;
+  if (!raced) {
+    if (!s.stats.milestones.firstMerge && hasPairOf(s)) return 'merge';
+    const slots = fitted(s, s.activeCar);
+    if (!ACTIVE_FAMILIES.some((f) => slots[f]) && fittable(s)) return 'fit';
+    return 'race';
+  }
+  const g = goalStatus(s);
+  if (g && !g.keystoneDone && s.owned.length === 1) return 'craft';
+  return null;
+}
+
+/** The part the fit step teaches: the best bench part for an empty slot (the merged Engine on a fresh save). */
+export function onboardFitPart(s: GameState): Part | null {
+  const slots = fitted(s, s.activeCar);
+  const parts = allParts(s).filter((p) => ACTIVE_FAMILIES.includes(p.f) && !slots[p.f]);
+  return parts.sort((a, b) => b.t - a.t || (a.f === 'engine' ? -1 : b.f === 'engine' ? 1 : 0))[0] ?? null;
+}
+
+const STAT_OF: Record<string, { label: string; key: 'top' | 'grip' | 'accel'; meaning: string }> = {
+  engine: { label: 'Top speed', key: 'top', meaning: 'faster on the straights' },
+  tires: { label: 'Grip', key: 'grip', meaning: 'quicker through bends and off the line' },
+  turbo: { label: 'Acceleration', key: 'accel', meaning: 'quicker off the line' },
+};
+
+/** What fitting `part` to `car` changes, in the family's own stat: "Top speed 49 → 55 mph · faster on the straights". */
+export function fitChange(s: GameState, car: CarId, part: Part): { label: string; from: string; to: string; meaning: string; up: boolean; short: string } | null {
+  const st = STAT_OF[part.f];
+  if (!st) return null;
+  const a = computeLoadout(s, car).stats;
+  const b = loadoutWith(s, car, { [part.f]: part }).stats;
+  const fmt = (v: number) => st.key === 'top' ? `${mph(v)} mph` : st.key === 'grip' ? v.toFixed(2) : v.toFixed(1);
+  const from = fmt(a[st.key]), to = fmt(b[st.key]);
+  if (from === to) return null;
+  const short = st.key === 'top' ? to : `${st.key === 'grip' ? 'grip' : 'accel'} ${to}`;
+  // "65 → 71 mph": the unit once, after the new value
+  return { label: st.label, from: st.key === 'top' ? String(mph(a.top)) : from, to, meaning: st.meaning, up: b[st.key] > a[st.key], short };
+}
+
+/** "Top speed 49 → 55 mph" for a part that was just fitted, from the stats before and after. */
+export function statLine(f: Family, a: { top: number; grip: number; accel: number }, b: { top: number; grip: number; accel: number }): string | null {
+  const st = STAT_OF[f];
+  if (!st) return null;
+  const fmt = (v: number) => st.key === 'top' ? `${mph(v)} mph` : st.key === 'grip' ? v.toFixed(2) : v.toFixed(1);
+  const from = fmt(a[st.key]), to = fmt(b[st.key]);
+  return from === to ? null : `${st.label} ${st.key === 'top' ? mph(a.top) : from} → ${to}`;
+}
+
+/** Where on a course a time difference came from. */
+export type Where = 'off the line' | 'on the straights' | 'through the bends';
+
+/**
+ * What each fitted part did on this exact race, measured in the simulation: the same event, seed and rivals, clean
+ * shifts and Perfect boosts, with the part and without it. Returns the parts that made a difference, biggest first,
+ * with where on the course most of the time came from.
+ */
+export function measureParts(s: GameState, setup: RaceSetup): { part: Part; seconds: number; where: Where; whereS: number }[] {
+  const car = setup.player.car;
+  const slots = fitted(s, car);
+  const ev = eventById(setup.eventId);
+  const cap = ev.partCap ?? (ev.heatOf ? eventById(ev.heatOf).partCap : undefined);
+  const run = (stats: RacerStats) => {
+    const out = runRace({ ...setup, player: { ...setup.player, stats }, analysis: false }, 'perfect', 'clean');
+    const me = out.standings.find((r) => r.isPlayer)!;
+    return { time: out.playerTime ?? Infinity, splits: me.splits };
+  };
+  let track;
+  try { track = new RaceSim({ ...setup, analysis: false }).track; } catch { return []; }
+  const base = run(computeLoadout(s, car, undefined, cap).stats);
+  const out: { part: Part; seconds: number; where: Where; whereS: number }[] = [];
+  for (const f of ACTIVE_FAMILIES) {
+    const p = slots[f];
+    if (!p) continue;
+    const without = run(loadoutWith(s, car, { [f]: null }, cap).stats);
+    const seconds = without.time - base.time;
+    if (!(seconds >= 0.05) || !Number.isFinite(seconds)) continue;
+    // per-segment gain, grouped by kind of segment
+    const by: Record<Where, number> = { 'off the line': 0, 'on the straights': 0, 'through the bends': 0 };
+    let prevA = 0, prevB = 0;
+    track.segments.forEach((sg, i) => {
+      const a = base.splits[i], b = without.splits[i];
+      if (a === undefined || b === undefined) return;
+      const gain = (b - prevB) - (a - prevA);
+      prevA = a; prevB = b;
+      const k: Where = i === 0 ? 'off the line' : sg.radius ? 'through the bends' : 'on the straights';
+      by[k] += gain;
+    });
+    const best = (Object.entries(by) as [Where, number][]).sort((x, y) => y[1] - x[1])[0];
+    out.push({ part: p, seconds, where: best[0], whereS: best[1] });
+  }
+  return out.sort((a, b) => b.seconds - a.seconds);
+}
+
+/**
+ * The part a player needs for the goal and cannot make from what they hold: one free crate of the family, at the tier
+ * that closes the gap without overshooting, offered once during the first session (the guaranteed route past an
+ * unlucky or emptied bench). Null when the bench can already make it.
+ */
+export function rescueCrate(s: GameState): { family: Family; tier: number } | null {
+  if (s.tips['fr:rescue']) return null;
+  const g = goalStatus(s);
+  if (!g || g.keystoneDone) return null;
+  const { have, need } = ingredients(s, g.family, g.tier);
+  if (have >= need) return null;
+  let t = g.tier - 1;
+  while (t > 1 && 2 ** (t - 1) > need - have) t--;
+  return { family: g.family, tier: t };
+}
+
+/** The guided sequence is over: record it (once). */
+export function finishOnboard(s: GameState, now: number, skipped = false) {
+  if (!s.onboard || s.onboard.done || (skipped && s.onboard.skipped)) return;
+  s.onboard = { ...s.onboard, step: 'done', done: true, ...(skipped ? { skipped: true } : {}), at: now };
+}
+
 export function tutorialStep(s: GameState): TutorialStep | null {
   if (s.tips.skipGuide) return null;
-  const merged = !!s.stats.milestones.firstMerge;
+  const ob = onboardStep(s);
+  if (ob) return ob === 'race' ? 'race1' : ob === 'craft' ? 'craftGoal' : ob;
+  if (onboardActive(s)) return null; // finishing: the UI records it this frame
   const raced = s.stats.races > 0 || !!s.pendingQuick;
-  if (!s.tips.goal && !merged && !raced) return 'goal';
-  if (!merged && hasPairOf(s)) return 'merge';
-  if (!s.tips.fit && !raced && hasEmptyCar(s)) return 'fit';
-  if (!raced) return 'race1';
-  const g = goalStatus(s);
-  if (!s.tips.spend && !(s.stats.spent ?? 0) && bestBuy(s).affordable) return 'spend';
-  if (!s.tips.goalCard) return 'goalCard';
-  if (g && !g.keystoneDone && !s.tips.craftGoal && hasPairOf(s, g.family)) return 'craftGoal';
+  // just in time, one line each: cash once it buys something useful
+  if (raced && !s.tips.spend && !(s.stats.spent ?? 0) && bestBuy(s).affordable) return 'spend';
   if (!s.tips.betterPart && benchUpgradeWaiting(s)) return 'betterPart';
   if (s.nitro > 0 && !s.tips.nitroBank) return 'nitroBank';
   if (s.tray.some(Boolean) && !s.tips.overflow) return 'overflow';
@@ -126,9 +266,16 @@ export function bestBuy(s: GameState): { pick: BuyPick | null; affordable: boole
   return { pick: options.slice().sort((a, b) => a.price - b.price)[0] ?? null, affordable: false };
 }
 
-/** Tips that only make sense to a brand-new player: a returning save marks them done on load. */
+/** Tips that only make sense to a brand-new player: a returning save marks them done on load. The first-session
+ *  sequence starts only for a save that has never raced and owns one car; any other save is recorded as done. */
 export function settleTutorialForExistingSave(s: GameState) {
   if (s.stats.races >= 3 || s.owned.length > 1) {
     for (const id of BEGINNER_STEPS) s.tips[id] = true;
+  }
+  const o = s.onboard as unknown;
+  if (o !== undefined && (!o || typeof o !== 'object' || typeof (o as { step?: unknown }).step !== 'string')) delete s.onboard; // malformed
+  if (!s.onboard) {
+    const old = s.stats.races > 0 || s.owned.length > 1 || !!s.pendingQuick;
+    s.onboard = old || s.tips.skipGuide ? { step: 'done', done: true } : { step: 'merge' };
   }
 }

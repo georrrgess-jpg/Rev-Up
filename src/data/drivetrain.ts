@@ -39,6 +39,7 @@ export interface Drivetrain {
 /** Display / reference values for the roster at full build (docs/CONTRACTS.md). */
 export const BENCHMARK_MPH: Partial<Record<CarId, number>> = {
   junker: 85, beater: 105, hothatch: 130, muscle: 150, tourer: 165, tuner: 140, super: 205, rally: 150, gt: 190, proto: 225, vireo: 230, mako: 240, sovereign: 255, ardent: 200, meridian: 250, tempest: 270,
+  kestrelr: 210, // 1.10 Redline (Progression): the Kestrel 1600 R, the lowest top end of the late cars
 };
 
 export const DRIVETRAINS: Record<CarId, Drivetrain> = {
@@ -86,6 +87,11 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // a 15,500 rpm motor redline, the quickest shifts in the game and a wide green. Its signature is launch control
   // (data/circuit.ts LAUNCH_CONTROL): tap LAUNCH on GO for more traction and pull through the launch segment.
   tempest: { gears: [0.45, 0.78, 1.32], idle: 600, redline: 15500, band: [0.8, 0.97], windowS: 0.55, shiftS: 0.012, lowPull: 1, gaugeMph: 300, topScale: 1.4, accelScale: 0.9, pullExp: 2.6 },
+  // ---- 1.10 Redline (Progression workstream, clearly marked; the Racing workstream may retune the gearing): the
+  // Kestrel 1600 R. The Kestrel's screaming four, rebuilt: six short, close gears and a 10,500 rpm redline, peaky
+  // (bogs if you short-shift), a quick sequential box. Top speed is deliberately the lowest of the late cars.
+  kestrelr: { gears: [0.33, 0.47, 0.6, 0.73, 0.87, 1.28], idle: 1200, redline: 10500, band: [0.86, 0.975], windowS: 0.45, shiftS: 0.016, autoS: 0.32, lowPull: 0.7, gaugeMph: 220, topScale: 1.1, accelScale: 0.95, pullExp: 2.3 },
+  // ---- end 1.10 Redline
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };

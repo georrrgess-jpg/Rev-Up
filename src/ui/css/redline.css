@@ -1,0 +1,23 @@
+/* 1.10 Redline Series card (Race menu) and the earned-car preview in the Showroom (Progression workstream). */
+.redline-series { margin: 10px 0 4px; padding: 10px 12px; border-radius: 14px; background: linear-gradient(160deg, rgba(224, 32, 46, .16), rgba(224, 32, 46, 0) 55%), var(--panel); border: 1px solid rgba(224, 32, 46, .45); }
+.redline-series .feat-label { font-size: var(--fs-2xs); font-weight: var(--w-heavy); letter-spacing: .08em; text-transform: uppercase; color: #ff8a8a; }
+.redline-series .rr-count { color: var(--muted); letter-spacing: 0; text-transform: none; }
+.redline-series .rl-reward { display: grid; gap: 2px; margin: 4px 0 8px; }
+.redline-series .rl-reward b { font-size: var(--fs-md); }
+.redline-series .rl-reward small { font-size: var(--fs-xs); color: var(--muted); overflow-wrap: anywhere; }
+.rl-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.rl-step { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(255, 255, 255, .06); }
+.rl-step:first-child { border-top: 0; }
+.rl-step .rl-n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: var(--w-heavy); font-size: var(--fs-xs); background: rgba(255, 255, 255, .08); }
+.rl-step.current .rl-n { background: #e0202e; color: #fff; }
+.rl-step.done .rl-n { background: var(--green); color: #10210e; }
+.rl-step.locked { opacity: .62; }
+.rl-step .rl-txt { min-width: 0; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.rl-step .rl-txt small { display: block; font-size: var(--fs-2xs); color: var(--muted); }
+.rl-step .rl-txt .rl-prize { color: var(--amber2); }
+.rl-step.done .rl-txt .rl-prize { color: var(--green); }
+.rl-step .btn { min-height: 44px; min-width: 72px; }
+.redline-series .rl-go { width: 100%; margin-top: 8px; min-height: 48px; }
+.redline-series .rr-intro { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--muted); }
+.redline-series.done { border-color: rgba(164, 219, 155, .5); }
+@media (max-width: 340px) { .rl-step { grid-template-columns: 24px minmax(0, 1fr); } .rl-step .btn { grid-column: 1 / -1; } }

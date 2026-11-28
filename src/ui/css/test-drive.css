@@ -1,0 +1,37 @@
+/* Test & Compare (race workstream, 1.10). Loaded by src/ui/testDrive.ts after style.css. */
+.td h2 { margin-bottom: 2px; }
+.td .td-lede { margin: 2px 0 8px; }
+.td .td-course { font-size: var(--fs-sm); line-height: 1.35; padding: 8px 10px; border-radius: 10px; background: rgba(127,127,127,.12); margin-bottom: 10px; }
+.td .td-fams { display: flex; gap: 6px; margin-bottom: 8px; }
+.td .td-fams .btn { flex: 1 1 0; min-height: 44px; }
+.td .td-fams .btn.on { background: var(--amber2, #f2a33a); color: #251608; border-color: transparent; }
+.td .td-cands { display: flex; flex-direction: column; gap: 6px; }
+.td .td-cand {
+  display: flex; align-items: center; gap: 10px; min-height: 48px; width: 100%; text-align: left; padding: 8px 10px;
+  border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: inherit; font: inherit; cursor: pointer;
+}
+.td .td-cand .grow { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.td .td-cand.on { border-color: var(--amber2, #f2a33a); box-shadow: inset 0 0 0 1px var(--amber2, #f2a33a); background: rgba(242,163,58,.1); }
+.td .td-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); }
+.td .td-cand.on .td-dot { border-color: var(--amber2, #f2a33a); background: radial-gradient(circle, var(--amber2, #f2a33a) 45%, transparent 50%); }
+.td .td-virtual { font-size: var(--fs-2xs); font-weight: var(--w-heavy); letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; border: 1px dashed var(--muted); color: var(--muted); }
+.td .td-gain { flex: none; font-size: var(--fs-xs); font-weight: var(--w-heavy); white-space: nowrap; }
+.td .td-gain.up { color: #3fbf6b; }
+.td .td-gain.down { color: #e0675a; }
+.td .td-last { font-size: var(--fs-xs); }
+.td .td-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.td .td-btns .btn { min-height: 48px; }
+.td-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
+.td-table th, .td-table td { padding: 7px 4px; border-top: 1px solid var(--line); text-align: right; vertical-align: baseline; }
+.td-table thead th { border-top: 0; font-size: var(--fs-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: var(--w-heavy); }
+.td-table tbody th { text-align: left; font-weight: var(--w-strong); padding-right: 8px; }
+.td-table td { white-space: nowrap; }
+.td-table tr.up .td-delta { color: #3fbf6b; font-weight: var(--w-heavy); }
+.td-table tr.down .td-delta { color: #e0675a; font-weight: var(--w-heavy); }
+.td .td-verdict { font-size: var(--fs-md); font-weight: var(--w-strong); color: inherit; padding: 8px 10px; border-radius: 10px; background: rgba(127,127,127,.12); }
+.td .td-verdict.up { box-shadow: inset 3px 0 0 #3fbf6b; }
+.td .td-verdict.down { box-shadow: inset 3px 0 0 #e0675a; }
+.td .td-note { font-size: var(--fs-xs); }
+/* the race HUD's TEST tag (solo test runs show it where the standings sit) */
+.racescreen .hud .stand .test-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #5ef2ff; color: #03222a; font-weight: var(--w-heavy); letter-spacing: .06em; font-size: var(--fs-2xs); margin-bottom: 2px; }
+@media (max-width: 360px) { .td-table { font-size: var(--fs-xs); } .td-table th, .td-table td { padding: 6px 2px; } }

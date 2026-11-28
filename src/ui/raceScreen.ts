@@ -1,4 +1,4 @@
-import { Look, SceneView, drawBackdrop, drawForeground, drawRoadDressing, hash, roadColors, sceneLights, sceneLook } from '../render/scene';
+import { Look, SceneView, drawBackdrop, drawForeground, drawRoadDressing, roadColors, sceneLights, sceneLook } from '../render/scene';
 import { RaceFx, drawCourseSigns, drawTrackside } from '../render/raceFx';
 import { resultCard } from './results';
 import type { RaceView } from './raceMenu';
@@ -8,10 +8,14 @@ import { music } from '../audio-api';
 import { RaceAudio, RivalAudio, launchControlSound } from '../audio-race';
 import { CircuitResult, Ghost, explainFinish, ghostDelta, ghostX, keepsGhost, readGhost } from '../core/circuit';
 import { openFitParts } from './fit';
+import { RaceCoach, wantsRaceCoach } from './firstRun'; // [onboard] first-run race coaching hook
 import { DownshiftRecord, GearEvent, RaceOutcome, RaceSetup, RaceSim, ShiftRecord, SimAudioState, speedMph } from '../core/race';
 import { drivetrainFor } from '../data/drivetrain';
 import { mph } from '../core/units';
-import { Gauge, ShiftCue } from './raceGauge';
+import type { TestProbe } from '../core/testDrive';
+import { RunChanges, RunSummary, compareRuns, summarize } from '../core/runReport';
+import { competitionSummary } from '../core/circuit';
+import { Gauge, ShiftCue, gaugeRange } from './raceGauge';
 import type { LastResult } from '../core/state';
 import { CarId, Family, RACE, RIVALS, carById, eventById, finishStripe, trackLength } from '../data/tables';
 import { CarStyle, carLengthM, drawCar, fitCanvas } from '../render/car';
@@ -19,6 +23,10 @@ import { artOf, rivalLook } from '../data/rivalCars';
 import type { Racer } from '../core/race';
 import type { App } from './app';
 import { h, ordinal } from './dom';
+
+/** Track canvas resolution tiers (device pixels per CSS pixel, capped by the screen's own): full, then two steps a
+ *  slow phone falls back to — chosen in the countdown, or after two slow seconds mid-race. */
+const RES_TIERS = [2, 1.5, 1.15];
 
 /** Lane per racer index (racer 0 runs in lane 1, …); back lanes are drawn first. */
 const LANE_OF = [1, 3, 0, 2];
@@ -30,9 +38,12 @@ export function telemetryRows(o: RaceOutcome, windows: number): HTMLElement[] {
   const clean = o.shiftsClean ?? 0;
   const log = (o.shiftLog ?? []).filter((s) => s.grade !== 'assist');
   const mark = { clean: '✓', early: 'early', late: 'late', missed: 'missed', assist: '' } as const;
+  const launch = o.standings.find((r) => r.isPlayer)?.splits[0];
+  // a compact post-race cluster: top speed big, then launch, clean inputs and boosts
   const rows: HTMLElement[] = [
-    h('div', { class: 'race-telemetry', 'aria-label': 'Race telemetry' },
-      h('div', { class: 'tm' }, h('span', {}, 'Top speed'), h('b', { class: 'num' }, `${mph(o.topSpeed ?? 0)} mph`)),
+    h('div', { class: 'race-telemetry cluster-readout', 'aria-label': 'Race telemetry' },
+      h('div', { class: 'tm big' }, h('span', {}, 'Top speed'), h('b', { class: 'num' }, `${mph(o.topSpeed ?? 0)}`, h('small', {}, ' mph'))),
+      launch !== undefined ? h('div', { class: 'tm' }, h('span', {}, 'Launch'), h('b', { class: 'num' }, `${launch.toFixed(2)} s`)) : null,
       h('div', { class: 'tm' }, h('span', {}, 'Clean shifts'), h('b', { class: 'num' }, `${clean}/${shifts}`)),
       h('div', { class: 'tm' }, h('span', {}, 'Perfect boosts'), h('b', { class: 'num' }, `${o.perfects}/${windows}`))),
   ];
@@ -43,7 +54,7 @@ export function telemetryRows(o: RaceOutcome, windows: number): HTMLElement[] {
 
 /** Circuit rows for the result card: the ghost comparison, what this race earned once, the ladder step, and why the
  *  finish went the way it did (from the race's own splits and stats) with one useful change. */
-export function circuitRows(app: App, o: RaceOutcome, c: CircuitResult | null, onAction: (car: CarId, family?: Family) => void): HTMLElement[] {
+export function circuitRows(app: App, o: RaceOutcome, c: CircuitResult | null, onAction: (car: CarId, family?: Family) => void, onTest?: (car: CarId, family: Family, tier?: number) => void): HTMLElement[] {
   const rows: HTMLElement[] = [];
   if (c?.ghostT != null && c.ghostDelta != null) {
     const d = c.ghostDelta;
@@ -60,9 +71,27 @@ export function circuitRows(app: App, o: RaceOutcome, c: CircuitResult | null, o
       h('b', { class: 'cx-head' }, x.headline),
       x.reasons.length ? h('ul', {}, ...x.reasons.map((r) => h('li', {}, r))) : null,
       h('p', { class: 'cx-tip' }, x.suggestion.text,
-        car && a && (a.kind === 'fit' || a.kind === 'upgrade') ? h('button', { class: 'btn sm', onclick: () => onAction(car, a.family) }, 'Fit parts') : null)));
+        car && a && (a.kind === 'fit' || a.kind === 'upgrade') ? h('button', { class: 'btn sm', onclick: () => onAction(car, a.family) }, 'Fit parts') : null,
+        car && a?.family && onTest && (a.kind === 'fit' || a.kind === 'upgrade') ? h('button', { class: 'btn sm', onclick: () => onTest(car, a.family!, a.tier) }, 'Test it') : null)));
+  }
+  // a rival challenge still open on this event: its prize, so a loss shows what a win here is worth
+  if (o.place > 1 && o.eventId) {
+    const rung = competitionSummary(app.game.state).ladder.rungs.find((r) => r.event === o.eventId && !r.beaten && r.open);
+    if (rung) rows.push(h('div', { class: 'cx-earned prize' }, h('b', {}, `Beat ${rung.name} here: `), rung.prize));
   }
   return rows;
+}
+
+/** Previous run per event this session (what changed since the last try). */
+const lastRuns = new Map<string, RunSummary>();
+
+/** "What changed" since the last run of this event (or the personal best). */
+export function changeRows(ch: RunChanges | null): HTMLElement[] {
+  if (!ch || !ch.rows.length) return [];
+  return [h('div', { class: `run-changes ${ch.against}`, 'aria-label': ch.against === 'last' ? 'Since your last run' : 'Against your best' },
+    h('b', { class: 'rc-head' }, ch.headline),
+    ch.rows.length > 1 ? h('div', { class: 'rc-grid' }, ...ch.rows.map((r) => h('div', { class: `rc ${r.better === true ? 'up' : r.better === false ? 'down' : ''}` },
+      h('span', {}, r.label), h('b', { class: 'num' }, r.now), h('small', { class: 'num' }, `${r.better === true ? '▲ ' : r.better === false ? '▼ ' : ''}was ${r.was}`)))) : null)];
 }
 
 /** The last race started (a retry of the same event within two minutes gets the short countdown). */
@@ -84,6 +113,11 @@ export interface RaceAudioSnapshot extends SimAudioState {
 }
 
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number }
+
+/** A Test & Compare run (src/ui/testDrive.ts): solo on the test course, nothing committed or paid, measured by the
+ *  probe every sim step; `onDone` gets the finished run (or null when the player leaves it). */
+export interface TestRunOpts { label: string; probe: TestProbe; onDone: (o: RaceOutcome | null, sim: RaceSim) => void }
+export interface RaceScreenOpts { test?: TestRunOpts }
 
 export class RaceScreen {
   el: HTMLElement;
@@ -111,6 +145,12 @@ export class RaceScreen {
   private cueDone = new Set<number>();
   private calloutTimer = 0;
   private quality = 1; // 1 full, 0 reduced effects
+  /** 1.10: the track canvas's resolution tier (RES_TIERS), chosen from the countdown's own frames before GO. */
+  private resTier = 0;
+  private cdFrames: number[] = [];
+  private resDecided = false;
+  private warmPpm = 0;
+  private needWarm = false;
   private frameTimes: number[] = [];
   private dpr = 1;
   private reduced: boolean;
@@ -154,31 +194,38 @@ export class RaceScreen {
   /** Drama camera: seconds left of an overtake close-up, and the rival in it. */
   private dramaT = 0;
   private dramaFoe: string | null = null;
+  /** 1.10: a short tag over the car in a pass ("PASSED" / "PASSES YOU"), and the rival moments already called out. */
+  private passTag: { id: string; text: string; t: number; good: boolean } | null = null;
+  private momentSeq = 0;
+  private defendTold = false;
   private frameNo = 0;
   private finishLock = 0;
   private curtain: HTMLElement;
   /** Car sprites still to render ahead of the GO zoom (one per countdown frame, off the input path). */
   private warmQueue: (() => void)[] | null = null;
 
-  constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void) {
+  private test: TestRunOpts | null;
+  private changes: RunChanges | null = null;
+  constructor(private app: App, private setup: RaceSetup, private raceId: number, private onClose: () => void, opts: RaceScreenOpts = {}) {
+    this.test = opts.test ?? null;
     // the live race takes the player's SHIFT input; Quick Race and the bots shift for themselves
     this.sim = new RaceSim({ ...setup, shift: 'manual' });
     if (import.meta.env.DEV) (window as unknown as { __race?: RaceScreen }).__race = this;
     this.hum = new RaceAudio(this.sim, app.game.state.installed?.[setup.player.car]); // engine voice with the fitted engine / turbo
     this.reduced = app.game.state.settings.reducedMotion;
     // a retry of the same event soon after gets the short countdown: one tap and you are racing again
-    const quick = lastStart.id === setup.eventId && Date.now() - lastStart.at < 120_000;
-    lastStart = { id: setup.eventId, at: Date.now() };
+    const quick = !!this.test || (lastStart.id === setup.eventId && Date.now() - lastStart.at < 120_000);
+    if (!this.test) lastStart = { id: setup.eventId, at: Date.now() };
     // the first Tempest race (launch control never landed yet) always gets the full countdown, to read the LAUNCH cue
     const teachLaunch = this.sim.hasLaunchControl && !app.game.state.stats.milestones['cx:launch-control'];
     this.countdown = this.reduced ? 1.2 : quick && !teachLaunch ? 1.6 : 2.4;
     const ev0 = eventById(setup.eventId);
-    this.ghost = keepsGhost(ev0) && !app.game.rivalRunName ? readGhost(app.game.state, ev0.id) : null;
+    this.ghost = keepsGhost(ev0) && !app.game.rivalRunName && !this.test ? readGhost(app.game.state, ev0.id) : null;
     this.rivalsAudio = new RivalAudio(this.sim);
     this.countdown0 = this.countdown;
     this.look = sceneLook(this.sim.track.theme, this.sim.track.id);
-    this.fx = new RaceFx(this.reduced, this.look);
-    this.eventName = app.game.rivalRunName ?? eventById(setup.eventId).name;
+    this.fx = new RaceFx(this.reduced, this.look, !!app.game.state.settings.lightFx); // [nitro] lighter effects setting
+    this.eventName = this.test ? this.sim.track.name : app.game.rivalRunName ?? eventById(setup.eventId).name;
     this.canvas = h('canvas', { class: 'track', 'aria-hidden': 'true' });
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
     this.posEl = h('div', { class: 'pos num' });
@@ -221,7 +268,7 @@ export class RaceScreen {
     this.shiftBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.tapShift(); });
     this.shiftBtn.addEventListener('click', (e) => { if ((e as PointerEvent).pointerType === '' || e.detail === 0) this.tapShift(); });
     this.gradeEl = h('div', { class: 'shiftgrade', role: 'status', 'aria-live': 'polite' });
-    this.gauge = new Gauge(setup.player.car, this.reduced, this.sim.band());
+    this.gauge = new Gauge(setup.player.car, this.reduced, this.sim.band(), gaugeRange(setup.player.car, setup.player.stats, this.sim.perfectMul));
     const pauseBtn = h('button', { class: 'iconbtn pausebtn', 'aria-label': 'Pause', onclick: () => this.setPaused(true) }, 'Ⅱ');
     this.el = h('div', { class: 'racescreen', role: 'dialog', 'aria-label': `Race: ${this.eventName}` },
       this.canvas,
@@ -252,11 +299,16 @@ export class RaceScreen {
     this.updateHud(true);
     this.showCallout('3', 'countdown');
     if (teachLaunch) this.tick('⚡ Launch control: tap LAUNCH right on GO', 'gold');
+    else if (!this.test && this.sim.track.course) this.tick(`${this.sim.track.course} — ${this.sim.track.favours}`); // 1.10: what this course asks for
     sfx.countdown(false);
+    // [onboard] first-run race coaching hook (src/ui/firstRun.ts): SHIFT first, then NITRO in a boost zone
+    this.frCoach = wantsRaceCoach(app) ? new RaceCoach(app, this.sim, this.el, setup) : null;
   }
+  /** [onboard] first-run race coach (src/ui/firstRun.ts), or null. */
+  private frCoach: RaceCoach | null = null;
 
   private resize() {
-    const fit = fitCanvas(this.canvas, this.quality ? 2 : 1);
+    const fit = fitCanvas(this.canvas, this.quality ? RES_TIERS[this.resTier] : 1);
     this.dpr = fit.dpr;
     this.gauge.resize();
   }
@@ -275,6 +327,8 @@ export class RaceScreen {
   private setPaused(p: boolean) {
     if (this.finished || p === this.paused) return;
     this.paused = p;
+    this.fx.nitro.setPaused(p); // [nitro] pause hides every transient boost effect
+    if (p) this.particles = []; // [nitro] and the ignition sparks
     if (p) {
       suspendAudio();
       this.pauseEl = h('div', { class: 'paused' }, h('div', { style: 'text-align:center' },
@@ -302,6 +356,7 @@ export class RaceScreen {
 
   private quit() {
     // Leaving forfeits this run: no payout and no nitro spent.
+    if (this.test) { const t = this.test; this.test = null; t.onDone(null, this.sim); this.close(); return; }
     this.app.game.abandonRace();
     this.close();
   }
@@ -326,11 +381,11 @@ export class RaceScreen {
     const inLaunch = this.sim.track.segments[0] && this.sim.player.x < this.sim.track.segments[0].length;
     const r = this.sim.tapNitro();
     if (r === 'perfect') {
-      sfx.nitro(true); this.showCallout('PERFECT NITRO', 'perfect'); this.burst(46, '#ffd75e');
+      this.showCallout('PERFECT NITRO', 'perfect'); /* [nitro] sound: RaceAudio, from the sim */ this.burst(46, '#ffd75e');
       if (!this.reduced) { this.kick = 1.6; this.flash.className = 'race-flash on'; setTimeout(() => (this.flash.className = 'race-flash'), 260); }
       this.nitroBtn.classList.add('perfect-run');
     } else if (r === 'boost') {
-      sfx.nitro(false); this.burst(20, '#8fd3ff');
+      this.burst(20, '#8fd3ff'); /* [nitro] sound: RaceAudio, from the sim */
       this.showCallout(inLaunch ? 'Wheelspin — boosts work best on straights' : 'Nitro', inLaunch ? 'small' : 'boost', inLaunch ? 1400 : 900);
       if (!this.reduced) this.kick = 0.8;
     }
@@ -407,11 +462,15 @@ export class RaceScreen {
     // an automatic downshift is never silent: the new gear flashes ("↓3") while the cue waits for it to settle
     const ld = sim.lastDown;
     if (ld && ld !== this.downShown) { this.downShown = ld; this.showGrade(`↓${ld.into + 1} Braking downshift`, 'down'); }
-    this.gauge.draw(this.countdown > 0 ? 0.14 : att.f, p.gear, speedMph(p), cue, t / 1000, this.lastFrameDt, att.band, att.cue === 'hold');
+    this.gauge.draw({
+      f: att.f, gear: p.gear, gears: sim.drivetrain.gears.length, mph: speedMph(p), cue, t: sim.t, dt: this.lastFrameDt, attempt: att,
+      topGear: sim.topGear(), launchArmed, staging: this.countdown > 0,
+      nitro: { charges: sim.charges, boosting: p.nitroLeft > 0, perfect: p.nitroLeft > 0 && p.nitroMul > 1 },
+    });
     if (import.meta.env.DEV) {
       // dev-only frame trace for the shift cue (Playwright reads window.__shiftTrace when it exists)
       const tr = (window as unknown as { __shiftTrace?: unknown[] }).__shiftTrace;
-      if (tr) tr.push({ t: Math.round(t), st: +sim.t.toFixed(3), gear: p.gear, f: +att.f.toFixed(4), id: att.id, acue: att.cue, needle: +(this.gauge as unknown as { needle: number }).needle.toFixed(4), band: (this.gauge as unknown as { band: number[] }).band.join('-'), cue, braking: p.braking, dt: +this.lastFrameDt.toFixed(4) });
+      if (tr) tr.push({ t: Math.round(t), st: +sim.t.toFixed(3), gear: p.gear, f: +att.f.toFixed(4), id: att.id, acue: att.cue, needle: +this.gauge.needle.toFixed(4), band: this.gauge.band.join('-'), marker: this.gauge.marker.shape, label: this.gauge.marker.label, cue, braking: p.braking, dt: +this.lastFrameDt.toFixed(4) });
     }
   }
 
@@ -445,15 +504,31 @@ export class RaceScreen {
     this.last = t;
     if (dt > 0.1) dt = 0.1; // long frames never jump the simulation
     this.lastFrameDt = dt;
-    // adaptive effects: drop resolution/particles before touching sim timing
+    // adaptive effects: drop resolution/particles before touching sim timing.
+    // 1.10: the countdown's own frames pick the canvas resolution before GO (a slow phone launches at a resolution it
+    // can draw, instead of spending the launch at 15 fps); the track canvas is what costs (raster), not the sim.
+    if (!this.resDecided && this.countdown > 0 && this.frameNo > 3) {
+      this.cdFrames.push(dt);
+      if (this.cdFrames.length >= 6) {
+        this.resDecided = true;
+        const med = [...this.cdFrames].sort((a, b) => a - b)[3];
+        const tier = med > 0.05 ? 2 : med > 0.03 ? 1 : 0;
+        if (tier > this.resTier) { this.resTier = tier; this.resize(); this.rewarm(); }
+      }
+    } else if (this.countdown <= 0) this.resDecided = true;
     this.frameTimes.push(dt);
-    if (this.frameTimes.length >= 60) {
-      const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+    const span = this.frameTimes.reduce((a, b) => a + b, 0);
+    if (span >= 1) {
+      const avg = span / this.frameTimes.length;
       this.frameTimes = [];
-      // two slow seconds in a row drop effects for the rest of the race; a single hitch (a GC, the launch) does not,
-      // and quality never climbs back mid-race, which would re-render every sprite and stutter again
+      // two slow seconds in a row step the resolution down (then effects) for the rest of the race; a single hitch
+      // (a GC, the launch) does not, and quality never climbs back mid-race, which would re-render every sprite again
       this.slowWindows = avg > 0.021 ? this.slowWindows + 1 : 0;
-      if (this.slowWindows >= 2 && this.quality === 1) { this.quality = 0; this.resize(); }
+      if (this.slowWindows >= 2) {
+        this.slowWindows = 0;
+        if (this.resTier < RES_TIERS.length - 1) { this.resTier++; this.resize(); }
+        else if (this.quality === 1) { this.quality = 0; this.resize(); }
+      }
     }
     if (!this.paused) {
       if (this.countdown > 0) {
@@ -466,6 +541,7 @@ export class RaceScreen {
         this.acc += dt;
         while (this.acc >= RACE.dt && !this.finished) {
           this.sim.step(RACE.dt);
+          this.test?.probe.observe(this.sim);
           this.acc -= RACE.dt;
           if (this.sim.player.finishTime !== null || this.sim.done) this.onPlayerFinish();
         }
@@ -477,11 +553,15 @@ export class RaceScreen {
         this.acc += dt;
         while (this.acc >= RACE.dt) { this.sim.step(RACE.dt); this.acc -= RACE.dt; }
         this.finishHold -= dt;
-        if (this.finishHold <= 0) this.showResult(this.result);
+        if (this.finishHold <= 0) {
+          if (this.test) { const t = this.test, o = this.outcome; this.test = null; t.onDone(o, this.sim); this.close(); }
+          else this.showResult(this.result);
+        }
       }
       this.shake = Math.max(0, this.shake - dt);
       this.kick = Math.max(0, this.kick - dt);
       this.dramaT = Math.max(0, this.dramaT - dt);
+      if (this.passTag) { this.passTag.t -= dt; if (this.passTag.t <= 0) this.passTag = null; }
       // render the GO zoom's car sprites now, one per frame, so the launch never waits for them
       if (this.countdown > 0 && this.warmQueue?.length) this.warmQueue.shift()!();
       this.stepParticles(dt);
@@ -489,6 +569,7 @@ export class RaceScreen {
     }
     this.draw();
     this.shiftHud(t);
+    this.frCoach?.frame(this.countdown, this.finished); // [onboard] first-run race coaching hook
     if (t - this.lastHud > 100) { this.lastHud = t; this.updateHud(); }
   }
 
@@ -523,6 +604,16 @@ export class RaceScreen {
       const lbl = `BOOST ZONE IN ${eta.toFixed(1)} s`;
       if (this.nitroBtn.dataset.label !== lbl) this.nitroBtn.dataset.label = lbl;
     } else if (inWindow && this.nitroBtn.dataset.label !== "▲ BOOST ZONE — TAP") this.nitroBtn.dataset.label = "▲ BOOST ZONE — TAP";
+    // rival moments near the player: a bogged launch, a defender's push (each said once, never over another call)
+    for (const m of this.sim.rivalMoments) {
+      if (m.seq <= this.momentSeq) continue;
+      this.momentSeq = m.seq;
+      const r = this.sim.racers.find((x) => x.id === m.id);
+      if (!r || this.ticker.classList.contains('on')) continue;
+      const nm = r.name.split(' ')[0];
+      if (m.kind === 'bad-launch' && this.sim.t < 1.5) this.tick(`${nm} bogs down off the line`, 'blue');
+      else if (m.kind === 'defend' && !this.defendTold) { this.defendTold = true; this.tick(`${nm} defends — keep the pressure on`); }
+    }
     // overtakes, called out once they settle (after the launch)
     if (this.sim.t > 2) {
       const order = this.sim.standings().map((r) => r.id).join('|');
@@ -533,7 +624,10 @@ export class RaceScreen {
         if (me < was) this.tick(`Passed ${this.sim.racers.find((r) => r.id === before[me])?.name ?? 'a rival'} · ${ordinal(me + 1)}`, 'gold');
         else if (me > was) this.tick(`${this.sim.racers.find((r) => r.id === now[me - 1])?.name ?? 'A rival'} passed you · ${ordinal(me + 1)}`);
         // a pass involving the player: the camera closes in on the two cars for a moment
-        if (me !== was) { this.dramaT = 1.4; this.dramaFoe = me < was ? before[me] : now[me - 1]; }
+        if (me !== was) {
+          this.dramaT = 1.4; this.dramaFoe = me < was ? before[me] : now[me - 1];
+          this.passTag = { id: this.dramaFoe, text: me < was ? 'PASSED' : 'PASSES YOU', t: 1.1, good: me < was };
+        }
       }
       this.lastOrder = order;
     }
@@ -551,13 +645,27 @@ export class RaceScreen {
     if (this.finished) return;
     this.finished = true;
     this.hum.finish();
-    this.nitroBtn.classList.remove('window');
+    this.nitroBtn.classList.remove('window', 'perfect-run'); // [nitro] no boost glow left on at the line
     this.shiftBtn.classList.remove('soon', 'green', 'late');
     // Finish an off-screen copy for the real result, and commit now so closing the page cannot lose or
     // double the payout. The visible race keeps running so the crossing and the rivals' arrival are seen.
     const outcome = this.sim.clone().finish();
     this.outcome = outcome;
+    if (this.test) {
+      // a test run: nothing is committed or paid; the run's own time is the result
+      this.rivalsAudio.stop();
+      sfx.win();
+      this.showCallout(`${this.test.label.split(' · ')[0]} · ${outcome.playerTime?.toFixed(2) ?? '—'} s`, 'perfect', 1400);
+      this.finishHold = this.reduced ? 0.3 : 1.1;
+      this.updateHud(true);
+      return;
+    }
     const rival = !!this.app.game.rivalRunName;
+    // what changed since the last run of this event (this session) or the best saved before this race
+    const sum = summarize(outcome);
+    const bestBefore = this.app.game.state.events[this.setup.eventId]?.bestTime ?? null;
+    this.changes = rival ? null : compareRuns(sum, lastRuns.get(`${this.setup.eventId}:${sum.car}`) ?? null, bestBefore);
+    if (!rival) lastRuns.set(`${this.setup.eventId}:${sum.car}`, sum);
     const committed = this.app.game.commitRace(this.raceId, outcome);
     this.result = committed ?? this.app.game.state.lastResult;
     // the Circuit side (ghost, ladder, series and milestone prizes), once per race, right after its commit
@@ -588,10 +696,16 @@ export class RaceScreen {
   private resultExtras(): HTMLElement[] {
     const o = this.outcome;
     if (!o) return [];
-    return [...telemetryRows(o, this.sim.windows.length), ...circuitRows(this.app, o, this.circuit, (car, family) => {
+    const why = circuitRows(this.app, o, this.circuit, (car, family) => {
       this.close();
       openFitParts(this.app, car, family);
-    })];
+    }, (car, family, tier) => {
+      this.close();
+      void import('./testDrive').then((m) => m.openTestDrive(this.app, { car, family, tier }));
+    });
+    // one explanation, not three: the Circuit "why" (from the splits) replaces the telemetry's own coach line
+    const tel = telemetryRows(o, this.sim.windows.length).filter((x) => !(why.some((w) => w.classList.contains('cx-why')) && x.classList.contains('race-coach')));
+    return [...changeRows(this.changes), ...tel, ...why];
   }
 
   /** A win: a short burst of confetti from the finish gantry. */
@@ -615,9 +729,10 @@ export class RaceScreen {
     const sim = this.sim;
     const st = sim.standings();
     const me = st.findIndex((r) => r.isPlayer) + 1;
-    this.posEl.innerHTML = this.countdown > 0 ? '–' : `${me}<small>/${sim.racers.length}</small>`;
+    this.posEl.innerHTML = this.test ? '' : this.countdown > 0 ? '–' : `${me}<small>/${sim.racers.length}</small>`;
     this.timeEl.textContent = `${Math.max(0, sim.player.finishTime ?? sim.t).toFixed(sim.player.finishTime !== null ? 2 : 1)} s`;
-    this.standEl.innerHTML = st.map((r, i) => `<div class="${r.isPlayer ? 'me' : ''}">${i + 1}. ${r.isPlayer ? 'You' : r.name}</div>`).join('');
+    if (this.test) { if (this.standEl.dataset.k !== this.test.label) { this.standEl.dataset.k = this.test.label; this.standEl.replaceChildren(h('div', { class: 'test-tag' }, 'TEST'), ...this.test.label.split(' · ').map((x) => h('div', {}, x))); } }
+    else this.standEl.innerHTML = st.map((r, i) => `<div class="${r.isPlayer ? 'me' : ''}">${i + 1}. ${r.isPlayer ? 'You' : r.name}</div>`).join('');
     const L = sim.length;
     sim.racers.forEach((r, i) => { this.dots[i].style.left = `${Math.min(100, (r.x / L) * 100)}%`; });
     if (this.ghost) {
@@ -668,6 +783,28 @@ export class RaceScreen {
       });
     }
     this.warmQueue = q;
+  }
+
+  /** The overtake beat: a small pill over the car just passed (or passing), fading out. */
+  private drawPassTag(ctx: CanvasRenderingContext2D, x: number, y: number, tag: { text: string; t: number; good: boolean }) {
+    const s = this.dpr;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, tag.t / 0.3);
+    ctx.font = `800 ${Math.round(12 * s)}px Barlow, system-ui`;
+    const w = ctx.measureText(tag.text).width + 14 * s, hh = 18 * s;
+    ctx.fillStyle = tag.good ? '#ffd75e' : 'rgba(10,12,16,0.85)';
+    ctx.beginPath(); ctx.roundRect?.(x - w / 2, y - hh, w, hh, hh / 2); if (!ctx.roundRect) ctx.rect(x - w / 2, y - hh, w, hh); ctx.fill();
+    ctx.fillStyle = tag.good ? '#2a1a00' : '#ffffff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(tag.text, x, y - hh / 2 + 0.5 * s);
+    ctx.restore();
+  }
+
+  /** After a resolution change in the countdown: warm the sprites the GO zoom needs at the new size. */
+  private rewarm() {
+    if (!this.warmPpm) return; // not queued yet: the regular warm-up runs at the new size
+    this.zoom = 0; this.zoomTarget = 0;
+    this.needWarm = true; // the next frame queues the warm-up again
   }
 
   private burst(n: number, c: string) {
@@ -737,14 +874,14 @@ export class RaceScreen {
     // a boost kick lets the camera lag so the car surges forward on screen
     // camera pull at speed: the faster the car, the more road it shows ahead (a felt sense of speed, no re-zoom)
     const pace = Math.min(1, player.v / (drivetrainFor(player.car).gaugeMph / 2.23694 * 0.8));
-    const lookAhead = this.lookT - 0.05 * Math.min(1, this.kick) + (this.reduced ? 0 : 0.08 * pace * pace);
+    const lookAhead = this.lookT - 0.05 * this.fx.nitro.surge /* [nitro] camera surge follows the boost envelope */ + (this.reduced ? 0 : 0.08 * pace * pace);
     let camX = mid - (W * (0.48 - lookAhead)) / ppm;
     camX = Math.min(camX, player.x - (W * 0.18) / ppm);
     camX = Math.max(camX, player.x - (W * (0.62 - lookAhead)) / ppm);
     // keep the whole player car on screen: player.x is its nose, and on a narrow phone at close zoom the car
     // is ~45% of the width, so "nose at 18%" alone leaves its tail off the left edge. This wins over look-ahead.
     const pLane = LANE_OF[sim.racers.indexOf(player)] ?? 3;
-    camX = Math.min(camX, player.x - carLengthM(player.car) * (0.86 + pLane * 0.06) - (W * 0.04) / ppm);
+    camX = Math.min(camX, player.x - (carLengthM(player.car) + this.fx.nitro.room /* [nitro] room for the exhaust */) * (0.86 + pLane * 0.06) - (W * 0.04) / ppm);
     if (this.finished) camX = Math.min(camX, sim.length - (W * 0.55) / ppm); // hold on the finish line
     // finish-line camera: once the line is on screen the camera stops with the gantry at 62% of the width and the car
     // blasts through it (eased in over a few frames, so it never jumps)
@@ -841,7 +978,7 @@ export class RaceScreen {
     // cars join one per frame under the opening curtain (the player first), so their sprites never all render in one
     // long frame
     const draws = firstFrame ? [] : sim.racers.map((r, i) => ({ r, lane: LANE_OF[i], i })).filter((d) => d.i <= this.frameNo - 2).sort((a, b) => a.lane - b.lane);
-    if (this.frameNo === sim.racers.length + 1) this.queueWarm(ppm / dramaMul, laneH, roadTop);
+    if (this.frameNo === sim.racers.length + 1 || (this.needWarm && this.frameNo > sim.racers.length + 1)) { this.needWarm = false; this.warmPpm = ppm / dramaMul; this.queueWarm(this.warmPpm, laneH, roadTop); }
     // the personal-best ghost: a translucent car in the next lane, driving its saved run
     if (this.ghost && !firstFrame) {
       const g = this.ghost, lane = 2, depth = 0.86 + lane * 0.06;
@@ -891,8 +1028,10 @@ export class RaceScreen {
         paint: b.paint, trim: b.trim, style: b.style, wheelAngle: r.x / 0.31,
         blur: this.reduced ? 0 : Math.max(0, Math.min(1, (r.v - 7) / 10)), brake: braking,
         livery: b.livery, detail: false, cache: true,
-        nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: sceneLights(theme),
+        nitro: this.fx.nitro.flame(r), nitroPerfect: this.fx.nitro.perfectOf(r), headlights: sceneLights(theme), // [nitro]
       });
+      this.fx.nitro.drawOver(ctx, r, sx, gy, len, this.dpr); // [nitro] ignition bloom, rim light, arcs, embers
+      if (this.passTag && this.passTag.id === r.id && this.passTag.t > 0) this.drawPassTag(ctx, sx + len * 0.5, gy - (len / carLengthM(b.art)) * 1.75, this.passTag);
       if (r.isPlayer) {
         ctx.fillStyle = '#ffc457';
         ctx.beginPath();
@@ -908,22 +1047,8 @@ export class RaceScreen {
         ctx.globalAlpha = 1;
       }
     }
-    // speed lines
-    if (!this.reduced && this.quality && player.v > 18) {
-      const perfectBoost = player.nitroLeft > 0 && player.nitroMul > 1;
-      const surge = player.car === 'super';
-      ctx.strokeStyle = perfectBoost ? (surge ? 'rgba(185,140,255,0.45)' : 'rgba(255,214,94,0.35)') : `rgba(255,255,255,${Math.min(0.22, (player.v - 18) / 80 + (player.nitroLeft > 0 ? 0.1 : 0))})`;
-      ctx.lineWidth = (perfectBoost ? 3 : 2) * this.dpr;
-      const n = perfectBoost ? 16 : 10;
-      const cell = W / 3;
-      for (let k = 0; k < n; k++) {
-        const world = camX * ppm * 1.6 + k * cell * 0.37;
-        const slot = Math.floor(world / cell);
-        const y = horizon * 0.3 + hash(slot * 13.1 + k) * (roadBot - horizon * 0.3);
-        const x = ((k * cell * 0.37 - camX * ppm * 1.6) % (W + cell) + W + cell) % (W + cell) - cell * 0.5;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (perfectBoost ? 90 : 60) * this.dpr, y); ctx.stroke();
-      }
-    }
+    // speed lines, tinted and stretched by the boost envelope [nitro]
+    if (this.quality) this.fx.nitro.drawStreaks(ctx, player, camX, ppm, W, horizon, roadTop, roadBot, this.dpr);
     drawForeground(sv);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }

@@ -207,11 +207,9 @@ export const sfx = {
   invalid() { tone(140, 0.12, 'square', 0.08, 0, 110); },
   scrap() { noise(0.25, 0.3, 0, 600, 'lowpass'); tone(90, 0.2, 'sawtooth', 0.1, 0, 50); },
   nitroBank() { tone(440, 0.08, 'triangle', 0.12); tone(660, 0.12, 'triangle', 0.12, 0.07); },
-  nitro(perfect: boolean) {
-    noise(0.9, perfect ? 0.45 : 0.3, 0, perfect ? 1800 : 1200, 'bandpass');
-    tone(perfect ? 180 : 140, 0.7, 'sawtooth', 0.08, 0, perfect ? 520 : 360);
-    if (perfect) tone(1046, 0.25, 'sine', 0.12, 0.02);
-  },
+  /** Kept for old callers: the race's nitro sound now comes from RaceAudio (audio-race.ts NitroSound), tied to the
+   *  sim's boost state, so a boost is never voiced twice or out of step with the picture. */
+  nitro(_perfect: boolean) { /* see NitroSound */ },
   /** An upshift: a crisp clack when clean, a heavier clunk early or late, a buzz when the box had to shift itself. */
   shift(grade: string) {
     if (grade === 'clean' || grade === 'assist') { noise(0.05, 0.16, 0, 3200, 'highpass'); tone(660, 0.05, 'triangle', 0.07, 0.01); }

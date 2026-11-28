@@ -50,6 +50,7 @@ export function openSettings(app: App) {
       volume('Effects', 'Engines, merges, nitro and timing cues', 'sfxVol', 1, setSfxVolume, () => sfx.cash()),
       toggle('Reduced motion', 'Shorter, calmer animations', () => game.state.settings.reducedMotion, (v) => { game.setSetting('reducedMotion', v); document.documentElement.classList.toggle('reduced', v); }),
       toggle('Boost zone cue', 'A beep when a boost zone opens', () => game.state.settings.nitroCue, (v) => game.setSetting('nitroCue', v)),
+      toggle('Lighter race effects', 'Fewer particles and glows, no speed streaks: smoother on older phones', () => !!game.state.settings.lightFx, (v) => game.setSetting('lightFx', v)),
       h('h3', {}, 'Install'),
       installHelp,
       h('p', {}, offline),

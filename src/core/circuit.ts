@@ -408,14 +408,45 @@ export function explainFinish(o: RaceOutcome, s?: GameState): FinishExplanation 
       ? `Lost ${sec(lost)} ${z === 'launch' ? '' : 'in '}${label[z]}${sl.better ? `: ${stat}` : ''}`
       : `Gained ${sec(lost)} ${z === 'launch' ? '' : 'in '}${label[z]}${!sl.better ? `: ${stat}` : ''}`, z]);
   }
+  // the one bend that cost the most against the foe, with both cars' exit speeds (1.10: names the bend, and only
+  // blames grip when the exit speeds and the grip stats both say so)
+  const bendIdx = track.segments.map((sg, i) => (sg.radius ? i : -1)).filter((i) => i >= 0);
+  let worstBend: { i: number; lost: number; me: number; foe: number } | null = null;
+  for (const i of bendIdx) {
+    const tm = me.splits[i], tf = foe.splits[i], tm0 = i ? me.splits[i - 1] : 0, tf0 = i ? foe.splits[i - 1] : 0;
+    if (tm === undefined || tf === undefined || tm0 === undefined || tf0 === undefined) continue;
+    const lost = (tm - tm0) - (tf - tf0);
+    const vm = me.splitV?.[i], vf = foe.splitV?.[i];
+    if (vm === undefined || vf === undefined) continue;
+    if (!worstBend || lost > worstBend.lost) worstBend = { i, lost, me: mph(vm), foe: mph(vf) };
+  }
+  const bendName = (i: number) => {
+    const sg = track.segments[i];
+    const k = bendIdx.indexOf(i);
+    const kind = sg.radius! <= 30 ? 'hairpin' : sg.type === 'hwbend' ? 'sweeper' : 'bend';
+    const same = bendIdx.filter((j) => (track.segments[j].radius! <= 30 ? 'hairpin' : track.segments[j].type === 'hwbend' ? 'sweeper' : 'bend') === kind);
+    if (same.length === 1) return `the ${kind}`;
+    if (k === bendIdx.length - 1) return `the last ${kind}`;
+    if (k === 0) return `the first ${kind}`;
+    return `the ${ordinal(same.indexOf(i) + 1)} ${kind}`;
+  };
+  const gripShort = foe.stats.grip > me.stats.grip * 1.005;
+  const bendCase = worstBend && worstBend.lost >= 0.08 && worstBend.foe - worstBend.me >= 2 && gripShort ? worstBend : null;
+  let bendLine: [number, string] | null = null;
+  if (bendCase) {
+    const nm = bendName(bendCase.i);
+    // the bend that cost most, right under the bends line (the zone total stays: it carries the grip numbers)
+    bendLine = [bendCase.lost * 0.999, `Worst was ${nm}: out at ${bendCase.me} mph vs ${fn}’s ${bendCase.foe}`];
+  }
   const close = Math.abs(margin) < 0.3;
-  const reasons = [...zoneReasons.map((r) => [Math.abs(r[0]), r[1]] as [number, string]), ...skillReasons].sort((a, b) => b[0] - a[0]).slice(0, 4).map((r) => r[1]);
+  const reasons = [...zoneReasons.map((r) => [Math.abs(r[0]), r[1]] as [number, string]), ...(bendLine ? [bendLine] : []), ...skillReasons].sort((a, b) => b[0] - a[0]).slice(0, 4).map((r) => r[1]);
   const headline = margin > 0
     ? `${close ? 'So close — ' : ''}${o.place === 1 ? '' : `${ordinal(o.place)}, `}${sec(margin)} behind ${foe.name}`
     : `Won by ${sec(margin)} over ${foe.name}${close ? ' — a close one' : ''}`;
   // the suggestion: the biggest leak the player can fix — a technique, or the part for the zone that lost most where
   // the foe really has the better stat
-  const buildZone = zoneReasons.filter(([lost, , z]) => lost > 0.05 && statLine(z).better).sort((a, b) => b[0] - a[0])[0];
+  // (a grip suggestion needs the corner data too: a bend lost at a lower exit speed, not just a lower grip stat)
+  const buildZone = zoneReasons.filter(([lost, , z]) => lost > 0.05 && statLine(z).better && (z !== 'bends' || !!bendCase)).sort((a, b) => b[0] - a[0])[0];
   const buildLost = buildZone?.[0] ?? 0;
   let suggestion: FinishExplanation['suggestion'];
   if (lcMissed && margin > 0 && shift < 0.3 && boost < 0.3) {
@@ -429,12 +460,15 @@ export function explainFinish(o: RaceOutcome, s?: GameState): FinishExplanation 
     const fam: Family = z === 'launch' ? (foe.stats.accel * dt(foe).accelScale > me.stats.accel * dt(me).accelScale ? 'turbo' : 'tires') : ZONE_FAMILY[z];
     const act = buildAction(s, car, fam, partCap);
     const where = `${fn} takes ${sec(buildZone[0])} out of you ${z === 'launch' ? 'off the line' : `in ${label[z]}`}`;
+    // a bend backed by its exit speeds leads with it: "Try more grip for the last hairpin (49 mph out, Anouk 51): …"
+    const bend = z === 'bends' && bendCase ? `Try more grip for ${bendName(bendCase.i)} (out at ${bendCase.me} mph, ${fn} at ${bendCase.foe})` : null;
     if (act?.kind === 'fit' && s) {
       const up = bestOwnedUpgrade(s, car, fam, partCap);
-      suggestion = { text: `Fit the ${up?.text ?? `better ${FAMILIES[fam].name}`}${up ? ` (${up.gain})` : ''} — ${where}.`, action: act };
-    } else if (act?.kind === 'upgrade') suggestion = { text: `A T${act.tier} ${FAMILIES[fam].name} is the most this car runs here — merge or order one: ${where}.`, action: act };
-    else if (act?.kind === 'tune') suggestion = { text: `Your ${FAMILIES[fam].name} is maxed; a Tune-up stage adds a little everywhere — ${where}.`, action: act };
-    else suggestion = { text: `${where}; your build is maxed for this course, so a car that suits it (or Perfect boosts on the exits) is the way through.` };
+      const part = `${up?.text ?? `better ${FAMILIES[fam].name}`}${up ? ` (${up.gain})` : ''}`;
+      suggestion = { text: bend ? `${bend}: fit the ${part}.` : `Fit the ${part} — ${where}.`, action: act };
+    } else if (act?.kind === 'upgrade') suggestion = { text: bend ? `${bend}: a T${act.tier} ${FAMILIES[fam].name} is the most this car runs here — merge or order one.` : `A T${act.tier} ${FAMILIES[fam].name} is the most this car runs here — merge or order one: ${where}.`, action: act };
+    else if (act?.kind === 'tune') suggestion = { text: `${bend ? `${bend}. ` : ''}Your ${FAMILIES[fam].name} is maxed; a Tune-up stage adds a little everywhere${bend ? '' : ` — ${where}`}.`, action: act };
+    else suggestion = { text: `${bend ?? where}; your build is maxed for this course, so a car that suits it (or Perfect boosts on the exits) is the way through.` };
   } else if (margin <= 0) suggestion = { text: close ? `Defend it next time: ${skillReasons.length ? 'clean shifts and Perfect boosts' : 'the same clean run'} keep ${fn} behind.` : 'A clean, quick run — try a harder event.' };
   else suggestion = { text: `${fn} is simply quicker on this course right now; a stronger build or a car that suits it closes the gap.`, action: car ? buildAction(s, car, 'engine', partCap) : undefined };
   return { headline, reasons, suggestion, foe: foe.name, margin, close };

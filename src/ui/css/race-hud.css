@@ -2,7 +2,7 @@
 
 /* Bottom bar: SHIFT under the left thumb, the gauge cluster in the middle, NITRO under the right thumb. */
 .racescreen .nitrobar.racebar { align-items: flex-end; gap: 8px; }
-.racescreen .racebar .gauge { flex: 1 1 auto; min-width: 0; max-width: 176px; height: 118px; align-self: flex-end; pointer-events: none; }
+.racescreen .racebar .gauge { flex: 1 1 auto; min-width: 0; max-width: 200px; height: 136px; align-self: flex-end; pointer-events: none; margin-bottom: -6px; }
 .racescreen .shiftwrap { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; }
 
 .shiftbtn {
@@ -41,7 +41,9 @@
 
 @media (max-width: 400px) {
   .shiftbtn { width: 92px; height: 92px; border-radius: 22px; }
-  .racescreen .racebar .gauge { height: 108px; }
+  .racescreen .racebar .gauge { height: 128px; }
+  .racescreen .nitrobar.racebar { gap: 6px; padding-left: calc(var(--safe-l) + 12px); padding-right: calc(var(--safe-r) + 12px); }
+  .racescreen .nitrobar .nitrobtn { width: 104px; height: 104px; }
 }
 @media (max-width: 340px) {
   .shiftbtn { width: 80px; height: 80px; font-size: var(--fs-sm); }
@@ -115,3 +117,30 @@
 .result .cx-why .cx-head { display: block; margin-bottom: 2px; }
 .result .cx-why ul { margin: 2px 0 4px 18px; padding: 0; }
 .result .cx-why .cx-tip { margin: 2px 0 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ---- Redline · nitro sequence (nitro & effects workstream) ----
+   Ready never competes with the shift cue: while SHIFT is amber or green the boost-zone button stops pulsing and its
+   ring stops turning (it stays lit and readable), so the only thing moving near a shift window is the shift light. */
+.racescreen:has(.shiftbtn.soon, .shiftbtn.green) .nitrobtn.window { animation: none; box-shadow: 0 6px 0 #133a55, 0 0 18px 4px rgba(255,196,87,.55); }
+.racescreen:has(.shiftbtn.soon, .shiftbtn.green) .nitrobtn.window::after { animation: none; }
+/* Fire: an accepted Perfect boost glows gold for exactly as long as the sim's boost (the class is removed when it ends) */
+.racescreen .nitrobtn.perfect-run { box-shadow: 0 6px 0 #6b4a00, 0 0 22px 6px rgba(255,214,94,.55); }
+@media (prefers-reduced-motion: reduce) { .racescreen .nitrobtn.window, .racescreen .nitrobtn.window::after { animation: none; } }
+.reduced .racescreen .nitrobtn.window, .reduced .racescreen .nitrobtn.window::after { animation: none; }
+/* ---- end nitro sequence ---- */
+
+/* ---- 1.10 Redline: the post-race cluster readout, what changed since the last run, the open rival prize ---- */
+.race-telemetry.cluster-readout { grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); background: #0b0e13; border-radius: 12px; padding: 6px; color: #f3f6fa; }
+.race-telemetry.cluster-readout .tm { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.08); }
+.race-telemetry.cluster-readout .tm span { color: rgba(243,246,250,.66); }
+.race-telemetry.cluster-readout .tm.big b { font-size: var(--fs-xl); line-height: 1; }
+.race-telemetry.cluster-readout .tm.big small { font-size: var(--fs-2xs); font-weight: var(--w-strong); color: rgba(243,246,250,.66); }
+.result .run-changes { margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: rgba(127,127,127,.12); font-size: var(--fs-sm); }
+.result .run-changes .rc-head { display: block; margin-bottom: 4px; }
+.result .run-changes .rc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; }
+.result .run-changes .rc { display: flex; flex-direction: column; min-width: 0; }
+.result .run-changes .rc span { font-size: var(--fs-2xs); color: var(--muted); }
+.result .run-changes .rc small { font-size: var(--fs-2xs); color: var(--muted); }
+.result .run-changes .rc.up small { color: #2f9e5a; font-weight: var(--w-heavy); }
+.result .run-changes .rc.down small { color: #c0392b; font-weight: var(--w-heavy); }
+.result .cx-earned.prize b { color: #b07a12; }

@@ -56,6 +56,12 @@ export function runGoalAction(app: App, a: GoalAction) {
     case 'workshop': void import('./mechanic').then((m) => m.openMechanic(app, { area: a.area as never })); return;
     case 'shelf': void openShelfOr(app); return;
     case 'upgrade': openShop(app, undefined, 'garage'); return;
+    case 'run': { // 1.10 Redline Series step (Progression, marked): the step's brief, raced from the Race menu
+      app.go('race');
+      const race = app.views.race as unknown as { startRivalRun(id: string, car: CarId): void };
+      void import('./rivalRuns').then((m) => m.openRivalBrief(app, a.runId, (id, car) => race.startRivalRun(id, car)));
+      return;
+    }
   }
 }
 

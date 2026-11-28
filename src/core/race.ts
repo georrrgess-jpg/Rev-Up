@@ -35,6 +35,10 @@ export interface RaceSetup {
   /** Launch control (cars with LAUNCH_CONTROL, the Tempest E4): 'perfect' starts with it engaged (bots, tests, the
    *  counterfactual replay); the live screen calls tapLaunch() on GO instead. */
   launch?: 'perfect' | 'none';
+  /** Test & Compare (core/testDrive.ts): race this course instead of the event's track (a fixed slice of a real one). */
+  track?: Track;
+  /** Test & Compare: no rivals on the road (the event still names the scenery). */
+  solo?: boolean;
 }
 
 export interface Racer {
@@ -52,6 +56,8 @@ export interface Racer {
   nitroLeft: number; // seconds
   nitroMul: number;
   splits: number[]; // time at end of each segment
+  /** Speed (m/s) at the end of each segment (a bend's exit speed). */
+  splitV?: number[];
   /** Gear index (0 = first). */
   gear: number;
   /** Seconds of torque cut left from the current shift. */
@@ -75,7 +81,32 @@ export interface Racer {
   slip: number;
   /** Launch control engaged for this start (Tempest E4: more traction and pull through the launch segment). */
   lc?: boolean;
+  /** Rivals' race craft for this start (see CRAFT; deterministic per seed and rival). */
+  craft?: RivalCraft;
+  /** Defending: seconds left of the push, and the segment it was used on (once per straight). */
+  defendT?: number;
+  defendSeg?: number;
 }
+
+/** A rival's race craft for one start: how its launch lands, whether it brakes late, whether it defends. */
+export interface RivalCraft { launch: number; late: boolean; defend: boolean }
+
+/**
+ * Rival race craft (1.10 Redline). Drawn once per race from the seed (a stream of its own, so rival stats and every
+ * older result are unchanged), and balance-neutral on average (measured with the pace tuners):
+ * - launch: a bogged start (wheelspin, slow off the line), a clean one, or a great one;
+ * - late brakers dive deeper into a bend and carry a touch less through it (overcooked);
+ * - defenders answer a player closing right behind on a straight with a short push, once per straight.
+ */
+export const CRAFT = {
+  badLaunchP: 0.2, badLaunch: 0.92,
+  greatLaunchP: 0.15, greatLaunch: 1.06,
+  lateP: 0.35, lateBrake: 1.2, lateCap: 0.992,
+  defendP: 0.45, defendPush: 0.05, defendS: 0.9, defendGap: 8,
+};
+
+/** One rival moment the HUD can call out (a new object each time). */
+export interface RivalMoment { seq: number; t: number; kind: 'bad-launch' | 'great-launch' | 'defend'; id: string }
 
 /** One gear change of the player's, for the race screen's sound and HUD (a new object each time). */
 export interface GearEvent { seq: number; t: number; dir: 'up' | 'down'; from: number; into: number; grade: ShiftGrade | 'auto-down'; auto: boolean }
@@ -287,7 +318,7 @@ export class RaceSim {
 
   constructor(readonly setup: RaceSetup) {
     const ev = eventById(setup.eventId);
-    this.track = TRACKS[ev.track];
+    this.track = setup.track ?? TRACKS[ev.track];
     this.length = trackLength(this.track);
     this.windows = nitroWindows(this.track, setup.windowScale ?? 1);
     this.charges = setup.nitroCharges;
@@ -297,17 +328,26 @@ export class RaceSim {
     const rng = makeRng(setup.seed);
     const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean, policy: ShiftPolicy): Racer => ({
       id, name, car, paint, isPlayer, stats, x: 0, v: 0, finishTime: null, nitroLeft: 0, nitroMul: 1, splits: [], gear: 0, cut: 0, limiterT: 0, policy, peak: 0, braking: false,
-      gearT: -9, brakeT: -9, zoneDown: 0, brakeTo: 0, slip: 0,
+      gearT: -9, brakeT: -9, zoneDown: 0, brakeTo: 0, slip: 0, splitV: [],
     });
     this.racers = [mk('player', setup.player.name, setup.player.car, setup.player.paint, { ...setup.player.stats }, true, setup.shift ?? 'ordinary')];
     if (setup.launch === 'perfect' && LAUNCH_CONTROL.cars.includes(setup.player.car)) this.racers[0].lc = true;
-    for (const rid of ev.rivals) {
+    for (const rid of setup.solo ? [] : ev.rivals) {
       const r = RIVALS[rid];
       const vary = () => 1 + (rng() * 2 - 1) * RACE.rivalVariance;
       this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false, setup.rivalShift ?? 'ordinary'));
       if (r.look) this.racers[this.racers.length - 1].look = r.look;
       // rivals in a launch-control car are pros: they always hit it
       if (LAUNCH_CONTROL.cars.includes(r.car)) this.racers[this.racers.length - 1].lc = true;
+    }
+    // race craft from a stream of its own (the stat variance above keeps its draws)
+    const craftRng = makeRng((setup.seed ^ 0x5bd1e995) >>> 0);
+    // (launches and late braking vary in a full field only: a one-on-one final or a two-car heat stays a straight fight)
+    const pack = this.racers.length >= 4;
+    for (const r of this.racers) {
+      if (r.isPlayer) continue;
+      const u = craftRng(), v = craftRng(), w = craftRng();
+      r.craft = { launch: r.lc || !pack ? 1 : u < CRAFT.badLaunchP ? CRAFT.badLaunch : u > 1 - CRAFT.greatLaunchP ? CRAFT.greatLaunch : 1, late: pack && v < CRAFT.lateP, defend: w < CRAFT.defendP };
     }
     // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured. It shifts clean.
     this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false, 'clean');
@@ -327,7 +367,7 @@ export class RaceSim {
   clone(): RaceSim {
     const c = Object.create(RaceSim.prototype) as RaceSim;
     Object.assign(c, this);
-    const cp = (r: Racer): Racer => ({ ...r, stats: { ...r.stats }, splits: [...r.splits] });
+    const cp = (r: Racer): Racer => ({ ...r, stats: { ...r.stats }, splits: [...r.splits], splitV: [...(r.splitV ?? [])] });
     (c as unknown as { racers: Racer[] }).racers = this.racers.map(cp);
     (c as unknown as { ghost: Racer }).ghost = cp(this.ghost);
     c.usedWindows = new Set(this.usedWindows);
@@ -336,6 +376,7 @@ export class RaceSim {
     c.attempt = { ...this.attempt, band: [...this.attempt.band] as [number, number] };
     c.lastDown = this.lastDown ? { ...this.lastDown } : null;
     c.gearEvents = this.gearEvents.map((e) => ({ ...e }));
+    c.rivalMoments = this.rivalMoments.map((e) => ({ ...e }));
     c.trace = [...this.trace];
     return c;
   }
@@ -554,6 +595,14 @@ export class RaceSim {
     return g;
   }
 
+  /** Rival moments, newest last (the race screen calls out the ones near the player). */
+  rivalMoments: RivalMoment[] = [];
+  private momentSeq = 0;
+  private rivalMoment(kind: RivalMoment['kind'], id: string) {
+    this.rivalMoments.push({ seq: ++this.momentSeq, t: this.t, kind, id });
+    if (this.rivalMoments.length > 12) this.rivalMoments.splice(0, this.rivalMoments.length - 12);
+  }
+
   /** Player gear changes, newest last (the race screen drains them each frame for sound). */
   gearEvents: GearEvent[] = [];
   private gearSeq = 0;
@@ -626,14 +675,24 @@ export class RaceSim {
       top *= 1 + RACE.nitroTopMul * r.nitroMul;
       r.nitroLeft = Math.max(0, r.nitroLeft - dt);
     }
+    // a defender's push: once per straight, when the player closes right behind it
+    if (r.craft?.defend && !seg.radius && r.finishTime === null && (r.defendT ?? 0) <= 0 && r.defendSeg !== index && this.t > 2) {
+      const p = this.player;
+      const gap = r.x - p.x;
+      if (gap > 0 && gap < CRAFT.defendGap && p.v > r.v && p.finishTime === null) { r.defendT = CRAFT.defendS; r.defendSeg = index; this.rivalMoment('defend', r.id); }
+    }
+    if ((r.defendT ?? 0) > 0) { accel *= 1 + CRAFT.defendPush; r.defendT = Math.max(0, r.defendT! - dt); }
     let a: number;
     if (seg.type === 'launch') {
       // launch control (Tempest E4): the motors meter torque to the grip, so more of it reaches the road
-      const raw = accel * RACE.launchTurboMul * (r.lc ? 1 + LAUNCH_CONTROL.pull : 1);
+      const raw = accel * RACE.launchTurboMul * (r.lc ? 1 + LAUNCH_CONTROL.pull : 1) * (r.craft?.launch ?? 1);
       const traction = st.grip * RACE.tractionG * d.accelScale * (r.lc ? LAUNCH_CONTROL.traction : 1); // the calibration scales the whole launch, so grip still matters off the line
       a = raw > traction ? traction + (raw - traction) * RACE.wheelspinKeep : raw;
       // wheelspin: how far the launch's pull exceeds the tyres' grip (fades as the car gets rolling)
       r.slip = raw > traction ? Math.min(1, ((raw - traction) / raw) * 1.6) * Math.max(0, 1 - r.v / 25) : 0;
+      // a bogged launch spins its tyres for everyone to see
+      if ((r.craft?.launch ?? 1) < 1) { r.slip = Math.max(r.slip, 0.7 * Math.max(0, 1 - r.v / 20)); if (this.steps === 0) this.rivalMoment('bad-launch', r.id); }
+      else if ((r.craft?.launch ?? 1) > 1 && this.steps === 0) this.rivalMoment('great-launch', r.id);
     } else { a = accel; r.slip = 0; }
     a *= Math.max(0, 1 - (r.v / top) ** (seg.type === 'launch' ? 4 : d.pullExp ?? 2)); // launch is traction- and turbo-bound
     // the gearbox: no engine pull while the clutch is in, lugging below the power band, nothing on the limiter
@@ -652,18 +711,21 @@ export class RaceSim {
       else if (r.cut <= 0 && this.shiftLog.length) this.shiftLog[this.shiftLog.length - 1].cost += lost;
     }
     a *= share * pull + (1 - share);
-    const brake = st.grip * 9.81 * 0.9;
+    // a late braker brakes harder and later, and carries a touch less through the bend
+    const late = !!r.craft?.late;
+    const brake = st.grip * 9.81 * 0.9 * (late ? CRAFT.lateBrake : 1);
+    const capMul = late ? CRAFT.lateCap : 1;
     let cap = Infinity;
-    if (seg.radius) cap = bendCap(st.grip, seg.radius);
+    if (seg.radius) cap = bendCap(st.grip, seg.radius) * capMul;
     // look ahead to the next bend
     const nextSeg = this.track.segments[index + 1];
     if (nextSeg?.radius) {
       const dd = start + seg.length - r.x;
-      const vc = bendCap(st.grip, nextSeg.radius);
+      const vc = bendCap(st.grip, nextSeg.radius) * capMul;
       cap = Math.min(cap, Math.sqrt(vc * vc + 2 * brake * Math.max(0, dd)));
     }
     r.braking = r.v > cap + 1e-9; // slowing for a bend (cruising at a bend's limit is not braking)
-    if (r.braking) { r.brakeT = this.t; r.brakeTo = Math.min(seg.radius ? bendCap(st.grip, seg.radius) : Infinity, nextSeg?.radius ? bendCap(st.grip, nextSeg.radius) : Infinity); }
+    if (r.braking) { r.brakeT = this.t; r.brakeTo = Math.min(seg.radius ? bendCap(st.grip, seg.radius) * capMul : Infinity, nextSeg?.radius ? bendCap(st.grip, nextSeg.radius) * capMul : Infinity); }
     // cornering load: a bend taken near its grip limit squeals (0 on straights)
     if (seg.radius) r.slip = Math.max(r.slip, Math.max(0, Math.min(1, (r.v / bendCap(st.grip, seg.radius) - 0.8) / 0.2)));
     else if (r.zoneDown && this.t - r.brakeT > SHIFT.zoneGapS) r.zoneDown = 0;
@@ -678,6 +740,7 @@ export class RaceSim {
       if (prevX < edge && r.x >= edge && r.splits.length === i) {
         const frac = r.v > 0 ? (edge - prevX) / (r.x - prevX) : 1;
         r.splits.push(this.t + dt * frac);
+        (r.splitV ??= []).push(r.v);
       }
     }
     if (r.x >= this.length) {

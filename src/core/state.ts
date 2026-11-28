@@ -353,6 +353,47 @@ function sanitizeCircuit(m: GameState, g: Partial<GameState>) {
   } else delete m.upgradeCredit;
 }
 
+const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+const shortStr = (x: unknown, n = 64): x is string => typeof x === 'string' && x.length > 0 && x.length <= n;
+/** Measured splits / stats of a Test & Compare run: finite numbers by short key, at most 40 of them. */
+function cleanNumMap(x: unknown): Record<string, number> | null {
+  if (!isObj(x)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(x).slice(0, 40)) if (k.length <= 32 && isNum(v)) out[k] = v;
+  return out;
+}
+
+/** 1.10 Redline fields: optional, cleaned on load (malformed values are dropped, never fatal). */
+function sanitizeRedline(m: GameState, g: Partial<GameState>) {
+  // onboarding: a step name, and booleans / a timestamp
+  const ob = g.onboard as unknown;
+  if (isObj(ob) && shortStr(ob.step, 32)) {
+    m.onboard = { step: ob.step };
+    if (ob.skipped === true) m.onboard.skipped = true;
+    if (ob.done === true) m.onboard.done = true;
+    if (isNum(ob.at) && ob.at >= 0) m.onboard.at = ob.at;
+  } else delete m.onboard;
+  // Test & Compare: one comparison per owned-or-known car id, with finite measurements only
+  const tr = g.testRuns as unknown;
+  if (isObj(tr)) {
+    const out: NonNullable<GameState['testRuns']> = {};
+    for (const [car, v] of Object.entries(tr)) {
+      if (!isObj(v) || car.length > 24) continue;
+      const a = cleanNumMap(v.a), b = cleanNumMap(v.b);
+      if (!a || !b || !isNum(v.at) || !shortStr(v.event) || typeof v.parts !== 'string' || v.parts.length > 200) continue;
+      out[car as CarId] = { at: v.at, event: v.event, a, b, parts: v.parts };
+    }
+    m.testRuns = out;
+  } else delete m.testRuns;
+  // settings: lighter race effects is a plain boolean (anything else falls back to off)
+  if (typeof m.settings.lightFx !== 'boolean') delete m.settings.lightFx;
+  for (const k of ['musicVol', 'sfxVol'] as const) {
+    const v = m.settings[k];
+    if (v !== undefined && !(isNum(v) && v >= 0 && v <= 1)) delete m.settings[k];
+  }
+  if (m.settings.introSeen !== undefined && typeof m.settings.introSeen !== 'boolean') delete m.settings.introSeen;
+}
+
 /** Migrate older save shapes forward. Returns null when the save cannot be used. */
 export function migrate(raw: unknown): GameState | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -381,6 +422,7 @@ export function migrate(raw: unknown): GameState | null {
   sanitizeSurplus(merged); // ---- Scrap & surplus: well-formed builds and kits, or none
   sanitizeCircuit(merged, g); // ---- 1.9 Circuit: shelf, goal pick, paid stages, upgrade credit
   cleanGhosts(merged); // ---- 1.9 Circuit time-trial ghosts (core/circuit.ts): malformed ones dropped
+  sanitizeRedline(merged, g); // ---- 1.10 Redline: onboarding, Test & Compare runs, light effects
   if (fromV1) { merged.v = SAVE_VERSION; installLegacyLoadout(merged); }
   return validateState(merged).length === 0 ? merged : null;
 }

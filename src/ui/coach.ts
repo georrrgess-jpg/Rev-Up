@@ -1,7 +1,11 @@
 import * as B from '../core/board';
 import type { SlotRef } from '../core/events';
+import * as I from '../core/install';
 import * as P from '../core/progression';
-import { tutorialStep, TutorialStep } from '../core/tutorial';
+import { finishOnboard, fitChange, onboardActive, onboardFitPart, onboardStep, rescueCrate, tutorialStep, TutorialStep } from '../core/tutorial';
+import { rescueOrOrder, skipOnboard } from './firstRun';
+
+const SKIP_RUN = 'Skip tutorial';
 import { FAMILIES, carById, eventById } from '../data/tables';
 import type { App } from './app';
 import { h } from './dom';
@@ -23,6 +27,10 @@ export interface CoachStep {
   prefer?: 'above' | 'below';
   /** Controls the callout should stay off when it can (the spare rack, the press, the action bar…). */
   keepClear?: Element[];
+  /** One extra button in the bubble (e.g. a free crate when the bench cannot make the goal's part). */
+  action?: { label: string; run: () => void };
+  /** The skip button's words ("Skip tutorial" during the first session). */
+  skipLabel?: string;
 }
 
 export class Coach {
@@ -31,15 +39,19 @@ export class Coach {
   readonly el: HTMLElement;
   private text: HTMLElement;
   private gotIt: HTMLButtonElement;
+  private actBtn: HTMLButtonElement;
+  private skipBtn: HTMLButtonElement;
   private step: CoachStep | null = null;
   private marked: Element[] = [];
 
   constructor(private host: HTMLElement, onAck: (id: string) => void, onSkip: () => void, private app = false) {
     this.text = h('div', { class: 'coach-text' });
     this.gotIt = h('button', { class: 'coach-btn', onclick: () => this.step && onAck(this.step.id) }, 'Got it');
+    this.actBtn = h('button', { class: 'coach-btn', onclick: () => this.step?.action?.run() });
+    this.skipBtn = h('button', { class: 'coach-btn subtle', onclick: () => onSkip() }, 'Skip tips');
     this.el = h('div', { class: 'coach', role: 'note', 'aria-live': 'polite' },
       this.text,
-      h('div', { class: 'coach-actions' }, this.gotIt, h('button', { class: 'coach-btn subtle', onclick: () => onSkip() }, 'Skip tips')),
+      h('div', { class: 'coach-actions' }, this.actBtn, this.gotIt, this.skipBtn),
       h('span', { class: 'coach-arrow', 'aria-hidden': 'true' }));
     this.el.hidden = true;
     host.append(this.el);
@@ -58,6 +70,12 @@ export class Coach {
     if (!step || !step.targets.length) { this.el.hidden = true; return; }
     if (this.text.textContent !== step.text) this.text.textContent = step.text;
     this.gotIt.hidden = !step.ack;
+    this.actBtn.hidden = !step.action;
+    if (step.action && this.actBtn.textContent !== step.action.label) this.actBtn.textContent = step.action.label;
+    const skip = step.skipLabel ?? 'Skip tips';
+    if (this.skipBtn.textContent !== skip) this.skipBtn.textContent = skip;
+    // an instruction with nothing to acknowledge: Skip sits beside the text, so the bubble stays one short row
+    this.el.classList.toggle('solo', !step.ack && !step.action);
     if (!same) for (const t of step.targets) { t.classList.add('coach-target'); this.marked.push(t); }
     this.el.hidden = false;
     requestAnimationFrame(() => this.place());
@@ -150,7 +168,12 @@ export class GuideCoach {
   constructor(private app: App) {
     Coach.appDriven = true;
     this.coach = new Coach(app.root, (id) => { app.game.markTip(id); this.update(); },
-      () => { app.game.markTip('skipGuide'); this.update(); app.toast('Tips off. Replay them any time from How to play (?).'); }, true);
+      () => {
+        // during the first session, Skip ends the guided run only; the one-line tips later have their own Skip
+        if (onboardActive(app.game.state)) skipOnboard(app);
+        else { app.game.markTip('skipGuide'); app.toast('Tips off. Replay them any time from How to play (?).'); }
+        this.update();
+      }, true);
     this.coach.el.classList.add('guide');
     // Views and sheets rebuild their DOM freely: re-resolve targets after any structural change (one per frame).
     new MutationObserver((muts) => {
@@ -167,7 +190,17 @@ export class GuideCoach {
     this.raf = requestAnimationFrame(() => { this.raf = 0; this.render(); });
   }
 
+  /** Keep `s.onboard` in step with play: record the step shown (for resuming), and the end of the sequence. */
+  private syncOnboard() {
+    const s = this.app.game.state;
+    if (!onboardActive(s) || this.app.busy || this.app.intro) return;
+    const step = onboardStep(s);
+    if (step === null) this.app.game.transact((d) => { finishOnboard(d, Date.now()); return []; });
+    else if (s.onboard!.step !== step) this.app.game.transact((d) => { d.onboard = { ...d.onboard!, step }; return []; });
+  }
+
   private render() {
+    try { this.syncOnboard(); } catch { /* never block the screen on bookkeeping */ }
     let cue: CoachStep | null = null;
     try { cue = this.cue(); } catch { cue = null; }
     const sheet = this.topSheet();
@@ -181,14 +214,15 @@ export class GuideCoach {
 
   /**
    * What a Garage cue should not cover: the spare rack, the scrap press and the action bar (the controls the
-   * cues teach), and for a cue on board cells the rest of the board, so the bubble docks above or below it.
+   * cues teach), the parts on the bench, the goal card, the car's slots and the top bar.
    */
-  private keepClear(cue: CoachStep): Element[] {
+  private keepClear(_cue: CoachStep): Element[] {
     if (this.app.route !== 'garage') return [];
     const all = (sel: string) => Array.from(this.app.root.querySelectorAll<HTMLElement>(sel)).filter(visible);
     const list: Element[] = [...all(SEL.tray), ...all(SEL.press), ...all('.view.on .actions')];
-    const board = cue.targets[0]?.closest('.board');
-    if (board) list.push(board);
+    // 1.10: the bubble may rest on empty bench cells, never on parts, the goal card, the car's slots or the top bar —
+    // so a merge or fit cue sits beside what it teaches instead of over the controls around it
+    list.push(...all('.view.on .board .cell').filter((c) => c.querySelector('.part')),...all('.view.on .goal-row'), ...all('.view.on .carrow'), ...all('.topbar'));
     return list;
   }
 
@@ -229,6 +263,11 @@ export class GuideCoach {
     const one = (id: string, el: HTMLElement | null, text: string, ack = false): CoachStep | null => el ? { id, targets: [el], text, ack } : null;
     const sheet = this.topSheet();
     const inShop = !!sheet?.querySelector('.workshop');
+    // the first session just ended (the next car's part is made): the one remaining step, once
+    if (!step && !sheet && app.route === 'garage' && s.onboard?.done && !s.onboard.skipped && s.onboard.at && !s.tips['fr:next']) {
+      const c = one('fr:next', this.find(SEL.race), `${remainingText(app)} Race to earn it.`, true);
+      if (c) return c;
+    }
     if (step) {
       const c = this.stepCue(step, sheet, inShop);
       if (c) return c;
@@ -254,12 +293,7 @@ export class GuideCoach {
     const one = (el: HTMLElement | null, text: string, ack = false): CoachStep | null => el ? { id: step, targets: [el], text, ack } : null;
     const route = app.route;
     switch (step) {
-      case 'goal': {
-        if (sheet || route !== 'garage' || !g) return null;
-        const reqs = [`craft a T${g.tier} ${FAMILIES[g.family].name} yourself`, `earn ${g.repNeed} Rep from races`];
-        return one(this.find(SEL.goal),
-          `This is your goal: the ${g.car.model}. It fits T${g.car.cap} parts (your ${car.model} stops at T${car.cap}), so it can go much faster. To unlock it, ${reqs.join(' and ')}.`, true);
-      }
+      case 'goal': case 'goalCard': return null; // folded into the first session's craft step and the result card
       case 'merge': {
         if (sheet || route !== 'garage') return null;
         const pair = this.pairOf('engine') ?? this.pairOf();
@@ -267,56 +301,81 @@ export class GuideCoach {
         const p = B.getPart(s, pair[0])!;
         const cells = pair.map((r) => this.cell(r)).filter(visible);
         if (cells.length < 2) return null;
-        return { id: step, targets: cells, text: `Drag one T${p.t} ${FAMILIES[p.f].name} onto the other (or tap one, then the other). Two matching parts make one part a tier higher: T${p.t} + T${p.t} = T${p.t + 1}.` };
+        return { id: step, targets: cells, skipLabel: SKIP_RUN, text: `Drag one ${FAMILIES[p.f].name} onto the other: two T${p.t}s make a T${p.t + 1}.` };
       }
       case 'fit': {
-        const fitText = `Parts don't fit themselves. Your ${car.model} has empty slots — fit your parts so they power the car. A fitted part leaves the bench.`;
-        if (sheet) return one(this.find(SEL.fitRecommended) ?? this.find('.sheet button', /recommended fit|fit recommended|fit best/i), 'Fit the recommended parts, or pick each slot yourself. Fitted parts power this car and free their bench cells.');
-        if (route === 'race') return one(this.find(SEL.raceFit), fitText);
-        return route === 'garage' ? one(this.find(SEL.fitNow) ?? this.find(SEL.fit), `${fitText} Tap here.`) : null;
+        const part = onboardFitPart(s);
+        if (!part) return null;
+        const ch = fitChange(s, s.activeCar, part);
+        const what = ch ? `${ch.label} ${ch.from} → ${ch.to}: ${ch.meaning}.` : 'It powers the car once fitted.';
+        if (sheet) {
+          const c = one(this.find(SEL.fitRecommended) ?? this.find('.sheet button', /recommended fit|fit recommended|fit best/i), `Fit it: ${what}`);
+          return c && { ...c, skipLabel: SKIP_RUN };
+        }
+        if (route === 'race') { const c = one(this.find(SEL.raceFit), `Fit your T${part.t} ${FAMILIES[part.f].name} first: ${what}`); return c && { ...c, skipLabel: SKIP_RUN }; }
+        if (route !== 'garage') return null;
+        // picked up (the Garage picks the merged part up for you): the Fit button; else the part itself
+        const fitBtn = this.find('.view.on .selbar .sel-fit');
+        if (fitBtn) return { id: step, targets: [fitBtn], skipLabel: SKIP_RUN, text: `Fit it to your ${car.model}. ${what}` };
+        const loc = I.locatePart(s, part.id);
+        const cell = loc && 'at' in loc ? this.cell(loc.at) : null;
+        return cell ? { id: step, targets: [cell], skipLabel: SKIP_RUN, text: `Tap your T${part.t} ${FAMILIES[part.f].name}, then Fit. ${what}` } : null;
       }
       case 'race1': {
         if (sheet) return null;
         const ev = P.recommendedEvent(s);
-        const text = `Race ${ev.name}: a win pays $${ev.payout.cash[0]} and ${ev.payout.rep[0]} Rep. Rep counts toward new cars; cash is for the Shop.`;
-        // in the Race menu the facts (track, difficulty, pay) sit above the button: keep them readable
-        if (route === 'race') { const c = one(this.find(SEL.raceLive), `${text} Tap NITRO in the amber boost zones.`); return c && { ...c, prefer: 'below' }; }
-        return route === 'garage' ? one(this.find(SEL.race), text) : null;
+        const fittedNow = Object.values(I.fitted(s, s.activeCar)).some(Boolean);
+        const text = fittedNow ? `Try it on track: race ${ev.name}. You'll learn SHIFT, then NITRO.` : `Race ${ev.name}: you'll learn SHIFT, then NITRO.`;
+        if (route === 'race') { const c = one(this.find(SEL.raceLive), text); return c && { ...c, prefer: 'below', skipLabel: SKIP_RUN }; }
+        if (route !== 'garage') return null;
+        const c = one(this.find(SEL.race), text);
+        return c && { ...c, skipLabel: SKIP_RUN };
       }
       case 'spend': {
         if (inShop) {
           const pick = this.find(SEL.shopPick);
-          return pick ? one(pick, pick.dataset.coachText ?? 'This is the best buy for your goal right now.', true) : null;
+          return pick ? one(pick, pick.dataset.coachText ?? 'The best buy for your goal right now.', true) : null;
         }
         if (sheet || route !== 'garage') return null;
-        return one(this.find(SEL.shop), `You have $${s.cash} to spend. Open the Shop: it suggests the buy that helps most with the ${g?.car.model ?? 'next car'}.`, true);
-      }
-      case 'goalCard': {
-        if (sheet || route !== 'garage' || !g) return null;
-        return one(this.find(SEL.goal), `${remainingText(app)} Tap the card any time for the details.`, true);
+        return one(this.find(SEL.shop), `$${s.cash} to spend: the Shop picks the buy that helps most.`, true);
       }
       case 'craftGoal': {
         if (sheet || route !== 'garage' || !g) return null;
+        const fam = FAMILIES[g.family];
+        const intro = `Next car: the ${g.car.model} (fits T${g.car.cap} parts). It needs a T${g.tier} ${fam.name} you merge yourself.`;
+        // a part of the family is picked up: point at its glowing matches
+        const sel = this.find('.view.on .board .cell.sel, .view.on .tray .cell.sel');
+        const selPart = sel ? B.getPart(s, { zone: sel.dataset.zone as 'board' | 'tray', i: Number(sel.dataset.i) }) : null;
+        if (sel && selPart?.f === g.family) {
+          const tg = Array.from(app.root.querySelectorAll<HTMLElement>('.view.on .cell.target')).filter(visible).slice(0, 2);
+          if (tg.length) return { id: step, targets: tg, skipLabel: SKIP_RUN, text: selPart.t + 1 >= g.tier
+            ? `Tap a glowing ${fam.name}: this merge makes the T${g.tier} the ${g.car.model} needs.`
+            : `Tap a glowing ${fam.name}: T${selPart.t} + T${selPart.t} = T${selPart.t + 1}. Two T${g.tier - 1}s make the T${g.tier}.` };
+        }
         const pair = this.pairOf(g.family);
         const cells = pair ? pair.map((r) => this.cell(r)).filter(visible) : [];
-        if (cells.length < 2) return null;
-        const fam = FAMILIES[g.family];
-        return { id: step, targets: cells, ack: true, text: `Merge your ${fam.plural} up the tiers: crafting a T${g.tier} ${fam.name} yourself is what the ${g.car.model} needs. Crate drops of that tier don't count.` };
+        if (cells.length === 2) return { id: step, targets: cells, skipLabel: SKIP_RUN, text: `${intro} Merge two ${fam.plural}.` };
+        // the bench can't make it: one free crate of the family (once), else the order route on the goal card
+        const rc = rescueCrate(s);
+        const goalEl = this.find('.view.on .goal-act') ?? this.find(SEL.goal);
+        if (!goalEl) return null;
+        if (rc) return { id: step, targets: [goalEl], skipLabel: SKIP_RUN, text: `${intro} You're short of ${fam.plural}.`, action: { label: `Get T${rc.tier} ${fam.name}`, run: () => rescueOrOrder(app) } };
+        return { id: step, targets: [goalEl], skipLabel: SKIP_RUN, text: `${intro} Tap here to get the ${fam.plural} you need.` };
       }
       case 'betterPart':
         if (sheet) return null;
-        if (route === 'race') return one(this.find(SEL.raceFit), `A better part is on your bench. Fit it to your ${car.model} before you race.`, true);
-        return route === 'garage' ? one(this.find(SEL.fitNow) ?? this.find(SEL.fit), `A better part is on your bench. Nothing fits itself — parts only help once fitted: tap here to fit it to your ${car.model}.`, true) : null;
+        if (route === 'race') return one(this.find(SEL.raceFit), `A better part is on your bench: fit it before you race.`, true);
+        return route === 'garage' ? one(this.find(SEL.fitNow) ?? this.find(SEL.fit), `A better part is on your bench: tap to fit it to your ${car.model}.`, true) : null;
       case 'nitroBank':
-        return sheet ? null : one(this.find(SEL.nitro), 'You banked nitro (shown on the Race button): three quick merges in a row add a charge. Banked charges add to your free crew nitro in live races.', true);
+        return sheet ? null : one(this.find(SEL.nitro), 'Nitro banked: three quick merges in a row add a charge for your next race.', true);
       case 'overflow':
-        return sheet || route !== 'garage' ? null : one(this.find(SEL.tray), 'The spare rack holds parts when the bench is full. Drag them back onto the bench or onto a match any time.', true);
+        return sheet || route !== 'garage' ? null : one(this.find(SEL.tray), 'Spare rack: parts wait here when the bench is full.', true);
       case 'scrap':
-        return sheet || route !== 'garage' ? null : one(this.find(SEL.press), 'Bench full: merge a pair, or drop a spare part here to scrap it. Scrap orders the exact part you pick in the Workshop.', true);
+        return sheet || route !== 'garage' ? null : one(this.find(SEL.press), 'Bench full: merge a pair, or recycle a part here. Scrap orders the exact part you pick.', true);
       case 'mergeAll':
-        return sheet || route !== 'garage' ? null : one(this.find(SEL.mergeAll) ?? this.find('.view.on .actions button', /merge all/i), 'Merge All is unlocked: one tap merges every pair on the bench. Quick manual merges still bank nitro.', true);
+        return sheet || route !== 'garage' ? null : one(this.find(SEL.mergeAll) ?? this.find('.view.on .actions button', /merge all/i), 'Merge All: one tap merges every pair on the bench.', true);
       case 'cap':
-        return sheet || route !== 'garage' ? null : one(this.find(SEL.fit), `Parts above the ${car.model}'s T${car.cap} limit still fit but run at T${car.cap}. Nothing fits itself: fit them to a car that takes their tier for full power.`, true);
+        return sheet || route !== 'garage' ? null : one(this.find(SEL.fit), `The ${car.model} runs parts at T${car.cap} at most; higher tiers get full power in a later car.`, true);
       case 'shop':
         return null;
     }

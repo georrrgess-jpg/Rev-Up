@@ -22,7 +22,8 @@ export type GoalAction = { label: string } & (
   | { kind: 'workshop'; area: string }
   | { kind: 'merge' }
   | { kind: 'shelf' }
-  | { kind: 'upgrade'; id: string });
+  | { kind: 'upgrade'; id: string }
+  | { kind: 'run'; runId: string }); // 1.10 Redline Series step (core/goals.ts seriesGoal)
 
 export interface Goal {
   key: string;

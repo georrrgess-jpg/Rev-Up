@@ -1,5 +1,7 @@
 import type { CarId } from '../data/tables';
-import { RIVAL_ART } from './rivalArt';
+import { RIVAL_ART as RIVAL_ONLY } from './rivalArt';
+import { VARIANT_ART } from './variantArt'; // 1.10 Redline (Progression): earned variants drawn through the rival-body hooks
+const RIVAL_ART = { ...RIVAL_ONLY, ...VARIANT_ART }; // 1.10 Redline: lookups below see both; RIVAL_ART_IDS stays rivals only
 
 // Rev Up vehicle renderer.
 //
@@ -245,7 +247,8 @@ const ENGINES: Record<string, EngineDef> = {
 // opponent-only bodies (src/render/rivalArt.ts) join the same table, so geometry, sprites and lamps work as for any car
 for (const [id, a] of Object.entries(RIVAL_ART)) DEFS[id] = a.def;
 /** Opponent-only bodies: drawn like any car (drawCar with this id), never owned by the player. */
-export const RIVAL_ART_IDS: readonly string[] = Object.keys(RIVAL_ART);
+export const RIVAL_ART_IDS: readonly string[] = Object.keys(RIVAL_ONLY);
+ENGINES.kestrelr = { x0: 2.68, x1: 3.74, kind: 'i4', col: '#e0202e', turbo: 0 }; // 1.10 Redline: the Kestrel R's bay
 const engineFor = (id: string): EngineDef => ENGINES[id] ?? ENGINES.muscle;
 const defFor = (id: string): CarDef => DEFS[id] ?? DEFS.muscle;
 
@@ -262,7 +265,7 @@ export const FACTORY_LOOKS: Record<string, { paint: string; trim: string }> = {
   tempest: { paint: '#101418', trim: '#5ef2ff' },
 };
 /** Ids that have their own drawing (the rest fall back to the muscle body). */
-export const ART_CARS = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign', 'ardent', 'meridian', 'tempest'] as const;
+export const ART_CARS = ['junker', 'beater', 'hothatch', 'muscle', 'tourer', 'tuner', 'super', 'rally', 'gt', 'proto', 'vireo', 'mako', 'sovereign', 'ardent', 'meridian', 'tempest', 'kestrelr' /* 1.10 Redline */] as const;
 /** The supercars shown on a turning platform under a spotlight in the Showroom. */
 export const PLATFORM_CARS: readonly string[] = ['vireo', 'mako', 'sovereign', 'ardent', 'meridian', 'tempest'];
 /** Mid-engined cars (engine / motors behind the cabin): the service bay opens the rear cover on these. */
@@ -456,7 +459,9 @@ export interface CarDrawOpts {
   cover?: number; // 0 = uncovered, 1 = fully covered
   silhouette?: boolean; // flat locked silhouette
   shadow?: boolean;
-  nitro?: number; // 0..1 flame
+  nitro?: number; // 0..1 flame (the race passes its boost envelope: see src/render/nitroFx.ts)
+  /** A Perfect boost: the flame turns gold-white and runs longer (nitro sequence, Redline). */
+  nitroPerfect?: boolean;
   brake?: boolean;
   livery?: string | null; // signature-finish stripe colour
   detail?: boolean;
@@ -2512,8 +2517,15 @@ function beam(c: Ctx, k: number) {
   ctx.beginPath(); ctx.moveTo(p.x, p.y + 0.12); ctx.lineTo(p.x + 4.5, p.y + 0.5); ctx.lineTo(p.x + 4.5, -0.1); ctx.lineTo(p.x, p.y - 0.15); ctx.closePath(); ctx.fill();
 }
 
-/** Nitro trail per car: exit height(s), length scale and colours (light trails on the hybrids, flames elsewhere). */
+/** Nitro trail per car: exit height(s), length scale and colours (light trails on the hybrids, flames elsewhere).
+ *  Owned by the nitro sequence (Redline): `flame` draws it, `nitroExits` gives the exits for the bloom and glow. */
 const TRAILS: Record<string, { ys: number[]; len: number; cols: [string, string, string, string]; x0?: number }> = {
+  // Ironhorse: twin side-by-side pipes, a long lazy blue flame
+  muscle: { ys: [0.25, 0.31], len: 1.15, cols: ['rgba(240,248,255,0.96)', 'rgba(120,190,255,0.9)', 'rgba(255,130,50,0.45)', 'rgba(255,100,40,0)'] },
+  // Strata GTR: a centre race exit, short and hot
+  gt: { ys: [0.36], len: 0.9, cols: ['rgba(255,250,235,0.98)', 'rgba(255,170,80,0.9)', 'rgba(255,90,40,0.45)', 'rgba(200,50,20,0)'] },
+  // Corvo: a rally side exit that spits orange
+  rally: { ys: [0.27], len: 0.85, cols: ['rgba(255,250,230,0.96)', 'rgba(255,180,90,0.9)', 'rgba(255,110,40,0.45)', 'rgba(200,60,20,0)'] },
   super: { ys: [0.3], len: 2.2, cols: ['rgba(255,255,255,0.95)', 'rgba(190,140,255,0.9)', 'rgba(255,80,190,0.45)', 'rgba(120,60,255,0)'] },
   proto: { ys: [0.3], len: 2.2, cols: ['rgba(255,255,255,0.95)', 'rgba(90,255,230,0.9)', 'rgba(60,140,255,0.45)', 'rgba(40,90,255,0)'] },
   // Vireo: short, hot blue-white flames out of the high deck exits
@@ -2529,20 +2541,42 @@ const TRAILS: Record<string, { ys: number[]; len: number; cols: [string, string,
   // Tempest: a long electric-cyan light trail (no flame: it has no exhaust)
   tempest: { ys: [0.48], len: 2.8, cols: ['rgba(255,255,255,0.98)', 'rgba(94,242,255,0.92)', 'rgba(120,90,255,0.45)', 'rgba(80,60,255,0)'] },
 };
+/** A Perfect boost: every trail shifts to the same gold-white, so it reads at a glance whatever the car. */
+const PERFECT_COLS: [string, string, string, string] = ['rgba(255,255,255,1)', 'rgba(255,244,170,0.98)', 'rgba(255,214,94,0.65)', 'rgba(255,190,70,0)'];
+const trailOf = (id: string) => TRAILS[id] ?? RIVAL_ART[id]?.trail;
 
-function flame(c: Ctx, k: number, phase: number) {
+/** Canvas points of a car's nitro exits (where the flame or light trail leaves the body), for a car drawn with
+ *  drawCar(ctx, id, x, y, w, …). The bloom, road glow and Ready pilot light sit here. */
+export function nitroExits(id: CarId | string, x: number, y: number, w: number): { x: number; y: number }[] {
+  const tr = trailOf(id), k = w / defFor(id).L, x0 = (tr?.x0 ?? 0) + 0.02;
+  return (tr?.ys ?? [0.3]).map((yy) => ({ x: x + x0 * k, y: y - yy * k }));
+}
+
+/** Length (car metres) of the nitro flame / light trail at envelope `k` (see flame). */
+export function nitroFlameLen(id: CarId | string, k: number, perfect = false): number {
+  return (0.6 + 1.2 * Math.max(0, Math.min(1, k))) * (trailOf(id)?.len ?? 1) * (perfect ? 1.4 : 1);
+}
+
+/** The nitro flame / light trail. `k` 0..1 is the boost envelope (it grows on ignition and shrinks as the boost
+ *  settles); `perfect` lengthens it 40%, thickens it and turns it gold-white. */
+function flame(c: Ctx, k: number, phase: number, perfect = false) {
   const { ctx } = c;
-  const tr = TRAILS[c.id] ?? RIVAL_ART[c.id]?.trail;
-  const len = (0.9 + 0.5 * k + 0.08 * Math.sin(phase * 5)) * (tr?.len ?? 1);
+  const tr = trailOf(c.id);
+  const lvl = Math.max(0, Math.min(1, k));
+  const len = nitroFlameLen(c.id, lvl, perfect) + 0.08 * Math.sin(phase * 5) * (tr?.len ?? 1);
   const x0 = (tr?.x0 ?? 0) + 0.02;
   const gr = ctx.createLinearGradient(x0, 0, x0 - len, 0);
-  if (tr) { gr.addColorStop(0, tr.cols[0]); gr.addColorStop(0.2, tr.cols[1]); gr.addColorStop(0.6, tr.cols[2]); gr.addColorStop(1, tr.cols[3]); }
-  else { gr.addColorStop(0, 'rgba(255,255,240,0.95)'); gr.addColorStop(0.25, k > 1 ? 'rgba(255,214,94,0.9)' : 'rgba(120,205,255,0.9)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); }
+  const cols = perfect ? PERFECT_COLS : tr?.cols;
+  if (cols) { gr.addColorStop(0, cols[0]); gr.addColorStop(0.2, cols[1]); gr.addColorStop(0.6, cols[2]); gr.addColorStop(1, cols[3]); }
+  else { gr.addColorStop(0, 'rgba(255,255,240,0.95)'); gr.addColorStop(0.25, 'rgba(120,205,255,0.9)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); }
   ctx.fillStyle = gr;
+  const thick = (0.7 + 0.5 * lvl) * (perfect ? 1.4 : 1);
+  ctx.globalAlpha = Math.min(1, 0.35 + lvl);
   (tr?.ys ?? [0.3]).forEach((y, i) => {
     const l = len * (i ? 0.8 + 0.2 * Math.sin(phase * 7) : 1);
-    ctx.beginPath(); ctx.moveTo(x0, y + 0.07); ctx.quadraticCurveTo(x0 - l * 0.5, y + 0.12, x0 - l, y); ctx.quadraticCurveTo(x0 - l * 0.5, y - 0.1, x0, y - 0.06); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x0, y + 0.07 * thick); ctx.quadraticCurveTo(x0 - l * 0.5, y + 0.12 * thick, x0 - l, y); ctx.quadraticCurveTo(x0 - l * 0.5, y - 0.1 * thick, x0, y - 0.06 * thick); ctx.closePath(); ctx.fill();
   });
+  ctx.globalAlpha = 1;
 }
 
 // ---------------------------------------------------------------- service bay: engine bay, hood, focus
@@ -2846,7 +2880,7 @@ export function drawCar(ctx: CanvasRenderingContext2D, id: CarId | string, x: nu
     return;
   }
   if (o.headlights) beam(c, o.headlights);
-  if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0);
+  if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0, o.nitroPerfect);
   backLayer(c, o.shadow !== false);
   for (const [wx, rear] of [[d.rx, true], [d.fx, false]] as const) wheel(ctx, id, d, wx, rear, o.wheelAngle ?? 0, detail, g.D, 0, o.style?.concours ?? 0);
   frontLayer(c, o.headlights ?? 0, !!o.brake);
@@ -2899,7 +2933,7 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
     ctx.save(); setupCtx(ctx, x, y, w, id);
     const c: Ctx = { ctx, id, d, g, paint, trim, stripe: null, detail: false, restore: 0 };
     if (o.headlights) beam(c, o.headlights);
-    if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0);
+    if (o.nitro) flame(c, o.nitro, o.wheelAngle ?? 0, o.nitroPerfect);
     ctx.restore();
   }
   blit(s.back);

@@ -931,3 +931,40 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
    than the screen, so a sideways drag moved the whole screen. */
 .showroom-view .scroll, .showroom-view.scroll { overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; touch-action: pan-y; }
 .showroom-view { overflow-x: hidden; }
+
+/* ---- 1.10 Redline first session (src/ui/firstRun.ts) ------------------------------------------------------------
+   The race coach: one bubble over the control it teaches (SHIFT, then NITRO), taps pass through it. While it runs,
+   the HUD's own hint line stays quiet so there is one instruction at a time. */
+.fr-race { position: absolute; z-index: 30; pointer-events: none; background: #fff2d2; color: #1c1408; border-radius: 12px;
+  padding: 9px 12px; font-size: var(--fs-sm); font-weight: var(--w-heavy); line-height: 1.3; text-align: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45); animation: coachin .18s ease-out; }
+.fr-race[hidden] { display: none; }
+.fr-race.go { background: #ffd75e; }
+.fr-race.good { background: #d8f5cf; color: #10240b; }
+.fr-race .fr-arrow { position: absolute; bottom: -7px; width: 14px; height: 14px; margin-left: -7px; background: inherit; transform: rotate(45deg); border-radius: 2px; }
+.fr-race .fr-arrow[hidden] { display: none; }
+.racescreen.fr-on .racehint { visibility: hidden; }
+.fr-target { outline: 3px solid #ffd75e; outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.reduced) .fr-target { animation: frpulse 1s ease-in-out infinite; }
+}
+@keyframes frpulse { 0%, 100% { outline-color: rgba(255,215,94,1); } 50% { outline-color: rgba(255,215,94,.25); } }
+
+/* The first result: what the fitted part measurably did, Rep and cash in one line, the next car and one button.
+   The card's own next-step, explanation and buttons step aside so there is a single primary action. */
+.fr-result { background: var(--bg2); border: 1px solid rgba(255,215,94,.45); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px;
+  text-align: left; font-size: var(--fs-sm); line-height: 1.4; display: grid; gap: 6px; }
+.fr-result .fr-gain b { color: var(--gold); }
+.fr-result .fr-skill, .fr-result .fr-econ { color: var(--dim); }
+.fr-result .fr-econ b { color: var(--text); }
+.fr-result .fr-next small { display: block; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; font-size: var(--fs-xs); }
+.fr-result .fr-acts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin-top: 4px; }
+.fr-result .fr-acts .btn { min-height: 52px; }
+.result .card.fr-card .next, .result .card.fr-card .next-act, .result .card.fr-card .btns,
+.result .card.fr-card .why-list, .result .card.fr-card .reward-more, .result .card.fr-card .standing { display: none; }
+@media (max-width: 340px) { .fr-result .fr-acts { grid-template-columns: 1fr; } }
+/* a coach instruction with nothing to acknowledge: one row, Skip beside the text */
+.coach.solo { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; }
+.coach.solo .coach-text { flex: 1; }
+.coach.solo .coach-actions { margin-top: 0; flex: none; }
+.coach.solo .coach-btn.subtle { padding: 0 6px; max-width: 76px; line-height: 1.1; white-space: normal; }

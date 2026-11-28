@@ -295,7 +295,10 @@ export function runBot(o: BotOpts): BotLog {
       L.maxLossStreak = Math.max(L.maxLossStreak, lossStreak[ev.id]);
       lastStreak = lossStreak[ev.id];
       stuckCar = car;
-    } else lastStreak = 0;
+    } else {
+      // 1.10: a win elsewhere doesn't make a stalled race go away: the player still saves for a Tune-up for it
+      lastStreak = Math.max(0, ...Object.entries(lossStreak).filter(([id]) => !(g.state.events[id]?.wins)).map(([, v]) => v));
+    }
     if (!L.milestones.firstRace) L.milestones.firstRace = Math.round(t);
     if (res?.boss) L.milestones[`boss-${raced.boss?.rival}`] = Math.round(t);
     if (res?.boss && raced.boss?.rival === 'ray') L.milestones.ray = Math.round(t);

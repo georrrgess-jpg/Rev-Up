@@ -5,7 +5,8 @@ import { sfx } from '../audio';
 import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
 import * as P from '../core/progression';
-import { STYLE_ITEMS, StyleItem, BLUEPRINT_FINISHES, CROWN_FINISH, CarId, DISTRICTS, ENABLED_CARS, EVENTS, RAY_FINISH, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
+import { STYLE_ITEMS, StyleItem, BLUEPRINT_FINISHES, CarId, DISTRICTS, ENABLED_CARS, EVENTS, SIGNATURE_FINISHES, carById, finishStripe } from '../data/tables';
+import * as RR from '../core/rivalRuns'; // 1.10 Redline Series: the earned car's card
 import { FACTORY_LOOKS, LIVERIES, PLATFORM_CARS, drawCar, fitCanvas } from '../render/car';
 import { mph } from '../core/units';
 import { openFitParts } from './fit';
@@ -29,6 +30,13 @@ const STAGES: Record<string, { wall: [string, string, string, string]; light: st
   sovereign: { wall: ['#0a0805', '#2e2416', '#17120b', '#060503'], light: '#ffeccb58', floor: 'rgba(201,162,74,0.2)' },
 };
 /** Factory look; the new cars use their art palette until the tables give them their own. */
+/** 1.10: how each rival / series paint is earned (shown on its locked swatch; tap previews it on the car). */
+const FINISH_HOW: Record<string, string> = {
+  'Ray’s Rust-Red': 'Beat Rusty Ray in a live race', 'Crown Teal': 'Win the Coastal Crown in a live race',
+  'Main Event Neon': 'Win The Main Event', 'Canyon Ochre': 'Win the Canyon Rally Final', 'Summit Ice': 'Win the Summit Gala',
+  'Riviera Gold': 'Win the Grand Riviera', 'Storm Cyan': 'Win Launch Control', 'Kit’s Apex Red': 'Win the Apex Duel Rival Run',
+  'Redline Red': 'Step 1 of the Redline Series (Shakedown)',
+};
 const lookOf = (id: CarId) => { const c = carById(id); const f = FACTORY_LOOKS[id]; return c.paint === '#555' && f ? f : { paint: c.paint, trim: c.trim }; };
 
 /** Rendered detailed cars, reused while a platform turns (one entry per canvas). */
@@ -327,7 +335,10 @@ export class ShowroomView implements View {
       const isNext = next?.car.id === car.id;
       const active = state.activeCar === car.id;
       const canvas = h('canvas', { 'aria-hidden': 'true' });
-      const label = pending ? 'Ready to reveal' : active ? 'Current car' : owned ? 'View' : isNext ? 'Next car' : 'Locked';
+      // 1.10: an earned variant (the Kestrel 1600 R) shows its challenge chain instead of the Rep ladder, and is drawn
+      // lit even before you earn it, so you can see what you are racing for
+      const series = car.earnedBy === 'redline' && !owned ? RR.redlineView(state) : null;
+      const label = pending ? 'Ready to reveal' : active ? 'Current car' : owned ? 'View' : series ? `Redline Series · ${series.done}/${series.of}` : isNext ? 'Next car' : 'Locked';
       const card = h('button', {
         class: `carcard${owned ? '' : ' locked'}${active ? ' active' : ''}`,
         'aria-label': `${car.model}, ${label}`,
@@ -335,7 +346,10 @@ export class ShowroomView implements View {
         onclick: () => {
           if (pending) this.app.openReveal(car.id);
           else if (owned) this.inspect(car.id);
-          else if (isNext) this.app.toast(next.line, { label: 'Garage', run: () => this.app.go('garage') });
+          else if (series) {
+            const st = series.next;
+            this.app.toast(series.lockedWhy ? `${car.model}: finish the Redline Series. ${series.lockedWhy}.` : st ? `${car.model}: step ${st.series!.step} of ${series.of} · ${st.name} — ${st.goal}` : `${car.model}: finish the Redline Series`, { label: 'Race', run: () => this.app.go('race') });
+          } else if (isNext) this.app.toast(next.line, { label: 'Garage', run: () => this.app.go('garage') });
           else this.app.toast(`Collect the previous cars to reach the ${car.model}`);
         },
       }, canvas,
@@ -343,8 +357,9 @@ export class ShowroomView implements View {
         h('div', { class: 'cn' }, car.model),
         h('div', { class: 'cm' }, `${car.name} · T${car.cap} parts`),
         h('div', { class: 'car-status' }, label),
-        isNext && next ? h('div', { class: 'car-need' }, h('div', { class: 'need-line' }, next.line.replace(/ to unlock the .*$/, '')), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(next.progress * 100)}%` }))) : null));
-      this.redrawCards.push(() => studio(canvas, car.id, state.paints[car.id], 0, pending || isNext, !owned && !isNext, owned ? carStyle(state, car.id) : undefined));
+        series ? h('div', { class: 'car-need' }, h('div', { class: 'need-line' }, series.next ? `Next: ${series.next.name} · ${RR.prizeText(series.next.prize)}` : series.lockedWhy ?? ''), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round((series.done / series.of) * 100)}%` })))
+          : isNext && next ? h('div', { class: 'car-need' }, h('div', { class: 'need-line' }, next.line.replace(/ to unlock the .*$/, '')), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(next.progress * 100)}%` }))) : null));
+      this.redrawCards.push(() => studio(canvas, car.id, state.paints[car.id], 0, pending || isNext, !owned && !isNext && !series, owned ? carStyle(state, car.id) : undefined));
       return card;
     });
     this.grid.replaceChildren(...cards);
@@ -405,11 +420,13 @@ export class ShowroomView implements View {
     };
     // Paint shop preview: tapping an item you don't own shows it on the car before you buy.
     let preview: { item: StyleItem } | null = null;
+    /** 1.10: a finish you have not earned yet, shown on the car (tap a 🔒 finish). */
+    let finishPreview: string | null = null;
     const soonItems = new Map<string, StyleItem>();
     const draw = () => {
       const st = this.app.game.state;
       const style = { ...carStyle(st, id) };
-      let paint = st.paints[id];
+      let paint = finishPreview ?? st.paints[id];
       if (preview) {
         const it = preview.item;
         if ((it.kind as string) === 'livery') style.livery = it.value || undefined;
@@ -432,6 +449,7 @@ export class ShowroomView implements View {
       ...STYLE_ITEMS.filter((i) => i.kind === 'paint' && (state.owns ?? []).includes(i.id)).map((i) => ({ name: i.name, paint: i.value, value: i.value })),
     ];
     const applyFinish = (value: string | null) => {
+      finishPreview = null;
       this.app.game.setPaint(id, value);
       updateFinish();
       draw();
@@ -441,16 +459,24 @@ export class ShowroomView implements View {
         class: 'btn finish-choice', 'data-finish': item.value ?? '', onclick: () => applyFinish(item.value),
       }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), item.name));
     }
+    // 1.10: every finish still to earn, with how to earn it; tapping one shows it on this car (tap again to stop)
     const lockedFinishes = [
       ...(sig && !state.livePodiums.includes(id) ? [{ name: sig.name, paint: sig.paint, how: 'Top 3 in a live race with this car' }] : []),
-      ...(!state.blueprints.includes(RAY_FINISH.name) ? [{ name: RAY_FINISH.name, paint: RAY_FINISH.paint, how: 'Beat Rusty Ray in a live race' }] : []),
-      ...(!state.blueprints.includes(CROWN_FINISH.name) && state.owned.includes('muscle') ? [{ name: CROWN_FINISH.name, paint: CROWN_FINISH.paint, how: 'Win the Coastal Crown in a live race' }] : []),
+      ...BLUEPRINT_FINISHES.filter((b) => !state.blueprints.includes(b.name)).map((b) => ({ name: b.name, paint: b.paint, how: FINISH_HOW[b.name] ?? 'Beat a rival for it' })),
     ];
     for (const item of lockedFinishes) {
-      finishButtons.append(h('button', {
-        class: 'btn finish-choice locked', 'aria-disabled': 'true', 'aria-label': `${item.name}, locked: ${item.how}`,
-        onclick: () => this.app.toast(`${item.name}: ${item.how}`),
-      }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), `🔒 ${item.name}`));
+      const btn = h('button', {
+        class: 'btn finish-choice locked', 'aria-label': `${item.name}, locked: ${item.how}. Preview on the car`, 'aria-pressed': 'false',
+        onclick: () => {
+          finishPreview = finishPreview === item.paint ? null : item.paint;
+          for (const b of finishButtons.querySelectorAll('button.locked')) b.setAttribute('aria-pressed', 'false');
+          btn.setAttribute('aria-pressed', String(finishPreview === item.paint));
+          finishName.textContent = finishPreview ? `Preview · ${item.name} — ${item.how}` : finishName.textContent;
+          if (!finishPreview) updateFinish();
+          draw();
+        },
+      }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), `🔒 ${item.name}`);
+      finishButtons.append(btn);
     }
     const updateFinish = () => {
       const paint = this.app.game.state.paints[id] ?? '';

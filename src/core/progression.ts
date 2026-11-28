@@ -28,7 +28,13 @@ export function rivalShiftFor(e: RaceEvent): 'ordinary' | 'clean' {
 
 /** Stars earned on Downtown Nights event goals (win · under par · a Perfect boost). */
 export function starsIn(s: GameState, district: string = 'downtown'): number {
-  return EVENTS.filter((e) => e.goals && e.district === district).reduce((n, e) => n + bitCount(s.stars?.[e.id] ?? 0), 0);
+  return EVENTS.filter((e) => e.goals && e.district === district).reduce((n, e) => n + bitCount(s.stars?.[e.id] ?? 0), 0)
+    + trapStars(s, district);
+}
+/** 1.10: a second road to Downtown stars that suits a top-speed build instead of a race win: each medal on the
+ *  district's speed trap (the Bridge Speed Trap: bronze, silver, gold) counts as one star. */
+export function trapStars(s: GameState, district: string = 'downtown'): number {
+  return EVENTS.filter((e) => e.speedTrap && e.district === district).reduce((n, e) => n + Math.min(3, s.medals?.[e.id] ?? 0), 0);
 }
 const bitCount = (b: number) => (b & 1) + ((b >> 1) & 1) + ((b >> 2) & 1);
 export const STAR_LABELS = ['Win', 'Under par', 'A Perfect boost'];
@@ -509,7 +515,12 @@ export function eventUnlocked(s: GameState, e: RaceEvent): { ok: boolean; why: s
   if (e.heatOf) return { ok: false, why: `Raced as part of ${eventById(e.heatOf).name}` };
   if (e.requires.car && !s.owned.includes(e.requires.car)) return { ok: false, why: `Unlock the ${carById(e.requires.car).model}` };
   if (e.requires.beatBoss && !s.bosses.includes(e.requires.beatBoss)) return { ok: false, why: `Beat ${RIVALS[e.requires.beatBoss].name}` };
-  if (e.requires.afterWin && !(s.events[e.requires.afterWin]?.wins)) return { ok: false, why: `Win ${eventById(e.requires.afterWin).name} first` };
+  // 1.10: a series round you keep finishing on the podium no longer blocks the next one (PERSIST_PODIUMS, as for an
+  // unlock race): the next round opens, and the stalled one stays there to win later (its rival reward needs the win)
+  if (e.requires.afterWin && !unlockEventDone(s, e.requires.afterWin)) {
+    const n = s.events[e.requires.afterWin]?.podiums ?? 0;
+    return { ok: false, why: `Win ${eventById(e.requires.afterWin).name} first${n ? ` (or ${PERSIST_PODIUMS - n} more podium${PERSIST_PODIUMS - n > 1 ? 's' : ''} there)` : ''}` };
+  }
   if (e.requires.rep && s.rep < e.requires.rep) return { ok: false, why: `${e.requires.rep - s.rep} more Rep` };
   if (e.requires.stars && starsIn(s) < e.requires.stars) return { ok: false, why: `${e.requires.stars - starsIn(s)} more Downtown stars` };
   if (e.carOnly && s.activeCar !== e.carOnly) return { ok: false, why: `${carById(e.carOnly).model} only`, switchCar: e.carOnly };
@@ -530,7 +541,8 @@ export function eventReason(s: GameState, e: RaceEvent): string {
   if (e.speedTrap) {
     const m = s.medals?.[e.id] ?? 0;
     const best = bestTrapMph(s.events[e.id]);
-    return m >= 3 ? `Gold won · record ${best} mph` : `${['Bronze', 'Silver', 'Gold'][m]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m]} mph through the gate${best ? ` · best ${best} mph` : ''}`;
+    const star = e.district === 'downtown' && m < 3 ? ' — each medal is a Downtown star' : '';
+    return m >= 3 ? `Gold won · record ${best} mph` : `${['Bronze', 'Silver', 'Gold'][m]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][m]} mph through the gate${best ? ` · best ${best} mph` : ''}${star}`;
   }
   if (e.goals) {
     const have = s.stars?.[e.id] ?? 0;
@@ -571,7 +583,16 @@ export interface Payout {
   boss: boolean;
   bossReward?: NonNullable<RaceEvent['boss']>['reward'];
   freshRep: number;
+  /** 1.10: the clean-shift skill bonus (live only: every timed shift in the green, at least CLEAN_RACE_MIN_SHIFTS). */
+  clean: number;
 }
+
+/** 1.10 Live races pay for skill twice: Perfect boosts (above) and a race with every shift clean, this share of the
+ *  win purse. Quick Races never earn it, so a live race stays worth more than the crew's (README "Economy"). */
+export const CLEAN_RACE_SHARE = 0.1;
+export const CLEAN_RACE_MIN_SHIFTS = 3;
+export const cleanRaceBonus = (e: RaceEvent) => (e.timeAttack || e.speedTrap ? 0 : roundCash(e.payout.cash[0] * CLEAN_RACE_SHARE));
+const allClean = (o: { shifts?: number; shiftsClean?: number }) => (o.shifts ?? 0) >= CLEAN_RACE_MIN_SHIFTS && o.shiftsClean === o.shifts;
 
 /** New track bonus ("fresh route" in code): +75% Rep for an event that isn't one of your last two races. */
 export function isFreshRoute(s: GameState, e: RaceEvent): boolean {
@@ -591,18 +612,21 @@ export function purse(s: GameState, e: RaceEvent) {
     quick: e.payout.cash.map((_, i) => quickCash(s, e, i + 1)),
     quickShare: quickShare(s),
     perfect: perfectBonus(e),
+    /** 1.10: + this for a live race with every shift clean */
+    clean: cleanRaceBonus(e),
     firstClear: !(s.events[e.id]?.wins) && !e.boss ? roundCash(e.firstClear.cash) : 0,
   };
 }
 
-export function computePayout(s: GameState, e: RaceEvent, place: number, mode: 'live' | 'quick', perfects: number): Payout {
+export function computePayout(s: GameState, e: RaceEvent, place: number, mode: 'live' | 'quick', perfects: number, shifting: { shifts?: number; shiftsClean?: number } = {}): Payout {
   const i = place - 1;
   const base = { cash: mode === 'quick' ? quickCash(s, e, place) : roundCash(e.payout.cash[i]), rep: e.payout.rep[i], crates: e.payout.crates[i] };
-  const p: Payout = { ...base, precision: 0, firstClear: false, boss: false, freshRep: 0 };
+  const p: Payout = { ...base, precision: 0, firstClear: false, boss: false, freshRep: 0, clean: 0 };
   if (isFreshRoute(s, e)) { p.freshRep = Math.ceil(base.rep * FRESH_ROUTE_BONUS); p.rep += p.freshRep; }
   if (mode === 'live') {
     p.precision = perfectBonus(e) * Math.min(2, perfects);
     p.cash += p.precision;
+    if (allClean(shifting)) { p.clean = cleanRaceBonus(e); p.cash += p.clean; }
     const won = place === 1;
     const rec = s.events[e.id];
     if (won && !(rec && rec.wins > 0) && !e.boss && (e.firstClear.cash > 0 || e.firstClear.crates > 0)) {
@@ -655,7 +679,7 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
   if (!pr || pr.id !== input.raceId) return null;
   const e = eventById(pr.eventId);
   const o = input.outcome;
-  const pay = computePayout(s, e, o.place, input.mode, o.perfects);
+  const pay = computePayout(s, e, o.place, input.mode, o.perfects, o);
   if (input.mode === 'quick') s.pendingQuick = null;
   else s.pendingRace = null;
   s.cash += pay.cash;
@@ -795,8 +819,9 @@ export function commitRace(s: GameState, input: CommitInput, events: GameEvent[]
     ...(trapMphNow !== undefined ? { trapMph: trapMphNow, trapKmh: Math.round(trapMphNow * 1.609344) } : {}),
     ...(earned.length ? { earnedStyle: earned } : {}),
     breakdown: [
-      { label: input.mode === 'quick' ? `Crew purse · ${ordinalShort(o.place)}` : `Purse · ${ordinalShort(o.place)}`, cash: pay.cash - pay.precision - (pay.firstClear ? e.firstClear.cash : 0), kind: 'base' as const },
+      { label: input.mode === 'quick' ? `Crew purse · ${ordinalShort(o.place)}` : `Purse · ${ordinalShort(o.place)}`, cash: pay.cash - pay.precision - pay.clean - (pay.firstClear ? e.firstClear.cash : 0), kind: 'base' as const },
       ...(pay.precision ? [{ label: `Perfect boost${o.perfects > 1 ? 's' : ''} ×${Math.min(2, o.perfects)}`, cash: pay.precision, kind: 'skill' as const }] : []),
+      ...(pay.clean ? [{ label: `Clean shifts ${o.shiftsClean}/${o.shifts}`, cash: pay.clean, kind: 'skill' as const }] : []),
       ...(pay.firstClear && e.firstClear.cash ? [{ label: 'First win', cash: e.firstClear.cash, kind: 'once' as const }] : []),
       ...(bossCash ? [{ label: `Beat ${RIVALS[e.boss!.rival].name}`, cash: bossCash, kind: 'once' as const }] : []),
       ...(medalCash ? [{ label: 'Medal', cash: medalCash, kind: 'once' as const }] : []),
@@ -849,9 +874,17 @@ export function recommendedEvent(s: GameState): RaceEvent {
     return !!r && r.starts - r.wins >= 3 && (recent.includes(e.id) || !!e.knockout?.heats.some((h) => recent.includes(h)));
   };
   if (s.activeCar === 'muscle' && final && !struggling(final)) return final;
+  // 1.10: an optional first win you have finished last in three times or more (no podium yet) is not pushed again
+  // while it gates nothing you are chasing: the pick moves on to races that pay Rep, and it stays in the menu
+  const gates = new Set(chaseableCars(s).map((c) => c.unlock?.event).filter(Boolean) as string[]);
+  const outclassed = (e: RaceEvent) => {
+    const r = s.events[e.id];
+    return !!r && !r.wins && r.starts >= 3 && r.bestPlace >= 4 && !e.series && !e.knockout
+      && !gates.has(e.id) && !EVENTS.some((x) => x.requires.afterWin === e.id && gates.has(x.id));
+  };
   // First uncleared event, else boss if unbeaten, else the best-paying open one.
   const boss = open.find((e) => e.boss && !s.bosses.includes(e.boss.rival) && !struggling(e));
-  const uncleared = open.find((e) => !e.boss && !(s.events[e.id]?.wins) && !struggling(e));
+  const uncleared = open.find((e) => !e.boss && !(s.events[e.id]?.wins) && !struggling(e) && !outclassed(e));
   if (uncleared && (!boss || EVENTS.indexOf(uncleared) < EVENTS.indexOf(boss))) return uncleared;
   if (boss) return boss;
   // After the main route, bring an earlier car back for a class meet it hasn't won yet.
@@ -869,7 +902,12 @@ export function recommendedEvent(s: GameState): RaceEvent {
     || ENABLED_CARS.some((c) => c.unlock?.stars && !s.owned.includes(c.id) && starsIn(s) < c.unlock.stars);
   const starHunt = open.filter((e) => e.goals && (s.stars?.[e.id] ?? 0) !== 7 && !(s.recentEvents ?? []).includes(e.id)
     && (starsWanted || (s.events[e.id]?.starts ?? 0) < 4));
-  if (starHunt.length) return starHunt[0];
+  // 1.10: while an unlock waits on stars, a Downtown speed-trap medal still to win counts too (trapStars)
+  if (starsWanted) starHunt.push(...open.filter((e) => e.speedTrap && e.district === 'downtown' && (s.medals?.[e.id] ?? 0) < 3 && !(s.recentEvents ?? []).includes(e.id)));
+  // 1.10: the goals you are closest to first (best finish there), and never one you have finished last in three times
+  const placeAt = (e: RaceEvent) => s.events[e.id]?.bestPlace ?? 2;
+  const hunt = starHunt.filter((e) => !((s.events[e.id]?.starts ?? 0) >= 3 && placeAt(e) >= 4)).sort((a, b) => placeAt(a) - placeAt(b));
+  if (hunt.length) return hunt[0];
   // Repeat races: the best Rep per race, counting the Fresh route bonus, so the pick rotates between routes.
   const pool = open.filter((e) => !e.boss && !struggling(e) && (s.activeCar === 'muscle' || e.id !== 'foundry-final'));
   const value = (e: RaceEvent) => e.payout.rep[0] * (isFreshRoute(s, e) ? 1 + FRESH_ROUTE_BONUS : 1) + EVENTS.indexOf(e) * 0.01;

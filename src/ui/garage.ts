@@ -12,7 +12,7 @@ import { ACTIVE_FAMILIES, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_RACES, ni
 import { familyIcon, partTileHtml, qualityName } from '../render/parts';
 import { drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
-import { tutorialStep } from '../core/tutorial';
+import { fitChange, onboardFitPart, onboardStep, statLine, tutorialStep } from '../core/tutorial';
 import { Coach, CoachStep } from './coach';
 import { h } from './dom';
 import { openShop } from './shop';
@@ -128,6 +128,8 @@ export class GarageView implements View {
   private selBar!: HTMLElement;
   private actionsEl!: HTMLElement;
   private prevStats: { top: number; accel: number; grip: number; car: string } | null = null;
+  /** The family of a part fitted to the active car in the batch being rendered (its stat change is named). */
+  private fitFam: Family | null = null;
   private shopBtn!: HTMLButtonElement;
 
   hide() {
@@ -253,15 +255,19 @@ export class GarageView implements View {
     // Show the stat change right where the fitted parts are listed.
     const st = lo.stats;
     const prev = this.prevStats;
+    const fitFam = this.fitFam;
+    this.fitFam = null;
     if (prev && prev.car === s.activeCar) {
       const bits = statDelta(prev, st);
       if (bits.length) {
         const down = mph(st.top) < mph(prev.top) || st.accel < prev.accel - 0.01 || st.grip < prev.grip - 0.001;
-        const f = h('div', { class: `floater stat${down ? ' down' : ''}` }, bits.join(' · '));
+        // a part just fitted: name the stat it drives, before → after ("Top speed 49 → 55 mph")
+        const line = fitFam ? statLine(fitFam, prev, st) : null;
+        const f = h('div', { class: `floater stat${down ? ' down' : ''}${line ? ' fitline' : ''}` }, line ?? bits.join(' · '));
         this.place(() => {
           const r = this.equipEl.getBoundingClientRect();
           const host = this.hostRect!;
-          return () => { f.style.left = `${r.left - host.left + r.width / 2}px`; f.style.top = `${r.top - host.top}px`; this.el.append(f); setTimeout(() => f.remove(), 1600); };
+          return () => { f.style.left = `${r.left - host.left + r.width / 2}px`; f.style.top = `${r.top - host.top}px`; this.el.append(f); setTimeout(() => f.remove(), line ? 2400 : 1600); };
         });
       }
     }
@@ -494,6 +500,13 @@ export class GarageView implements View {
         if (ev.some((e) => e.type === 'scrap')) { sfx.scrap(); this.app.toast(`Recycled ${ids.length} unused part${ids.length === 1 ? '' : 's'} · +${scrap} scrap`); }
       } };
     }
+    // a part above the car's cap has a home on the Parts Shelf: store it before scrapping anything
+    if (canStore(this.app.game)) {
+      const refs: SlotRef[] = [...s.tray.map((_, i) => ({ zone: 'tray' as const, i })), ...s.board.map((_, i) => ({ zone: 'board' as const, i }))];
+      const at = refs.find((r) => { const p = B.getPart(s, r); return !!p && isOverCap(s, p); });
+      const op = at ? B.getPart(s, at) : null;
+      if (at && op) return { label: `Store T${op.t} ${FAMILIES[op.f].name}`, aria: `Board full: store the T${op.t} ${FAMILIES[op.f].name} on the Parts Shelf`, run: () => storePart(this.app.game, at) };
+    }
     const junk = this.lowestScrap();
     const jp = junk ? B.getPart(s, junk) : null;
     if (junk && jp) return { label: `Scrap T${jp.t} ${FAMILIES[jp.f].name} (+${B.scrapValue(jp)})`, aria: `Board full: scrap a T${jp.t} ${FAMILIES[jp.f].name}`, run: () => { const j = this.lowestScrap(); if (j) this.requestScrap(j); } };
@@ -592,6 +605,7 @@ export class GarageView implements View {
     const reduced = this.s.settings.reducedMotion;
     let delay = 0;
     let fuseCount = 0;
+    let fits = 0;
     const FX_CAP = 6; // a batch merge plays at most this many merge sounds and floaters
     const batch = ev.some((e) => e.type === 'mergeAll');
     // one result line per merge site: where the merge started and what it ended as
@@ -642,6 +656,8 @@ export class GarageView implements View {
       }
       // ---- Fit Parts: show where each part went
       if (e.type === 'install' && e.car === this.s.activeCar) {
+        fits++;
+        this.fitFam = fits === 1 ? e.family : null; // several at once: the plain stat summary
         const p = I.fitted(this.s, e.car)[e.family];
         const fromCell = this.cellFor(e.from);
         const slot = this.eqSlots[e.family];
@@ -680,9 +696,12 @@ export class GarageView implements View {
     if (!batch) {
       for (const site of sites.values()) {
         const name = FAMILIES[site.f].name;
+        // the merged part would make the car faster: say how much, in its own stat, right on the result
+        const made = B.getPart(this.s, site.at);
+        const ch = made && I.upgradesFor(this.s, made).includes(this.s.activeCar) ? fitChange(this.s, this.s.activeCar, made) : null;
         this.later(() => {
           this.chainEl?.remove(); // the result line takes over from the cascade counter
-          this.floater(site.at, `T${site.from} ${name} → T${site.to}${site.chain > 1 ? ` · ×${site.chain}` : ''}`, `mres${site.to >= 5 ? ' high' : ''}`, 1300, 22);
+          this.floater(site.at, `T${site.from} ${name} → T${site.to}${site.chain > 1 ? ` · ×${site.chain}` : ''}${ch?.up ? ` · fit: ${ch.short}` : ''}`, `mres${site.to >= 5 ? ' high' : ''}`, ch?.up ? 1800 : 1300, 22);
         }, reduced ? 0 : Math.min(delay + 120, 620));
         if (site.chain >= 3) {
           this.later(() => { gsfx.cascadeEnd(site.chain); if (!reduced) { this.boardEl.classList.remove('quake'); void this.boardEl.offsetWidth; this.boardEl.classList.add('quake'); } }, Math.min(delay, 500));
@@ -697,6 +716,12 @@ export class GarageView implements View {
     // a new part above the car's cap (a crate or a merge): offer to store it right there
     const fresh = [...sites.values()].map((x) => x.at).concat(ev.filter((e): e is Extract<GameEvent, { type: 'place' }> => e.type === 'place').map((e) => e.at));
     this.offerStore(fresh);
+    // first session: the part just made is the one to fit, so pick it up (its Fit button is one tap away)
+    if (!batch && sites.size && onboardStep(this.s) === 'fit') {
+      const fp = onboardFitPart(this.s);
+      const at = [...sites.values()].map((x) => x.at).find((r) => B.getPart(this.s, r)?.id === fp?.id);
+      if (at) this.setSel(at);
+    }
   }
 
   private storeOffered = new Set<number | string>();

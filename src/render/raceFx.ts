@@ -10,6 +10,7 @@ import type { RaceSim, Racer } from '../core/race';
 import type { Look } from './scene';
 import { signText } from './scene';
 import { rivalLook } from '../data/rivalCars';
+import { NitroFx } from './nitroFx';
 
 type Kind = 'smoke' | 'chip' | 'spark' | 'pop';
 interface Part { x: number; y: number; vx: number; vy: number; life: number; max: number; s: number; grow: number; c: string; kind: Kind; lane: number }
@@ -57,7 +58,13 @@ export class RaceFx {
   private lastGear = new Map<string, number>();
   private burnT = 0;
 
-  constructor(private reduced: boolean, private look: Look | string) {}
+  /** The nitro sequence (Ready · Fire · Settle), read from the sim's boost state: see nitroFx.ts. */
+  readonly nitro: NitroFx;
+
+  /** `light`: the lighter-effects setting (fewer particles, no streaks, no additive bloom). */
+  constructor(private reduced: boolean, private look: Look | string, private light = false) {
+    this.nitro = new NitroFx(reduced, light);
+  }
 
   /** Rear-wheel world x of a racer drawn at `depth`. */
   static rearX(r: Racer, L: number, depth: number) { return r.x - L * depth * 0.8; }
@@ -67,6 +74,8 @@ export class RaceFx {
    * `lenOf` gives each racer's car length (m) and `laneOf` its lane index and depth.
    */
   update(dt: number, sim: RaceSim, staging: number, quality: number, lenOf: (r: Racer) => number, laneOf: (r: Racer) => { lane: number; depth: number }) {
+    if (this.light) quality = 0; // lighter effects: the same particle budget as the race's own quality drop
+    this.nitro.update(dt, sim, quality);
     for (const p of this.parts) {
       p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.s += p.grow * dt;
       if (p.kind === 'chip' || p.kind === 'spark') p.vy -= 9 * dt; // gravity
@@ -171,18 +180,23 @@ export class RaceFx {
     ctx.globalAlpha = 1;
   }
 
-  /** Light trails behind the light-bar cars off the line and while boosting (Lumen, Halcyon, Sovereign). */
+  /** Light trails behind the light-bar cars off the line and while boosting (Lumen, Halcyon, Sovereign), and the
+   *  nitro sequence's under-car layer (the boost's road glow, the Ready pilot light). Drawn just before the car. */
   drawTrail(ctx: CanvasRenderingContext2D, r: Racer, sx: number, gy: number, len: number, dpr: number, launching: boolean) {
+    this.nitro.drawUnder(ctx, r, sx, gy, len, dpr);
     const fx = fxOf(r);
-    if (this.reduced || !(fx.sig === 'trail' || fx.sig === 'arcs') || r.v < 4 || !(launching || r.nitroLeft > 0)) return;
-    const tl = Math.min(len * 2.2, r.v * 0.06 * len);
+    // the boost part follows the same envelope as the flame (it ends with the sim's boost, and at the line)
+    const boost = this.nitro.flame(r);
+    if (this.reduced || !(fx.sig === 'trail' || fx.sig === 'arcs') || r.v < 4 || !(launching || boost > 0)) return;
+    const k = launching ? 1 : boost;
+    const tl = Math.min(len * 2.2, r.v * 0.06 * len) * (this.nitro.perfectOf(r) && !launching ? 1.3 : 1);
     const y0 = gy - len * 0.13;
     const g = ctx.createLinearGradient(sx - tl, 0, sx, 0);
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, fx.accent!);
     ctx.strokeStyle = g; ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.85; ctx.lineWidth = 3 * dpr;
+    ctx.globalAlpha = 0.85 * k; ctx.lineWidth = 3 * dpr;
     ctx.beginPath(); ctx.moveTo(sx - tl, y0); ctx.lineTo(sx + len * 0.02, y0); ctx.stroke();
-    ctx.globalAlpha = 0.5; ctx.lineWidth = 2 * dpr;
+    ctx.globalAlpha = 0.5 * k; ctx.lineWidth = 2 * dpr;
     ctx.beginPath(); ctx.moveTo(sx - tl * 0.7, y0 - len * 0.06); ctx.lineTo(sx + len * 0.02, y0 - len * 0.06); ctx.stroke();
     ctx.globalAlpha = 1; ctx.lineCap = 'butt';
   }

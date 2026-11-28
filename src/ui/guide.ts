@@ -1,3 +1,4 @@
+import * as P from '../core/progression';
 import { CREW_NITRO, NITRO_CAP } from '../data/tables';
 import type { App } from './app';
 import { h } from './dom';
@@ -10,6 +11,19 @@ export function openGuide(app: App) {
     return h('div', { class: 'guide' },
       h('button', { class: 'btn sm close', onclick: close }, 'Close'),
       h('h2', {}, 'How to play'),
+      // 1.10 the first session in five lines, and a coached race to practise shifting and nitro again
+      h('section', { class: 'guide-sec refresher' }, h('h3', {}, 'Quick refresher'),
+        h('ol', {},
+          h('li', {}, 'Merge two matching parts (same family and tier) into the next tier.'),
+          h('li', {}, 'Fit parts to your car: Engine = top speed, Tires = grip, Turbo = acceleration.'),
+          h('li', {}, 'Race: tap SHIFT on green, then NITRO in the amber boost zone.'),
+          h('li', {}, 'Rep opens cars and is never spent. Cash buys parts. Scrap orders exact parts.'),
+          h('li', {}, 'The goal card names the next car, what it still needs, and has the button to it.')),
+        h('button', { class: 'btn wide', onclick: () => {
+          app.game.transact((d) => { d.tips['fr:practice'] = true; return []; });
+          close();
+          (app.views.race as unknown as { startLive(id: string): void }).startLive(P.recommendedEvent(app.game.state).id);
+        } }, 'Practise a coached race')),
       sec('Merge',
         'Drag a part onto a matching one (same family, same tier) to make the next tier. Or tap one part, then the other.',
         'Merges in quick succession can chain into neighbours (a cascade) and build a combo.'),

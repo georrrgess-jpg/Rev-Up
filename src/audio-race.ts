@@ -7,7 +7,7 @@
 //   nitro → whine and whistle up · launch → an extra chirp off the line · braking at speed → a little tyre scrub
 // and position / progress / nitro → music intensity. If the snapshot is missing (an older sim), the same values are
 // derived from the racer (rpmFrac, cut, limiterT, braking, nitroLeft, and the launch traction sums).
-import { duckEngine, isMuted, live, newEngine, tone } from './audio';
+import { duckEngine, isMuted, live, newEngine, noise, tone } from './audio';
 import { music } from './audio-api';
 import type { EngineVoice, PartLike } from './audio-engine';
 import { EngineVoice as Voice, resolveEngine, runScript } from './audio-engine';
@@ -15,6 +15,7 @@ import { drivetrainFor } from './data/drivetrain';
 import { RACE, trackLength, type CarId } from './data/tables';
 import { segmentAt, type RaceSim, type Racer } from './core/race';
 import { rivalLook } from './data/rivalCars';
+import { nitroEnvelope, nitroStyleOf, type NitroSoundKind } from './ui/nitroSequence';
 
 const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 
@@ -58,8 +59,104 @@ export function readFrame(sim: RaceSim, p: Racer = sim.player): RaceAudioFrame {
   };
 }
 
+/**
+ * The nitro sequence's sound (Redline): an ignition per car type the moment the sim accepts a boost, then a sustained
+ * layer whose level follows the same envelope as the picture (nitroEnvelope of the sim's nitroLeft), so it swells,
+ * holds and dies away exactly with the boost. Combustion cars roar (low filtered rush and a rumble pitched to the
+ * engine), the light-trail hybrids jet (a rising band-passed whoosh and a glassy tone), the Tempest whines (rising
+ * motor tone and crackle). A Perfect boost brightens the sustain and adds its own sting: a fast gold triad
+ * (C6 E6 G6 C7), pitched clear of the shift light (1320 Hz) and the boost-zone beep (988 Hz).
+ */
+export class NitroSound {
+  private n: { src: AudioBufferSourceNode; osc: OscillatorNode; f: BiquadFilterNode; g: GainNode; base: number } | null = null;
+  /** The level last set (tests read it). */
+  level = 0;
+
+  /** Ignition + sustain for a boost the sim just accepted. */
+  start(car: string, perfect: boolean) {
+    this.stop(0.03);
+    const L = live();
+    if (!L || isMuted()) return;
+    const st = nitroStyleOf(car);
+    try {
+      ignition(st.sound, st.pitch, perfect);
+      const { ctx: c, mix, noise: buf } = L;
+      const t = c.currentTime;
+      const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+      const f = c.createBiquadFilter();
+      const osc = c.createOscillator();
+      const og = c.createGain();
+      const g = c.createGain();
+      const bright = perfect ? 1.4 : 1;
+      let base = 0.11;
+      if (st.sound === 'roar') {
+        f.type = 'lowpass'; f.frequency.value = 900 * st.pitch * bright; f.Q.value = 0.9;
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(48 * st.pitch, t); osc.frequency.linearRampToValueAtTime(64 * st.pitch * bright, t + 1.2); og.gain.value = 0.5;
+      } else if (st.sound === 'jet') {
+        f.type = 'bandpass'; f.frequency.setValueAtTime(900 * st.pitch, t); f.frequency.exponentialRampToValueAtTime(2400 * st.pitch * bright, t + 1.2); f.Q.value = 1.4;
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(520 * st.pitch, t); osc.frequency.exponentialRampToValueAtTime(880 * st.pitch * bright, t + 1.2); og.gain.value = 0.18;
+        base = 0.09;
+      } else {
+        f.type = 'highpass'; f.frequency.value = 3200; f.Q.value = 0.7;
+        osc.type = 'sine'; osc.frequency.setValueAtTime(700 * st.pitch, t); osc.frequency.exponentialRampToValueAtTime(1900 * st.pitch * bright, t + 1.4); og.gain.value = 0.55;
+        base = 0.07;
+      }
+      g.gain.setValueAtTime(0.0001, t);
+      src.connect(f); osc.connect(og).connect(f); f.connect(g).connect(mix.sfx);
+      src.start(t); osc.start(t);
+      this.n = { src, osc, f, g, base: base * (perfect ? 1.25 : 1) };
+    } catch { this.stop(); }
+  }
+
+  /** Follow the boost envelope (0..1). */
+  set(level: number) {
+    this.level = level;
+    const n = this.n;
+    if (!n) return;
+    try { n.g.gain.setTargetAtTime(Math.max(0.0001, n.base * level), n.g.context.currentTime, 0.03); } catch { /* optional */ }
+  }
+
+  /** Fade out and release (the boost ended, the line, pause-and-leave, retry, close). */
+  stop(fade = 0.08) {
+    this.level = 0;
+    const n = this.n;
+    this.n = null;
+    if (!n) return;
+    try {
+      const t = n.g.context.currentTime;
+      n.g.gain.cancelScheduledValues(t);
+      n.g.gain.setTargetAtTime(0.0001, t, fade / 3);
+      n.src.stop(t + fade + 0.05); n.osc.stop(t + fade + 0.05);
+    } catch { /* already stopped */ }
+  }
+
+  get playing() { return !!this.n; }
+}
+
+/** The ignition: a whoomp per car type; a Perfect boost adds its sting. */
+function ignition(kind: NitroSoundKind, pitch: number, perfect: boolean) {
+  if (kind === 'roar') {
+    noise(0.45, perfect ? 0.42 : 0.32, 0, 700 * pitch, 'lowpass');
+    tone(110 * pitch, 0.32, 'sine', 0.2, 0, 42 * pitch);
+    tone(70 * pitch, 0.5, 'sawtooth', 0.06, 0.02, 120 * pitch);
+  } else if (kind === 'jet') {
+    noise(0.6, perfect ? 0.34 : 0.26, 0, 1800 * pitch, 'bandpass');
+    tone(330 * pitch, 0.5, 'triangle', 0.08, 0, 990 * pitch);
+    tone(90, 0.25, 'sine', 0.14, 0, 50);
+  } else {
+    tone(240, 0.6, 'sawtooth', 0.05, 0, 2400);
+    tone(480, 0.5, 'sine', 0.08, 0.01, 3000);
+    for (let i = 0; i < 4; i++) noise(0.03, 0.18, 0.04 + i * 0.07, 5200, 'highpass'); // crackle of current
+    tone(90, 0.22, 'sine', 0.12, 0, 55);
+  }
+  if (perfect) [1046, 1318, 1568, 2093].forEach((f, i) => tone(f, 0.28 - i * 0.03, 'sine', 0.085, 0.03 + i * 0.045));
+}
+
 export class RaceAudio {
   private v: EngineVoice | null = null;
+  /** The nitro layer (ignition + sustain), driven from frame(). */
+  readonly nitro = new NitroSound();
+  private nitroSeen = 0;
   private lastIntensity = -1;
   private lastIntensityT = 0;
   private done = false;
@@ -86,7 +183,9 @@ export class RaceAudio {
 
   /** Every frame while the race runs (the sim stepped this frame). */
   frame() {
-    if (!this.v || this.v.stopped || this.done) return;
+    if (this.done) return;
+    this.nitroFrame();
+    if (!this.v || this.v.stopped) return;
     try {
       const f = readFrame(this.sim);
       this.v.set(f);
@@ -102,8 +201,21 @@ export class RaceAudio {
     } catch { this.stop(); }
   }
 
+  /** The nitro layer from the sim's boost state: ignition on the step a boost is accepted, sustain on its envelope. */
+  private nitroFrame() {
+    const p = this.sim.player;
+    if (this.sim.nitroUsed !== this.nitroSeen) {
+      this.nitroSeen = this.sim.nitroUsed;
+      if (p.nitroLeft > 0) this.nitro.start(p.car, p.nitroMul > 1);
+    }
+    const lvl = p.finishTime === null ? nitroEnvelope(p.nitroLeft) : 0;
+    if (lvl > 0) this.nitro.set(lvl);
+    else if (this.nitro.playing) this.nitro.stop();
+  }
+
   /** The player crossed the line: lift, coast down to idle and switch off. */
   finish() {
+    this.nitro.stop(0.2);
     if (!this.v || this.v.stopped || this.done) return;
     this.done = true;
     try {
@@ -120,6 +232,7 @@ export class RaceAudio {
 
   /** Race over, left or paused for good: nothing keeps sounding. */
   stop() {
+    this.nitro.stop(0.05);
     this.v?.stop(undefined, 0.3);
     this.v = null;
   }

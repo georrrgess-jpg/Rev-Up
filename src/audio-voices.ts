@@ -117,4 +117,6 @@ export const ENGINES: Record<string, EngineSpec> = {
     cut: [600, 2400], q: 1.6, formants: [[320, 5, 1.6], [1200, 4, 2]], drive: 2.4, rasp: 0.32, raspHz: 1500, crackle: 0.3, gain: 0.96 },
 };
 
+// 1.10 Redline (Progression, marked): the Kestrel 1600 R is the Kestrel's four, louder and rawer (straight-cut, more rasp)
+ENGINES.kestrelr = { ...ENGINES.tuner, layout: 'I4 high-rev, race build', drive: 3.0, rasp: 0.6, raspHz: 3400, crackle: 0.4, gain: 1.16 };
 export const engineFor = (car: string): EngineSpec => ENGINES[car] ?? ENGINES.beater;

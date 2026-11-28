@@ -111,7 +111,8 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
     if (goal && a && !(a.kind === 'race' && a.eventId === r.eventId)) next = { label: a.label, sub: goal.missing, run: () => { close(); runGoalAction(app, a); } };
   }
   // the race screen's own coach line already says what to try: no second copy of it
-  const coached = !why && !s.pendingReveal && !!o.extras?.some((x) => x.classList.contains('race-coach') || !!x.querySelector?.('.race-coach'));
+  // (1.10: the race's own "why" row — splits, exit speeds and one suggestion — counts too: notices never stack)
+  const coached = !why && !s.pendingReveal && !!o.extras?.some((x) => x.classList.contains('race-coach') || x.classList.contains('cx-why') || !!x.querySelector?.('.race-coach, .cx-why'));
   const advice = why ? why.suggestion.text : s.pendingReveal ? nextText : r.advice || hintFor(s, 'results')?.text || nextText;
 
   const card = h('div', { class: `card${tierCls}`, role: 'dialog', 'aria-label': 'Race result' },

@@ -43,6 +43,7 @@ import {
   upgradeCost, upgradeLock,
 } from './progression';
 import { autoTradePick } from './shelf';
+import { prizeText, redlineView } from './rivalRuns';
 import type { GameState } from './state';
 
 export type GoalAction = { label: string } & (
@@ -52,12 +53,14 @@ export type GoalAction = { label: string } & (
   | { kind: 'workshop'; area: 'engine' | 'wheels' | 'body' | 'tuning' }
   | { kind: 'merge' }
   | { kind: 'shelf' }
-  | { kind: 'upgrade'; id: UpgradeId });
+  | { kind: 'upgrade'; id: UpgradeId }
+  /** 1.10: a Redline Series step (open its brief in the Race menu: car choice, rule, prize). */
+  | { kind: 'run'; runId: string });
 
 export interface GoalStage { label: string; done: boolean; reward: string }
 export interface Goal {
   key: string;
-  kind: 'car' | 'challenge';
+  kind: 'car' | 'challenge' | 'series';
   title: string;
   car?: CarId;
   why: string;
@@ -191,13 +194,32 @@ function challengeGoal(s: GameState): Goal | null {
     progress: c.total ? c.have / c.total : 0, stages: [{ label: what, done: false, reward: 'Cash and crates, once' }], sessionMilestone: what, action, recommended: false };
 }
 
-/** Every sensible target now: each car you can chase (two at a branch), and one challenge. */
+/** 1.10 Redline Series: the chain as a goal (open and not finished): the reward car, the steps, the next step. */
+function seriesGoal(s: GameState): Goal | null {
+  const v = redlineView(s);
+  if (!v.open || v.reward.owned || !v.next) return null;
+  const n = v.next;
+  return {
+    key: 'series:redline', kind: 'series', title: v.name, car: v.car,
+    why: `Five steps, each a different skill or build choice, each with a prize you can use at once. ${v.reward.role}`,
+    reward: `The ${v.reward.model} (T${v.reward.cap}), an earned car you can't buy`,
+    missing: `Step ${n.series!.step} of ${v.of}: ${n.goal}`, progress: v.done / v.of,
+    stages: [...v.steps.map((x) => ({ label: `${x.step}. ${x.run.name}`, done: x.done, reward: x.prize }))],
+    sessionMilestone: `${n.name} → ${prizeText(n.prize)}`,
+    action: { kind: 'run', runId: n.id, label: `Redline ${n.series!.step}/${v.of} · ${n.name}: ${n.goal}` },
+    recommended: false,
+  };
+}
+
+/** Every sensible target now: each car you can chase (two at a branch), the Redline Series, and one challenge. */
 export function goalOptions(s: GameState): Goal[] {
   const rec = recommendedCar(s);
   const cars = chaseableCars(s).map((c) => carGoal(s, c, c.id === rec?.id));
+  const series = seriesGoal(s);
   const ch = challengeGoal(s);
-  if (ch && !cars.length) ch.recommended = true;
-  return [...cars, ...(ch ? [ch] : [])];
+  if (series && !cars.length) series.recommended = true;
+  else if (ch && !cars.length) ch.recommended = true;
+  return [...cars, ...(series ? [series] : []), ...(ch ? [ch] : [])];
 }
 
 /** The goal in force: the player's pick while it is still an option, else the recommendation. */
