@@ -972,7 +972,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .guide .refresher ol { padding-left: 20px; margin: 6px 0 10px; }
 .guide .refresher li { margin: 3px 0; }
 /* a coach instruction with nothing to acknowledge: one row, Skip beside the text */
-.coach.solo { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; }
+.coach.solo:not([hidden]) { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; }
 .coach.solo .coach-text { flex: 1; }
 .coach.solo .coach-actions { margin-top: 0; flex: none; }
 .coach.solo .coach-btn.subtle { padding: 0 6px; max-width: 76px; line-height: 1.1; white-space: normal; }
