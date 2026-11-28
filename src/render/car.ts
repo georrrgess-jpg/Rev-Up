@@ -2761,8 +2761,10 @@ function drawCached(ctx: CanvasRenderingContext2D, id: string, x: number, y: num
   const f = w / W;
   const key = [id, paint, trim, o.livery ?? '', W, styleKey(o.style)].join('|');
   let s = spriteCache.get(key);
-  if (!s) {
-    if (spriteCache.size > 48) spriteCache.clear();
+  if (s) { spriteCache.delete(key); spriteCache.set(key, s); } // most recently used goes last
+  else {
+    // evict the least recently used sprites only (a full clear made a zooming launch rebuild every car at once)
+    while (spriteCache.size >= 96) spriteCache.delete(spriteCache.keys().next().value!);
     const k = W / d.L;
     const pad = Math.ceil(k * 0.6);
     const mk = () => {

@@ -916,3 +916,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .result .next { margin-bottom: 8px; }
 .result .next-act { overflow: hidden; }
 .result .next-act .stack { max-width: 100%; min-width: 0; }
+
+/* Race menu: on short phones the competition strip is one compact, swipeable row so the recommended event and its
+   Race button stay above the fold */
+@media (max-height: 720px) {
+  .comp-strip { display: flex; overflow-x: auto; scrollbar-width: none; gap: 6px; margin: 0 0 6px; padding-bottom: 2px; }
+  .comp-strip::-webkit-scrollbar { display: none; }
+  .comp-strip .cs-item { flex: 0 0 auto; max-width: 62%; min-height: 44px; padding: 4px 10px; }
+  .comp-strip .cs-item > span, .comp-strip .cs-pips { display: none; }
+  .comp-strip .cs-item b { font-size: var(--fs-sm); }
+}

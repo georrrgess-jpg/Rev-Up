@@ -39,7 +39,7 @@ function competitionStrip(s: GameState, jump: (eventId: string) => void): HTMLEl
   }
   if (c.series) items.push(h('div', { class: 'cs-item series' }, h('small', {}, c.series.name), h('b', { class: 'num' }, `Round ${c.series.round}/${c.series.of}`),
     c.series.points !== undefined ? h('span', {}, `${c.series.points} pts${c.series.leader ? ` · leader ${c.series.leader}` : ''}`) : null));
-  if (c.ghost && (c.ghost.text || c.ghost.best)) items.push(h('div', { class: 'cs-item ghost' }, h('small', {}, 'Best vs ghost'),
+  if (c.ghost && (c.ghost.text || c.ghost.best)) items.push(h('div', { class: 'cs-item cs-ghost' }, h('small', {}, 'Best vs ghost'),
     h('b', { class: 'num' }, c.ghost.text ?? `${c.ghost.best!.toFixed(2)} s`)));
   if (!items.length) return null;
   return h('section', { class: 'comp-strip', 'aria-label': 'Competition progress' }, ...items);

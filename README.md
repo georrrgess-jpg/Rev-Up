@@ -1,10 +1,22 @@
 # Rev Up
 
-An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Tapeback 1.1**) through muscle, grand tourers, rally and endurance cars to three Azure Riviera supercars and the flagship **Sovereign**.
+An original, portrait-first, installable mobile web game. Merge parts on a workbench, race for cash and reputation, and fill a showroom one earned car at a time — from a taped-up scrapyard hatchback (the **Tapeback 1.1**) through muscle, grand tourers, rally and endurance cars to six supercars: the Ardent Spyder, Vireo 9R, Mako TT, Meridian LT, the flagship **Sovereign** and the electric **Tempest E4**.
 
 - **Play:** https://georrrgess-jpg.github.io/Rev-Up/ (once GitHub Pages is enabled — see [Publishing](#publishing))
 - **Stack:** TypeScript + Vite, DOM/CSS for menus and the board, Canvas 2D for the race, reveal and car art, synthesized WebAudio (engines and an original soundtrack, generated at runtime: no audio files). No backend, no account, no runtime dependencies.
-- **Size:** ~180 KB JS + 22 KB CSS gzipped (the title screen is a separate ~3 KB chunk), plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+- **Size:** ~222 KB JS + 25 KB CSS gzipped (the title screen is a separate ~4 KB chunk), plus one bundled typeface (Barlow, three weights, ~68 KB woff2, SIL OFL); all art is drawn in code (no image downloads except the app icons).
+
+## Update 1.9 · Circuit
+
+- **A direction every session.** One **Next Goal** on the Garage home: the reward, the requirement still missing, and one button that goes straight to the right race, craft, order, Workshop area, Parts Shelf or upgrade. Tap the card for why it's worth chasing, the stages, what you can reach this session, an alternate route, and **Change goal** (any chaseable car or a challenge). Hints differ per screen instead of repeating.
+- **Unlocks in paid stages.** Every car from the Vexa GTi on unlocks in stages, each paid once: halfway Rep (a part two tiers under the keystone), the keystone crafted (a free Tune-up stage for the car you drive), a top 3 in the unlock race (scrap for two race kits), and link stages (e.g. win the Esplanade GP: a T8 Turbo toward the Halcyon). Three live podiums count as a stalled unlock race done. Measured (simulation, clean / mixed / weak): longest stretch without a reward 8:53 / 10:30 / 6:53 → 5:01 / 4:58 / 5:18 min; Strata GTR stretch 11.8 / 14.9 min → split in two by the Ardent (about 7 + 6); Mako TT 8.7 / 9.6 / 12.8 → 3.5 / 3.8 / 5.0 min; weak player Ironhorse 21.6 → 13.6, Kestrel 21.6 → 11.3 min. Rep thresholds trimmed (Vexa 520, Ironhorse 1,650, Strata 8,800, Halcyon 13,500, Mako 18,000, Sovereign 22,500).
+- **Parts Shelf.** Parts above your car's cap go to storage from the board (**Store**, which names the car that can use them) and come back when there's room. Surplus has immediate uses, each previewed: trade toward an ingredient your car can use, pay part of a Garage upgrade, or recycle toward a priced scrap order. Fitted and starred parts are protected; crafted credit is kept; no duplication or self-funding loops (tested).
+- **Garage upgrade paths.** Bench (6×7 board → Merge All by family → Merge All banks nitro), Parts Shelf (4 → 10 → 16 with overflow → 24 with one-tap store → 36) and Workshop counter (10% off orders → Polished orders → better trade-ins → 20% off), with later ranks opening at the Ironhorse, Altamar, Corvo, Lumen and Vireo. The Shop's Garage tab shows current benefit, next benefit, exact price and lock together; spare parts can pay part of a rank.
+- **Competition.** A 10-rung **rival ladder** with named opponents, each fast on particular courses (shown before you race), ending with a boss; the **Heritage Cup**, an 8-round class series for earlier cars (prizes at 3, 5 and 8 wins); **time trials against your personal-best ghost** (a translucent BEST car and a live delta); one-time skill awards (perfect launch, clean sweep, flawless, beat your ghost, launch control). Results explain close finishes from race data ("Lost 0.4 s in the hairpins: grip 2.31 vs Anouk's 2.48") and suggest a fix. One-tap restart; quick retries.
+- **Race drama.** Tighter camera on launches, passes and the finish; start gantry lights, grandstands, marshals, finish boards and a chequered finish gantry; audible nearest rivals; three new courses (Harbour Esplanade, Lagoon Causeway, Airfield Sprint) with their own scenery; the start curtain hides the scene build, so tapping Race reaches the first race frame in ~220 ms instead of ~410 ms (4× slowed phone).
+- **Three more supercars.** **Ardent Spyder** (featherweight open-top track car; beside the Halcyon after the Strata; wins the Esplanade GP), **Meridian LT** (long-tail highway car; beside the Sovereign; wins the Causeway Run) and **Tempest E4** (four-motor electric flagship with **launch control**: tap ⚡LAUNCH on GO; the last car; wins Launch Control). Each has its own proportions, wheels, lamps, engine voice, signature finish and reveal. All six supercars win their own course in clean, ordinary and missed shifting.
+- **Presentation.** A cinematic title (a tracking shot along the Tempest with a light sweep and flare, then the wordmark and Play; return launches ~1.4 s); the Garage leads with the goal and the board, and a picked-up part offers Fit · Store · Recycle; the Workshop sits in a detailed service bay; the Race menu leads with the recommended event, its reward and one Race button (rules behind a tap); results show one reward block and the next useful step; the Showroom gives the car the screen, with Customize, Compare and Race. Existing cars got layered lamps, richer paint and fixed nose details.
+- **Smoother.** Merges no longer force layouts (4× slowed phone: drag merge response ~170–190 → ~80–105 ms); the Workshop's hood eases in 0.4 s; the tips overlay no longer rebuilds every race frame; car sprites are evicted least-recently-used instead of all at once.
 
 ## Update 1.8 · Master update
 
@@ -199,13 +211,17 @@ src/render/            original car silhouettes (Canvas), part illustrations (SV
 src/audio*.ts          engine synthesis (audio-engine), per-car voices, race sync (audio-race), soundtrack (audio-music), API (audio-api)
 src/ui/mechanic.ts     the Mechanic Shop service bay; src/ui/intro.ts the title screen
 src/core/milestones.ts next milestone and earned-vs-wallet summary; src/core/purchases.ts exact price/benefit/lock for every purchase
+src/core/goals.ts      Next Goal: goal options, the recommended goal and its action, per-screen hints
+src/core/shelf.ts      Parts Shelf: store/return, earliest car per part, trade / contribute / recycle-toward
+src/core/circuit.ts    rival ladder, Heritage Cup, ghosts, milestones, competitionSummary, explainFinish (data: src/data/circuit.ts)
+src/render/bay.ts      the Workshop service bay; src/render/revealFx.ts signature reveals
 src/sw/sw-template.js  service worker template; vite.config.ts fills in the version and asset list
 src/dev.ts             dev-only late-state presets (stripped from production builds)
 tests/                 rules, race, progression/save tests and the playthrough bot
 scripts/               icons, static server, smoke, perf, input checks, gh-pages publish
 ```
 
-**Dev shortcuts** (only in `npm run dev`, never in production): `?dev=beater-ready | ray | muscle-ready | late | desert | summit | finale | riviera | super1 | super2 | flagship | full | fullx | cascade | offline | reveal` (`?intro` forces the title screen in automated browsers) loads a late or edge-case state, and `&seed=123` fixes the RNG.
+**Dev shortcuts** (only in `npm run dev`, never in production): `?dev=beater-ready | ray | muscle-ready | late | desert | summit | finale | slow | riviera | super1 | super2 | ardent | meridian | flagship | tempest | shelf | full | fullx | cascade | offline | reveal` (`?intro` forces the title screen in automated browsers) loads a late or edge-case state, and `&seed=123` fixes the RNG.
 
 ## Tuning knobs
 
@@ -256,6 +272,15 @@ Source lives on the development branch; the compiled site is published to a dedi
 ## Verification results
 
 Environment: Linux cloud container, Node 22, headless Chromium (Playwright), production build. **No physical phone was available**; every device number below is emulation.
+
+### 1.9 · Circuit
+
+- **Tests:** 317 passing, 13 probes skipped. New: `garage-paths` (26: branches, goals and hints, stages, persistence route, the shelf, no-loop and protection checks, upgrade ranks, migration), `circuit` (12: ladder, series, ghosts, milestones, clean vs missed on the same event, a fitting part/tune changes the result, home-course wins), `art` (+3), and the bot/economy audit/playthrough now run to the Tempest.
+- **Release checks:** build, smoke 22/22, input 24/24.
+- **Integrated path** (390×844, the old slow stretch `?dev=slow`): the goal card named the Ardent Spyder and what was missing; a T9 Engine on the board offered "Store for Halcyon" and went to the shelf; the goal's button picked up the Turbos, and crafting the T8 paid its stage (a free Tune-up stage, toast shown); the goal moved to "Race Summit 1000"; a 2nd place there paid the Halcyon's podium stage (512 scrap) and the goal advanced. Full Ardent unlock: reveal with its signature moment, active car, goal moved to the Halcyon; on its home course with fresh T8 parts it took 2nd by thousandths with 12/12 clean shifts, and the result explained the gap. No page errors.
+- **Layout pass** (320×568, 390×844, 1280×800; title, Garage incl. full 6×7, a $90k crowd and a picked-up over-cap part, Shelf, Shop Garage tab, goal sheet, all Workshop areas, Race menu, Pit Setup, jobs, Settings, Showroom, reveal, live HUD, results): fixed the "Best vs ghost" card escaping to the screen edge (a class clash with the race ghost) and made the competition strip one compact row on short phones so the recommended race's button stays above the fold.
+- **Performance** (production build, 4× CPU, 390×844): tap merges p50 144 ms, drag merges p50 80 ms; Workshop open/close long tasks 290 ms total; tap Race → first frame 220 ms (was 412); mid-race frames 17 ms median. The launch (first 2 s) still has more frames over 50 ms than 1.8 (about 21–25 vs 15) from the launch smoke and close-up camera.
+- **Not run:** real phones and speakers.
 
 ### 1.8 · Master update
 
