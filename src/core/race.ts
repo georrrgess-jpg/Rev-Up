@@ -251,6 +251,8 @@ export const SHIFT = {
   minTap: 0.45,
   /** No second shift within this many seconds. */
   debounce: 0.25,
+  /** After a tap before green, taps are ignored this long, so mashing SHIFT is never quicker than waiting for green. */
+  fumbleGuard: 0.12,
   /** After an automatic downshift the cue stays off this long (the "↓3" notice shows), then the new gear's attempt. */
   settleS: 0.25,
   /** Practice race: the green band opens this much lower. */
@@ -305,6 +307,8 @@ export class RaceSim {
   nitroTaps: number[] = [];
   private pendingCost = 0;
   private lastShiftT = -1;
+  /** The last tap made before the green window (a fumble: no gear change). */
+  private fumbleT = -1;
   /** Sim time of the player's last braking downshift. */
   private lastDownT = -1;
   private attemptSeq = 0;
@@ -555,12 +559,19 @@ export class RaceSim {
   tapShift(): ShiftGrade | 'top' | 'busy' | 'wait' | 'hold' {
     const p = this.player;
     const a = this.attempt;
-    if (this.done || p.finishTime !== null || p.cut > 0 || p.v < 1 || this.t - this.lastShiftT < SHIFT.debounce) return 'busy';
+    if (this.done || p.finishTime !== null || p.cut > 0 || p.v < 1 || this.t - this.lastShiftT < SHIFT.debounce || this.t - this.fumbleT < SHIFT.fumbleGuard) return 'busy';
     if (this.topGear(p)) return 'top';
     if (a.cue === 'hold') return 'hold';
     const f = a.f;
-    if (f < SHIFT.minTap) return 'wait';
     const [lo, hi] = a.band;
+    // Nothing shifts before the green window opens: a tap while the light is off or still filling ("soon") is a
+    // fumble, not a gear change. It also arms a short guard (fumbleGuard), so mashing SHIFT can't catch the opening green
+    // any sooner than a player who waits for it.
+    // (the launch holds the revs inside the band before the first window opens: only the cue decides, not the rpm)
+    if (f < SHIFT.minTap || (a.cue !== 'green' && a.cue !== 'late')) {
+      this.fumbleT = this.t;
+      return 'wait';
+    }
     // the green the player sees is clean to tap (including a green caught by braking, inside its grace)
     const grade: ShiftGrade = a.cue === 'green' || (f >= lo && f <= hi) ? 'clean' : f < lo ? 'early' : 'late';
     this.upshift(p, grade);

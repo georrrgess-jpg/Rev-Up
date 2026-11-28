@@ -69,7 +69,11 @@ describe('timed shifting', () => {
     expect(sim.tapShift()).toBe('busy'); // mid-shift
     while (sim.rpmFrac(sim.player) < SHIFT.minTap + 0.02 || sim.player.cut > 0) sim.step();
     for (let k = 0; k < 20; k++) sim.step();
-    expect(sim.tapShift()).toBe('early');
+    // before the window opens a tap is a fumble: no gear change (it used to shift early)
+    const g = sim.player.gear;
+    expect(sim.tapShift()).toBe('wait');
+    expect(sim.player.gear).toBe(g);
+    for (let k = 0; k < 12; k++) sim.step(); // past the fumble guard
     while (sim.shiftCue() !== 'late') sim.step();
     expect(sim.tapShift()).toBe('late');
   });
