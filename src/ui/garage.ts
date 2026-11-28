@@ -156,7 +156,9 @@ export class GarageView implements View {
     // the board takes what is left; the spare rack (0.8 of a cell, plus its frame) sits under it
     const H = body.clientHeight - fixed;
     const cellH = (H - pad - gap * (s.rows - 1) - 14) / (s.rows + 0.8);
-    const cell = Math.max(40, Math.min(88, Math.floor(Math.min(cellW, cellH))));
+    // a 7-row bench on a very short phone may go to 36 px so the whole board shows without scrolling (CSS matches)
+    const floor = s.rows >= 7 && window.innerHeight <= 660 ? 36 : 40;
+    const cell = Math.max(floor, Math.min(88, Math.floor(Math.min(cellW, cellH))));
     this.el.style.setProperty('--cell', `${cell}px`);
     // small cells: quality tags shrink to a glyph and the art fills more of the tile
     this.el.classList.toggle('cells-sm', cell < 50);

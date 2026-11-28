@@ -277,3 +277,34 @@ html, body { overflow: clip; overscroll-behavior: none; }
 .btn.tool .count { left: auto; right: 4px; top: 4px; }
 .btn.tool .dot { left: auto; right: 7px; top: 7px; }
 .carcard { overflow: clip; }
+/* a full 6×7 bench on a very short phone: cells may go to 36 px so the whole board shows above the spare rack */
+@media (max-height: 660px) {
+  .garage .garage-body:has(.board > .cell:nth-child(31)) { --board-min: calc(7 * 36px + 6 * var(--gap) + 8px); }
+  .garage .garage-body:has(.board > .cell:nth-child(31)) .boardwrap .board {
+    --cell: min(var(--cell-js), calc((100cqw - 10px - var(--gap) * (var(--cols) - 1)) / var(--cols)), max(36px, calc((100cqh - 8px - var(--gap) * (var(--cols))) / (var(--cols) + 1))));
+    padding: 3px;
+  }
+}
+@media (max-height: 660px) {
+  .garage .garage-body:has(.board > .cell:nth-child(31)) { padding-top: 0; }
+  .garage .garage-body:has(.board > .cell:nth-child(31)) > .goal-row { margin-bottom: 2px; }
+  .garage .garage-body:has(.board > .cell:nth-child(31)) > .carrow { margin-bottom: 1px; }
+}
+.garage .goal-row > .jobs-pill[hidden] { display: none; }
+/* results on short phones: a tighter payoff block so Garage / Race again stay near the fold */
+@media (max-height: 700px) {
+  .result .card { padding: 12px; }
+  .result .place { font-size: var(--fs-2xl); }
+  .result .gap { margin: 2px 0 8px; }
+  .result .gap .gap-main { font-size: var(--fs-md); }
+  .result .rewards { padding: 8px; }
+  .result .rewards .pays { gap: 4px; margin-bottom: 6px; }
+  .result .rewards .pays .chip { padding: 3px 7px; font-size: var(--fs-xs); min-height: 0; }
+  .result .reward-more > summary { min-height: 36px; }
+  .result .btns { flex-wrap: nowrap; }
+  .result .btns .btn { min-width: 0; font-size: var(--fs-xs); padding-inline: 6px; }
+}
+.race-view .racehead .head-stats { flex-wrap: nowrap; }
+.race-view .racehead .stats { min-width: 0; }
+.race-view .racehead .stats strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 359px) { .race-view .racehead > .btn .bl { display: none; } .race-view .racehead > .btn { min-width: 44px; padding-inline: 8px; } .race-view .racehead canvas { width: 72px; } }

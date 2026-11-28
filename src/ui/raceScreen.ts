@@ -898,7 +898,8 @@ export class RaceScreen {
     const roadTop = roadBot - Math.min(H * 0.36, W * 0.8);
     const horizon = roadTop - H * 0.09;
 
-    const sv: SceneView = { ctx, W, H, dpr: this.dpr, horizon, roadTop, roadBot, camX, ppm, t: sim.t, theme, trackId: sim.track.id, reduced: this.reduced };
+    const sv: SceneView = { ctx, W, H, dpr: this.dpr, horizon, roadTop, roadBot, camX, ppm, t: sim.t, theme, trackId: sim.track.id, reduced: this.reduced,
+      light: this.quality === 0 || !!this.app.game.state.settings.lightFx }; // [scenery] lighter effects thin the scenery's live particles
     drawBackdrop(sv);
     const pal = roadColors(theme);
 

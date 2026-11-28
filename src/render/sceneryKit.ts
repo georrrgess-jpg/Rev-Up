@@ -103,16 +103,27 @@ export function container(k: Kit, x: number, yb: number, w: number, h: number, c
   if (mark && w > 30 * u) { c.fillStyle = 'rgba(255,255,255,0.75)'; c.fillRect(x + w * 0.18, yb - h * 0.62, w * 0.34, h * 0.18); }
 }
 
-/** A crushed car cube: a squashed slab of paint with a window band, rust and a flattened wheel. x = left edge. */
+/** A crushed car cube: a squashed slab of paint with a glass band, a pillar, a door seam, squashed wheel arches and
+ *  a chrome bumper end. x = left edge. */
 export function carCube(k: Kit, x: number, yb: number, w: number, h: number, col: string, seed: number) {
   const { c, u } = k;
   rect(c, x, yb - h, w, h, col);
-  rect(c, x, yb - h, w, 1.2 * u, light(col, 0.35));
-  rect(c, x + w * 0.12, yb - h * 0.72, w * 0.7, h * 0.22, 'rgba(30,40,55,0.75)');
-  c.fillStyle = 'rgba(120,60,30,0.45)';
-  if (hash(seed) > 0.4) c.fillRect(x + w * hash(seed * 3) * 0.6, yb - h * 0.4, w * 0.22, h * 0.3);
-  ell(c, x + w * (0.2 + hash(seed * 5) * 0.6), yb - h * 0.2, w * 0.1, h * 0.14, '#1b1716');
-  rect(c, x, yb - h * 0.45, w, 0.8 * u, 'rgba(0,0,0,0.3)');
+  rect(c, x, yb - h, w, Math.max(1, 1.2 * u), light(col, 0.35));
+  const flip = hash(seed * 1.3) > 0.5;
+  // glass band with a pillar
+  rect(c, x + w * 0.16, yb - h * 0.82, w * 0.62, h * 0.28, 'rgba(28,38,52,0.85)');
+  rect(c, x + w * (flip ? 0.36 : 0.5), yb - h * 0.82, w * 0.06, h * 0.28, col);
+  rect(c, x + w * 0.18, yb - h * 0.8, w * 0.2, h * 0.07, 'rgba(255,255,255,0.25)');
+  // door seam and a crease where it folded
+  rect(c, x + w * 0.46, yb - h * 0.54, 0.8 * u, h * 0.5, dark(col, 0.35));
+  rect(c, x, yb - h * 0.46, w, 0.8 * u, 'rgba(0,0,0,0.28)');
+  // squashed wheel arches
+  c.fillStyle = '#16120f';
+  c.beginPath(); c.ellipse(x + w * 0.2, yb, w * 0.11, h * 0.3, 0, Math.PI, 0); c.ellipse(x + w * 0.8, yb, w * 0.11, h * 0.3, 0, Math.PI, 0); c.fill();
+  // bumper and a rust patch
+  rect(c, flip ? x : x + w - 1.6 * u, yb - h * 0.45, 1.6 * u, h * 0.3, '#cfd3d6');
+  if (hash(seed * 2.7) > 0.45) rect(c, x + w * (0.55 + hash(seed * 3) * 0.3), yb - h * 0.42, w * 0.12, h * 0.22, 'rgba(130,60,25,0.55)');
+  rect(c, x, yb - h, 1 * u, h, dark(col, 0.3));
 }
 
 /** A stack of crushed car cubes, x = centre. */
@@ -144,20 +155,23 @@ export function tyrePile(k: Kit, x: number, yb: number, s: number, n: number) {
   }
 }
 
-/** A race-track tyre wall: rows of tyres with painted bands, from x0 to x1 (bold red/white or any two colours). */
+/** A race-track tyre wall: columns of stacked tyres seen side-on, with a belt across the front painted in bold
+ *  alternating blocks (colA / colB), from x0 to x1. r = tyre half-width. */
 export function tyreWall(k: Kit, x0: number, x1: number, yb: number, r: number, rows: number, colA: string, colB: string) {
-  const { c } = k;
-  rect(c, x0, yb - rows * r * 1.8, x1 - x0, rows * r * 1.8, '#141213');
-  for (let row = 0; row < rows; row++) {
-    const cy = yb - r - row * r * 1.8;
-    for (let x = x0 + r + (row % 2) * r; x < x1; x += r * 2.05) {
-      const band = Math.floor((x - x0) / (r * 8)) % 2 ? colA : colB;
-      disc(c, x, cy, r, '#1d1b1c');
-      c.fillStyle = band; c.fillRect(x - r, cy - r * 0.25, r * 2, r * 0.5);
-      disc(c, x, cy, r * 0.42, '#0e0d0d');
-    }
-  }
-  rect(c, x0, yb - rows * r * 1.8 - 0.5 * r, x1 - x0, 0.6 * r, k.rim);
+  const { c, u } = k;
+  const th = r * 0.95, top = yb - rows * th;
+  rect(c, x0, top, x1 - x0, rows * th, '#121011');
+  // one path for every tyre, one fill (hundreds of tyres per tile)
+  c.fillStyle = '#242122'; c.beginPath();
+  for (let x = x0; x < x1; x += r * 2) for (let row = 0; row < rows; row++) c.roundRect(x + 0.5 * u, top + row * th + 0.5 * u, r * 2 - 1 * u, th - 1 * u, th * 0.45);
+  c.fill();
+  c.fillStyle = '#0c0b0b';
+  for (let x = x0; x < x1; x += r * 2) for (let row = 0; row < rows; row++) c.fillRect(x + 2 * u, top + row * th + th * 0.3, r * 2 - 4 * u, 0.8 * u);
+  // the front belt: blocks of six tyres in alternating colours
+  const bh = th * 0.55, by = top + (rows * th - bh) / 2;
+  for (let x = x0, i = 0; x < x1; x += r * 12, i++) rect(c, x, by, Math.min(r * 12, x1 - x), bh, i % 2 ? colA : colB);
+  rect(c, x0, by, x1 - x0, 0.8 * u, 'rgba(255,255,255,0.35)');
+  rect(c, x0, top, x1 - x0, 1.2 * u, k.rim);
 }
 
 /** A wooden pallet stack, x = left. */
@@ -618,4 +632,25 @@ export function signText(c: C2, text: string, x: number, y: number, w: number, h
   c.fillText(text, x + w / 2, y + h / 2 + (asc - desc) / 2);
   c.textAlign = align;
   c.textBaseline = base;
+}
+
+// ---------------------------------------------------------------- mountains
+
+/** A mountain peak with a lit right face and a jagged snow cap, x = apex x, base = foot line. */
+export function peak(k: Kit, x: number, base: number, w: number, h: number, rock: string, snow?: string, snowFrac = 0.36) {
+  const { c } = k;
+  const L = x - w / 2, R = x + w / 2, top = base - h;
+  poly(c, [L, base, x, top, R, base], rock);
+  poly(c, [x, top, R, base, x + w * 0.06, base], light(rock, 0.14));
+  if (!snow) return;
+  const sh = h * snowFrac, f = sh / h;
+  const pts = [x, top, x + (w / 2) * f, top + sh];
+  const n = 6;
+  for (let i = 1; i < n; i++) {
+    const t = i / n, px = x + (w / 2) * f - w * f * t;
+    pts.push(px, top + sh * (i % 2 ? 0.7 : 1.08));
+  }
+  pts.push(x - (w / 2) * f, top + sh);
+  poly(c, pts, snow);
+  poly(c, [x, top, x + (w / 2) * f, top + sh, x + w * 0.02, top + sh * 0.8], light(snow, 0.5));
 }

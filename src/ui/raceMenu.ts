@@ -70,7 +70,7 @@ export class RaceView implements View {
     this.jump = h('nav', { class: 'race-jump', 'aria-label': 'Race menu sections' });
     this.el = h('section', { class: 'view race-view', 'aria-label': 'Race' },
       h('div', { class: 'racehead' }, this.headCanvas, this.head, h('span', { style: 'flex:1' }),
-        h('button', { class: 'btn sm secondary', 'aria-label': 'Change car in the Showroom', onclick: () => app.go('showroom') }, icon('showroom'), 'Change')),
+        h('button', { class: 'btn sm secondary', 'aria-label': 'Change car in the Showroom', onclick: () => app.go('showroom') }, icon('showroom'), h('span', { class: 'bl' }, 'Change'))),
       this.fitBar,
       this.jump,
       this.list);

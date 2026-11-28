@@ -157,20 +157,24 @@ function buildLayers(v: SceneView, pal: Pal, recipe: Recipe) {
   const live: Built['live'] = [];
   const rim = pal.rim ?? 'rgba(255,236,200,0.5)';
   const mk = (c: C2): Kit => ({ c, u, rim, shadow: 'rgba(0,0,0,0.22)' });
-  const paintTile = (w: number, top: number, bottom: number, par: number, paint: Parameters<RecipeBuilder['layer']>[3]): Layer => {
+  const paintTile = (w: number, top: number, bottom: number, par: number, paint: Parameters<RecipeBuilder['layer']>[3], density = 1): Layer => {
     const cv = canvas(w, bottom - top);
     const c = cv.getContext('2d')!;
     c.translate(0, -top);
     const emit: Emit[] = [];
-    const place = (n: number, fn: (x: number, r: number, k: number) => void, seed = 0) => {
+    // items wrap across the tile edge; a copy that cannot reach the tile (the widest prop spans ±220 px) is skipped
+    const M = 230 * u;
+    const place = (n0: number, fn: (x: number, r: number, k: number) => void, seed = 0) => {
+      const n = n0 > 1 ? Math.max(1, Math.round(n0 * density)) : n0;
       for (let k = 0; k < n; k++) {
         const r = hash(k * 7.3 + seed * 13.7 + 1);
         const x = ((k + 0.5 + (r - 0.5) * 0.6) / n) * w;
-        for (const o of [-w, 0, w]) fn(x + o, r, k);
+        for (const o of [-w, 0, w]) if (x + o > -M && x + o < w + M) fn(x + o, r, k);
       }
     };
     paint({
       c, k: mk(c), w, place,
+      at: (frac, fn) => { for (const o of [-w, 0, w]) if (frac * w + o > -M && frac * w + o < w + M) fn(frac * w + o); },
       emit: (e) => { if (e.x >= 0 && e.x < w) emit.push(e); },
       text: (t, x, y, bw, bh, col, maxPx, weight = 900) => signText(c, t, x, y, bw, bh, Math.min(3 * u, bh * 0.18), col, maxPx, weight, 'Barlow, system-ui, sans-serif'),
     });
@@ -178,7 +182,7 @@ function buildLayers(v: SceneView, pal: Pal, recipe: Recipe) {
   };
   const B: RecipeBuilder = {
     W, H, u, hz, rt, rb, span: rt - hz, trackId: String(v.trackId), look: v.theme as Look, pal,
-    layer: (par, top, bottom, paint, widthMul = 1.6) => { layers.push(paintTile(Math.ceil(W * widthMul), Math.max(0, Math.floor(top)), Math.ceil(bottom), par, paint)); },
+    layer: (par, top, bottom, paint, widthMul = 1.6, density = 1) => { layers.push(paintTile(Math.ceil(W * widthMul), Math.max(0, Math.floor(top)), Math.ceil(bottom), par, paint, density)); },
     fore: (paint) => {
       const fh = H - rb + 8 * u;
       if (fh > 2) fore = paintTile(Math.ceil(W * 1.4), rb, rb + fh, 1.1, (P) => { P.c.fillStyle = pal.fore; P.c.fillRect(0, rb, P.w + 2, fh); paint(P); });
