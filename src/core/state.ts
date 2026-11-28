@@ -191,9 +191,13 @@ export interface GameState {
   /** 1.9 Time trials: personal-best ghost per event (compact samples of distance over time). */
   ghosts?: Record<string, { t: number; car: CarId; d: number[] }>;
   // ---- end Scrap & surplus
-  settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean; /** 0..1, default 0.7 */ musicVol?: number; /** 0..1, default 1 */ sfxVol?: number; /** the intro has been seen once (repeat launches are quick) */ introSeen?: boolean };
+  settings: { muted: boolean; reducedMotion: boolean; nitroCue: boolean; /** 0..1, default 0.7 */ musicVol?: number; /** 0..1, default 1 */ sfxVol?: number; /** the intro has been seen once (repeat launches are quick) */ introSeen?: boolean; /** 1.10 lighter race effects (fewer particles, no heat shimmer or streaks) */ lightFx?: boolean };
   stats: { fusions: number; races: number; wins: number; mints: number; polished: number; scrapped: number; milestones: Record<string, number>; earned?: number; spent?: number };
   tips: Record<string, boolean>;
+  /** 1.10 Redline onboarding: the first-session test run, step by step (resumable; skippable). */
+  onboard?: { step: string; skipped?: boolean; done?: boolean; at?: number };
+  /** 1.10 Test & Compare: the last comparison per car (measured splits of current vs candidate build). */
+  testRuns?: Partial<Record<CarId, { at: number; event: string; a: Record<string, number>; b: Record<string, number>; parts: string }>>;
   pendingRace: { id: number; eventId: string; car: CarId; seed: number; startedAt: number } | null;
   /** Quick Race runs in the background for the race's real duration, then pays once. */
   pendingQuick: { id: number; eventId: string; car: CarId; startedAt: number; endsAt: number; outcome: LeanOutcome } | null;
