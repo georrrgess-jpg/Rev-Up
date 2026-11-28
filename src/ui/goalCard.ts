@@ -109,7 +109,9 @@ export class GoalCard {
       if (g) {
         this.setText(g.title, [h('span', { class: 'need', 'data-car': `${g.title} ·` }, g.missing)], g.progress);
         this.open.setAttribute('aria-label', `Next goal: ${g.title}. Still needed: ${g.missing}. Reward: ${g.reward}. Tap for details or to change goal.`);
-        this.act.replaceChildren(actionLabel(g.action));
+        // on the card the requirement is already shown beside the button: keep only the destination ("Race" / "Cul-de-sac Dash")
+        this.act.replaceChildren(actionLabel({ ...g.action, label: g.action.label.replace(/\s*[:·—]\s.*$/, '') }));
+        this.act.setAttribute('aria-label', g.action.label);
         this.act.setAttribute('aria-label', g.action.label);
         this.act.hidden = false;
       } else {

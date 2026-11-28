@@ -359,3 +359,7 @@
 .garage .goal .gt::before { content: 'Goal · '; color: var(--dim); }
 .garage .goal.ready .gt::before { content: none; }
 @media (max-width: 359px) { .garage .goal .gl .need::before { content: none; } }
+/* the goal button never lets its second line spill out of the button (long event names) */
+.garage .goal .goal-act { overflow: hidden; min-width: 0; }
+.garage .goal .goal-act .stack { display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
+.garage .goal .goal-act small { max-width: 100%; }
