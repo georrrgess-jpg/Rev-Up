@@ -705,7 +705,8 @@ export class RaceScreen {
     });
     // one explanation, not three: the Circuit "why" (from the splits) replaces the telemetry's own coach line
     const tel = telemetryRows(o, this.sim.windows.length).filter((x) => !(why.some((w) => w.classList.contains('cx-why')) && x.classList.contains('race-coach')));
-    return [...changeRows(this.changes), ...tel, ...why];
+    // (the first-run coach adds its own "what your part did" block: no second one beside it)
+    return [...(this.frCoach ? [] : changeRows(this.changes)), ...tel, ...why];
   }
 
   /** A win: a short burst of confetti from the finish gantry. */

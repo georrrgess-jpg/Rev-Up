@@ -29,7 +29,7 @@ describe('baseline playthrough (simulation)', () => {
       expect(m.beater).toBeLessThan(4.5 * 60);
       expect(m.hothatch).toBeGreaterThan(8 * 60);
       expect(m.hothatch).toBeLessThan(14.5 * 60);
-      expect(m.muscle).toBeGreaterThan(17 * 60);
+      expect(m.muscle).toBeGreaterThan(14 * 60); // 1.10: the Vexa stretch got the Foundry Sprint and 1,500 Rep (was 1,650)
       expect(m.muscle).toBeLessThan(26 * 60);
     }
   });

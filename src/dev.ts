@@ -120,17 +120,22 @@ export function applyPreset(game: Game, preset: string) {
       // 'slow': the old slowest stretch — the Strata GTR just won, the Ardent and the Halcyon both open (two goals),
       // Rep part-way, no T8 Turbo yet, cash for one order. 'shelf': a full Parts Shelf (rank 1, 10 parts) and a full
       // bench with over-cap parts. 'ardent' / 'meridian' / 'tempest': each new car owned and active on its build.
+      // 1.10 'redline' / 'redline5': the Redline Series open at step 1 (or with steps 1–4 done, the final next) on a
+      // Halcyon X save with the Kestrel 1600 (T6), the Corvo (T8), the Ardent (T8) and the Halcyon (T9) built
+      case 'redline':
+      case 'redline5':
       case 'slow':
       case 'ardent':
       case 'meridian':
       case 'tempest': {
-        const upTo = ({ slow: 'gt', ardent: 'ardent', meridian: 'meridian', tempest: 'tempest' } as const)[preset as 'slow'];
+        const series = preset === 'redline' || preset === 'redline5';
+        const upTo = ({ slow: 'gt', ardent: 'ardent', meridian: 'meridian', tempest: 'tempest', redline: 'proto', redline5: 'proto' } as const)[preset as 'slow'];
         const all = ENABLED_CARS.map((c) => c.id);
         s.owned = all.slice(0, all.indexOf(upTo) + 1);
         if (preset === 'slow') s.owned = s.owned.filter((c) => c !== 'ardent');
         s.activeCar = upTo; s.revealed = [...s.owned];
-        s.rep = ({ slow: 10200, ardent: 11600, meridian: 20400, tempest: 27500 } as const)[preset as 'slow'];
-        s.cash = ({ slow: 16000, ardent: 30000, meridian: 60000, tempest: 90000 } as const)[preset as 'slow'];
+        s.rep = ({ slow: 10200, ardent: 11600, meridian: 20400, tempest: 27500, redline: 14000, redline5: 14000 } as const)[preset as 'slow'];
+        s.cash = ({ slow: 16000, ardent: 30000, meridian: 60000, tempest: 90000, redline: 40000, redline5: 40000 } as const)[preset as 'slow'];
         s.scrap = 2500; s.activeS = 3600; s.nitro = 3; s.stats.races = 160;
         for (const c of s.owned) { const u = ENABLED_CARS.find((x) => x.id === c)!.unlock; if (u) for (let t = 2; t <= u.tier; t++) if (!s.crafted.includes(`${u.family}:${t}`)) s.crafted.push(`${u.family}:${t}`); }
         for (let k = 0; k < 6; k++) for (const e of EVENTS) {
@@ -138,7 +143,7 @@ export function applyPreset(game: Game, preset: string) {
           if (e.requires.car && !s.owned.includes(e.requires.car)) continue;
           if (e.requires.afterWin && !s.events[e.requires.afterWin]) continue;
           if (preset === 'tempest' && e.id === 'launch-final') continue;
-          if (preset === 'slow' && (e.id === 'summit-1000' || e.district === 'riviera')) continue;
+          if ((preset === 'slow' || series) && (e.id === 'summit-1000' || e.district === 'riviera')) continue;
           s.events[e.id] = { wins: 1, starts: 1, bestPlace: 1, bestTime: 20 };
           if (e.boss) { s.bosses.push(e.boss.rival); s.blueprints.push(e.boss.reward.blueprint); s.badges.push(e.boss.reward.badge); }
         }
@@ -147,6 +152,12 @@ export function applyPreset(game: Game, preset: string) {
         const fam: Family[] = ['engine', 'tires', 'turbo'];
         const cap = ENABLED_CARS.find((c) => c.id === upTo)!.cap;
         s.installed = { [upTo]: Object.fromEntries(fam.map((f) => [f, { id: s.nextPartId++, f, t: cap, q: 'std' as const }])) };
+        if (series) {
+          for (const [car, t] of [['tuner', 6], ['rally', 8], ['ardent', 8]] as const) s.installed[car] = Object.fromEntries(fam.map((f) => [f, { id: s.nextPartId++, f, t, q: 'std' as const }]));
+          s.rivalRuns = {};
+          if (preset === 'redline5') for (const id of ['rl-1', 'rl-2', 'rl-3', 'rl-4']) s.rivalRuns[id] = { tries: 2, best: 24, bestGap: 0.3, done: true, claimed: true };
+          if (preset === 'redline5') s.blueprints.push('Redline Red');
+        }
         s.upgrades = { ...s.upgrades, grid: 1, storage: 1, workshop: 1, printer: 3, crateTier: 3 };
         expandBoard(s);
         fill(s, preset === 'slow' ? [['turbo', 7], ['turbo', 7], ['engine', 7], ['tires', 6], ['turbo', 6]] : [['engine', cap - 1], ['tires', cap - 1], ['turbo', cap - 1], ['engine', 6]]);

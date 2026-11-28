@@ -962,7 +962,14 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .fr-result .fr-acts .btn { min-height: 52px; }
 .result .card.fr-card .next, .result .card.fr-card .next-act, .result .card.fr-card .btns,
 .result .card.fr-card .why-list, .result .card.fr-card .reward-more, .result .card.fr-card .standing { display: none; }
-@media (max-width: 340px) { .fr-result .fr-acts { grid-template-columns: 1fr; } }
+/* short phones: the one button stays above the fold (the Rep line in the block covers the progress bar) */
+@media (max-height: 700px) {
+  .result .card.fr-card .place { font-size: var(--fs-2xl, 1.6rem); }
+  .result .card.fr-card .rep-progress, .fr-result .fr-skill { display: none; }
+  .result .card.fr-card .rewards { padding-bottom: 6px; }
+}
+.guide .refresher ol { padding-left: 20px; margin: 6px 0 10px; }
+.guide .refresher li { margin: 3px 0; }
 /* a coach instruction with nothing to acknowledge: one row, Skip beside the text */
 .coach.solo { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; }
 .coach.solo .coach-text { flex: 1; }

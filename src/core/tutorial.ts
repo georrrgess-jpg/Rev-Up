@@ -200,7 +200,7 @@ export function tutorialStep(s: GameState): TutorialStep | null {
   const raced = s.stats.races > 0 || !!s.pendingQuick;
   // just in time, one line each: cash once it buys something useful
   if (raced && !s.tips.spend && !(s.stats.spent ?? 0) && bestBuy(s).affordable) return 'spend';
-  if (!s.tips.betterPart && benchUpgradeWaiting(s)) return 'betterPart';
+  if (!s.tips.betterPart && s.stats.milestones.firstMerge && benchUpgradeWaiting(s)) return 'betterPart';
   if (s.nitro > 0 && !s.tips.nitroBank) return 'nitroBank';
   if (s.tray.some(Boolean) && !s.tips.overflow) return 'overflow';
   if (freeSlots(s) === 0 && !s.tips.scrap) return 'scrap';

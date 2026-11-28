@@ -35,7 +35,8 @@ const FINISH_HOW: Record<string, string> = {
   'Ray’s Rust-Red': 'Beat Rusty Ray in a live race', 'Crown Teal': 'Win the Coastal Crown in a live race',
   'Main Event Neon': 'Win The Main Event', 'Canyon Ochre': 'Win the Canyon Rally Final', 'Summit Ice': 'Win the Summit Gala',
   'Riviera Gold': 'Win the Grand Riviera', 'Storm Cyan': 'Win Launch Control', 'Kit’s Apex Red': 'Win the Apex Duel Rival Run',
-  'Redline Red': 'Step 1 of the Redline Series (Shakedown)',
+  'Redline Red': 'Step 1 of the Redline Series (Shakedown)', 'Heritage Green': '3 round wins in the Heritage Cup',
+  'Circuit Volt': 'Win the Circuit Crown', 'Esplanade Orange': 'Beat Mika Lehtonen on the rival ladder (Esplanade GP)',
 };
 const lookOf = (id: CarId) => { const c = carById(id); const f = FACTORY_LOOKS[id]; return c.paint === '#555' && f ? f : { paint: c.paint, trim: c.trim }; };
 

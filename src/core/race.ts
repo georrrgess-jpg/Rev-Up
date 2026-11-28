@@ -347,7 +347,9 @@ export class RaceSim {
     for (const r of this.racers) {
       if (r.isPlayer) continue;
       const u = craftRng(), v = craftRng(), w = craftRng();
-      r.craft = { launch: r.lc || !pack ? 1 : u < CRAFT.badLaunchP ? CRAFT.badLaunch : u > 1 - CRAFT.greatLaunchP ? CRAFT.greatLaunch : 1, late: pack && v < CRAFT.lateP, defend: w < CRAFT.defendP };
+      // the practice (first) race stays approachable: nobody gets a flying start or fights back
+      const great = !this.practice && u > 1 - CRAFT.greatLaunchP;
+      r.craft = { launch: r.lc || !pack ? 1 : u < CRAFT.badLaunchP ? CRAFT.badLaunch : great ? CRAFT.greatLaunch : 1, late: pack && v < CRAFT.lateP, defend: !this.practice && w < CRAFT.defendP };
     }
     // A no-nitro twin of the player: it never boosts, so each boost's real gain can be measured. It shifts clean.
     this.ghost = mk('ghost', 'ghost', setup.player.car, '#000000', { ...setup.player.stats }, false, 'clean');

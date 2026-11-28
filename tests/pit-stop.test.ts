@@ -117,7 +117,7 @@ describe('Rival Runs', () => {
 
   it('three distinct runs, each with a car rule, an objective and a prize', () => {
     expect(RR.RIVAL_RUNS.length).toBeGreaterThanOrEqual(3);
-    expect(new Set(RR.RIVAL_RUNS.map((r) => r.objective.kind)).size).toBe(3);
+    expect(new Set(RR.RIVAL_RUNS.filter((r) => !r.series).map((r) => r.objective.kind)).size).toBe(3); // 1.10: + Redline steps (tests/redline.test.ts)
     expect(RR.RIVAL_RUNS.some((r) => r.partCap)).toBe(true);
     expect(RR.RIVAL_RUNS.some((r) => r.nitro === 0)).toBe(true);
     expect(BLUEPRINT_FINISHES.some((b) => b.name === KIT_FINISH.name)).toBe(true);

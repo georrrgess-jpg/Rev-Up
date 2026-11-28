@@ -45,7 +45,7 @@ export function compareRuns(cur: RunSummary, last: RunSummary | null, bestBefore
       rows.push({ label: 'Launch', now: `${cur.launch.toFixed(2)} s`, was: `${last.launch.toFixed(2)} s`, delta: `${sg(cur.launch - last.launch, 2)} s`, better: cur.launch < last.launch });
     if (cur.top !== last.top) rows.push({ label: 'Top speed', now: `${cur.top} mph`, was: `${last.top} mph`, delta: `${sg(cur.top - last.top, 0)} mph`, better: cur.top > last.top });
     if (cur.clean !== last.clean || cur.shifts !== last.shifts) rows.push({ label: 'Clean shifts', now: `${cur.clean}/${cur.shifts}`, was: `${last.clean}/${last.shifts}`, delta: '', better: cur.clean / Math.max(1, cur.shifts) > last.clean / Math.max(1, last.shifts) ? true : cur.clean / Math.max(1, cur.shifts) < last.clean / Math.max(1, last.shifts) ? false : null });
-    if (cur.perfects !== last.perfects || cur.nitroUsed !== last.nitroUsed) rows.push({ label: 'Perfect boosts', now: `${cur.perfects}`, was: `${last.perfects}`, delta: '', better: cur.perfects > last.perfects ? true : cur.perfects < last.perfects ? false : null });
+    if (cur.perfects !== last.perfects) rows.push({ label: 'Perfect boosts', now: `${cur.perfects}`, was: `${last.perfects}`, delta: '', better: cur.perfects > last.perfects ? true : cur.perfects < last.perfects ? false : null });
     const moved = rows.slice(1).filter((r) => r.better !== null);
     const lead = moved.find((r) => r.better === (dt < 0)) ?? moved[0];
     const headline = Math.abs(dt) < 0.005 ? 'Same time as your last run' : `${Math.abs(dt).toFixed(2)} s ${dt < 0 ? 'quicker' : 'slower'} than your last run${lead ? ` — ${lead.label.toLowerCase()} ${lead.was} → ${lead.now}` : ''}`;

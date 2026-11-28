@@ -50,7 +50,8 @@ function stage(last: CarId): GameState {
 
 describe('the supercar ladder', () => {
   it('the three supercars are enabled in the Azure Riviera, after the Halcyon X, the Sovereign capped at T10', () => {
-    const ids = ENABLED_CARS.map((c) => c.id);
+    const ladder = ENABLED_CARS.filter((c) => !c.earnedBy); // 1.10: the Kestrel 1600 R is earned, not on the Rep ladder
+    const ids = ladder.map((c) => c.id);
     // 1.9 Circuit: the Ardent sits beside the Halcyon, the Meridian beside the Sovereign, the Tempest last
     expect(ids.slice(-8)).toEqual(['gt', 'ardent', 'proto', 'vireo', 'mako', 'meridian', 'sovereign', 'tempest']);
     expect(DISTRICTS.riviera.enabled).toBe(true);
@@ -58,7 +59,7 @@ describe('the supercar ladder', () => {
     expect(carById('sovereign').cap).toBe(10);
     expect(MAX_TIER).toBe(10);
     // Rep rises along the ladder
-    for (let i = 1; i < ENABLED_CARS.length; i++) expect(ENABLED_CARS[i].unlock!.rep).toBeGreaterThan(ENABLED_CARS[i - 1].unlock?.rep ?? -1);
+    for (let i = 1; i < ladder.length; i++) expect(ladder[i].unlock!.rep).toBeGreaterThan(ladder[i - 1].unlock?.rep ?? -1);
   });
 
   it('each needs Rep, a crafted keystone and a won event — Rep alone never unlocks it', () => {

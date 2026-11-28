@@ -53,6 +53,7 @@ export const LADDER_BUILDS: Record<string, Build[]> = {
   'cul-de-sac': [B('beater', [3, 3, 3], 'arrival'), B('hothatch', [4, 4, 4], 'full')],
   'maple-mile': [B('beater', [3, 3, 3], 'arrival'), B('hothatch', [4, 3, 4], 'next car')],
   'tapeback-trophy': [B('junker', [2, 2, 2], 'full')],
+  'foundry-sprint': [B('hothatch', [4, 4, 4], 'full')], // 1.10
   'foundry-final': [B('muscle', [5, 4, 4], 'arrival'), B('muscle', [5, 5, 5], 'full')],
   'harbor-launch': [B('muscle', [5, 4, 4], 'arrival'), B('muscle', [5, 5, 5], 'full')],
   'cliff-esses': [B('muscle', [5, 5, 4], 'arrival'), B('muscle', [5, 5, 5], 'full')],
@@ -97,7 +98,10 @@ export const LADDER_BUILDS: Record<string, Build[]> = {
 export type Input = [ShiftPolicy, Nitro];
 // `tuned`: inputs that must win once the car has all three Tune-up stages (the cash route for players who miss
 // shifts and boosts), so nobody is stuck for good.
-export const CATEGORY: Record<'open' | 'early' | 'late' | 'stock' | 'boss', { win: Input[]; lose: Input[]; tuned: Input[]; soft?: Input[] }> = {
+export const CATEGORY: Record<'open' | 'early' | 'late' | 'stock' | 'boss' | 'heat', { win: Input[]; lose: Input[]; tuned: Input[]; soft?: Input[] }> = {
+  // 1.10: a knockout's qualifying heats (top 3 / top 2 go through) let a driver with missed shifts through on the
+  // reference build; the final ('boss') still needs clean shifts and boosts
+  heat: { win: [['clean', 'perfect'], ['ordinary', 'perfect'], ['clean', 'late']], lose: [], tuned: [['missed', 'none']], soft: [['ordinary', 'none']] },
   open: { win: [['ordinary', 'late']], lose: [['missed', 'none'], ['ordinary', 'none']], tuned: [['missed', 'none']] },
   early: { win: [['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'none']], tuned: [['missed', 'none']] },
   late: { win: [['clean', 'perfect'], ['ordinary', 'perfect'], ['clean', 'late']], lose: [['missed', 'late'], ['missed', 'none']], tuned: [['missed', 'none']], soft: [['ordinary', 'none']] },
@@ -114,14 +118,15 @@ export const TARGETS: Record<string, { cat: keyof typeof CATEGORY; ref: number }
   'maple-mile': { cat: 'early', ref: 1 },
   'foundry-final': { cat: 'early', ref: 1 },
   'hatch-attack': { cat: 'early', ref: 0 },
+  'foundry-sprint': { cat: 'early', ref: 0 },
   'harbor-launch': { cat: 'late', ref: 1 },
   'cliff-esses': { cat: 'late', ref: 1 },
   'coast-crown': { cat: 'boss', ref: 0 },
   'neon-mile': { cat: 'late', ref: 1 },
   'stock-cup': { cat: 'stock', ref: 1 },
   'skyline-run': { cat: 'late', ref: 0 },
-  'main-event:1': { cat: 'late', ref: 0 },
-  'main-event:2': { cat: 'late', ref: 0 },
+  'main-event:1': { cat: 'heat', ref: 0 },
+  'main-event:2': { cat: 'heat', ref: 0 },
   'main-event:3': { cat: 'boss', ref: 1 },
   'midnight-run': { cat: 'late', ref: 1 },
   'canyon-qualifier': { cat: 'late', ref: 2 },

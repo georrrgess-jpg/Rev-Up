@@ -431,7 +431,7 @@ export function explainFinish(o: RaceOutcome, s?: GameState): FinishExplanation 
     return `the ${ordinal(same.indexOf(i) + 1)} ${kind}`;
   };
   const gripShort = foe.stats.grip > me.stats.grip * 1.005;
-  const bendCase = worstBend && worstBend.lost >= 0.08 && worstBend.foe - worstBend.me >= 2 && gripShort ? worstBend : null;
+  const bendCase = worstBend && worstBend.lost >= 0.06 && worstBend.foe - worstBend.me >= 1 && gripShort ? worstBend : null;
   let bendLine: [number, string] | null = null;
   if (bendCase) {
     const nm = bendName(bendCase.i);

@@ -117,7 +117,8 @@ function showCompare(app: App, car: CarId, c: TD.Candidate, a: TD.TestMetrics, b
   const course = TD.courseFor(car);
   app.game.transact((d) => { TD.saveTestRun(d, car, course, a, b, c, Date.now()); return []; });
   // what the part does on its own: the same two runs with identical (clean) shifting
-  const same = { a: TD.simulateSide(app.game.state, car, 'current', null, 'clean'), b: TD.simulateSide(app.game.state, car, 'candidate', c, 'clean') };
+  // (an estimate is already two runs with the same shifting: its verdict reads the same numbers as its table)
+  const same = how.live ? { a: TD.simulateSide(app.game.state, car, 'current', null, 'clean'), b: TD.simulateSide(app.game.state, car, 'candidate', c, 'clean') } : { a, b };
   const rows = TD.compareRows(course, a, b);
   const name = `T${c.tier} ${FAMILIES[c.family].name}`;
   const dLive = b.time - a.time, dPart = same.b.time - same.a.time;

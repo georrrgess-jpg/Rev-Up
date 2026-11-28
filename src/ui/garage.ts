@@ -12,7 +12,7 @@ import { ACTIVE_FAMILIES, FAMILIES, Family, MAX_TIER, MERGE_ALL_UNLOCK_RACES, ni
 import { familyIcon, partTileHtml, qualityName } from '../render/parts';
 import { drawCar, fitCanvas } from '../render/car';
 import type { App, View } from './app';
-import { fitChange, onboardFitPart, onboardStep, statLine, tutorialStep } from '../core/tutorial';
+import { fitChange, onboardActive, onboardFitPart, onboardStep, statLine, tutorialStep } from '../core/tutorial';
 import { Coach, CoachStep } from './coach';
 import { h } from './dom';
 import { openShop } from './shop';
@@ -551,9 +551,11 @@ export class GarageView implements View {
     if (this.drag?.ghost) return; // the drag hint is live
     if (Date.now() < this.refuseUntil && !this.sel) return; // keep a refusal's reason readable for a moment
     this.hintEl.classList.remove('bad');
-    const coached = !s.tips.skipGuide;
+    // the first session's coach says what to do; once it is skipped or over, the hint line does
+    const coached = onboardActive(s);
     if (!s.stats.milestones.firstMerge) t = coached ? '' : 'Drag two matching parts together to merge them';
     else if (s.stats.races === 0 && !s.pendingRace) t = coached ? '' : 'Merged! Tap Race to earn cash and Rep';
+    else if (this.sel && coached) t = '';
     else if (this.sel) {
       const part = B.getPart(s, this.sel);
       if (part) t = part.t >= MAX_TIER ? `T${part.t} ${FAMILIES[part.f].name}: top tier` : B.allParts(s).filter((q) => q.f === part.f && q.t === part.t).length > 1 ? `Craft a T${part.t + 1}: tap a glowing T${part.t}` : `T${part.t} ${FAMILIES[part.f].name} · no match on the bench yet`;
@@ -715,7 +717,8 @@ export class GarageView implements View {
     if (!reduced) for (const f of flights) this.fly(f.html, f.from, f.to);
     // a new part above the car's cap (a crate or a merge): offer to store it right there
     const fresh = [...sites.values()].map((x) => x.at).concat(ev.filter((e): e is Extract<GameEvent, { type: 'place' }> => e.type === 'place').map((e) => e.at));
-    this.offerStore(fresh);
+    // (not for the next car's own part, nor during the first session: its keystone toast and coach say what it is for)
+    if (!ev.some((e) => e.type === 'keystone') && !onboardActive(this.s)) this.offerStore(fresh);
     // first session: the part just made is the one to fit, so pick it up (its Fit button is one tap away)
     if (!batch && sites.size && onboardStep(this.s) === 'fit') {
       const fp = onboardFitPart(this.s);

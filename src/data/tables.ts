@@ -1113,7 +1113,7 @@ export const RIVAL_PACE: Record<string, number> = {
   'rusty-ray': 1.031,
   'cul-de-sac': 0.953,
   'maple-mile': 1.020,
-  'foundry-sprint': 1.07, // 1.10: a real test in a T4 Vexa (clean shifts and the right tyres), not a farm
+  'foundry-sprint': 1.13, // 1.10: a real test in a T4 Vexa (clean shifts and the right tyres), not a farm
   'foundry-final': 1.330,
   'hatch-attack': 0.986,
   'harbor-launch': 0.949,

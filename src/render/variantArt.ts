@@ -79,7 +79,7 @@ export const VARIANT_ART: Record<string, RivalArt> = {
       foil(k, [k.pt(-0.14, 1.15), k.pt(0.52, 1.18), k.pt(0.5, 1.23), k.pt(-0.12, 1.22)], '#25282d', '#121316', RED);
       k.fill([k.pt(-0.16, 1.07), k.pt(0.16, 1.09), k.pt(0.16, 1.29), k.pt(-0.16, 1.29)], '#191b1f');
       // a deep splitter and a roof intake ahead of the cage
-      foil(k, [k.pt(3.78, 0.15), k.pt(4.2, 0.14), k.pt(4.2, 0.18), k.pt(3.78, 0.2)], '#22252a', '#111214');
+      foil(k, [k.pt(3.8, 0.15), k.pt(4.14, 0.14), k.pt(4.14, 0.18), k.pt(3.8, 0.2)], '#22252a', '#111214');
       k.fill(k.topPatch(1.4, 1.7, 0.38, 0.62, 0.035), '#16181b');
     },
     face(k) {

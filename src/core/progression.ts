@@ -61,7 +61,7 @@ export const chaseableCars = (s: GameState): CarClass[] => ENABLED_CARS.filter((
 export function nextCar(s: GameState): CarClass | null {
   const list = chaseableCars(s);
   const pick = s.goalPick ? list.find((c) => c.id === s.goalPick) : undefined;
-  return pick ?? recommendedCar(s) ?? ENABLED_CARS.find((c) => !s.owned.includes(c.id)) ?? null;
+  return pick ?? recommendedCar(s) ?? ENABLED_CARS.find((c) => c.unlock && !s.owned.includes(c.id)) ?? null; // 1.10: earned cars (no unlock) are never 'next'
 }
 /** The car the game recommends when you have not picked one: the first chaseable car in ladder order, unless the
  *  other car at a branch is clearly closer (a quarter of the way further along). */

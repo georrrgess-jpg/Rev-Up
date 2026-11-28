@@ -103,7 +103,8 @@ export class RaceCoach {
     const ls = sim.lastShift;
     if (ls && ls !== this.lastShift) {
       this.lastShift = ls;
-      if (ls.grade === 'clean') { this.cleanShifts++; this.feedback = { text: this.cleanShifts === 1 ? 'Clean shift ✓ Full power kept. Again on the next green.' : 'Clean shift ✓', until: now + 900, target: 'shift' }; }
+      // (the HUD grades every shift itself; the coach adds what to do next)
+      if (ls.grade === 'clean') { this.cleanShifts++; if (this.cleanShifts === 1) this.feedback = { text: 'Nice! Full power kept. Again on the next green.', until: now + 1100, target: 'shift' }; }
       else if (ls.grade === 'early') this.feedback = { text: 'A bit early. Wait for the green light.', until: now + 1300, target: 'shift' };
       else if (ls.grade === 'late') this.feedback = { text: 'A bit late. Tap as soon as it turns green.', until: now + 1300, target: 'shift' };
       else if (ls.grade === 'missed') this.feedback = { text: 'Missed: the car shifted itself. Catch the next green.', until: now + 1500, target: 'shift' };
@@ -150,7 +151,7 @@ export class RaceCoach {
     if (g0) {
       const part = `T${g0.part.t} ${FAMILIES[g0.part.f].name}`;
       lines.push(h('div', { class: 'fr-gain' }, h('b', {}, `Your ${part}: ${g0.seconds.toFixed(1)} s faster`),
-        h('span', {}, g0.whereS >= 0.05 ? ` on this course, mostly ${g0.where} (${g0.whereS.toFixed(1)} s).` : ' on this course.')));
+        h('span', {}, g0.whereS >= 0.05 ? ` here, mostly ${g0.where}.` : ' on this course.')));
     } else {
       const slots = s.installed?.[s.activeCar] ?? {};
       if (!Object.values(slots).some(Boolean)) lines.push(h('div', { class: 'fr-gain' }, h('b', {}, 'Your car has empty slots.'), h('span', {}, ' Fit a part and race again to feel the difference.')));
@@ -168,7 +169,7 @@ export class RaceCoach {
     let act: { label: string; sub: string; run: () => void } | null = null;
     if (g && !g.keystoneDone) {
       const fam = FAMILIES[g.family];
-      lines.push(h('div', { class: 'fr-next' }, h('small', {}, 'Next car'), h('b', {}, g.car.model), h('span', {}, ` fits T${g.car.cap} parts · needs a T${g.tier} ${fam.name} you merge${s.rep < g.repNeed ? ` and ${g.repNeed - s.rep} more Rep` : ''}`)));
+      lines.push(h('div', { class: 'fr-next' }, h('small', {}, 'Next car'), h('b', {}, g.car.model), h('span', {}, ` (T${g.car.cap} parts) needs a T${g.tier} ${fam.name} you merge${s.rep < g.repNeed ? ` + ${g.repNeed - s.rep} Rep` : ''}`)));
       act = { label: `Merge ${fam.plural}`, sub: `toward the T${g.tier}`, run: () => this.toGarage(() => this.craft(g.family)) };
     } else if (goal) {
       lines.push(h('div', { class: 'fr-next' }, h('small', {}, 'Next'), h('b', {}, goal.title), h('span', {}, ` · ${goal.missing}`)));

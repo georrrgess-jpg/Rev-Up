@@ -264,7 +264,7 @@ export class GuideCoach {
     const sheet = this.topSheet();
     const inShop = !!sheet?.querySelector('.workshop');
     // the first session just ended (the next car's part is made): the one remaining step, once
-    if (!step && !sheet && app.route === 'garage' && s.onboard?.done && !s.onboard.skipped && s.onboard.at && !s.tips['fr:next']) {
+    if (!sheet && app.route === 'garage' && s.onboard?.done && !s.onboard.skipped && s.onboard.at && !s.tips['fr:next']) {
       const c = one('fr:next', this.find(SEL.race), `${remainingText(app)} Race to earn it.`, true);
       if (c) return c;
     }
