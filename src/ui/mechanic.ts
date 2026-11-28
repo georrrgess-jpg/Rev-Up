@@ -545,7 +545,10 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
       const cls = carById(car);
       const p = pending;
       const cancel = h('button', { class: 'btn', onclick: () => { pending = null; note = ''; build(); draw(); } }, 'Cancel');
-      const bar = (main: HTMLElement, extra?: HTMLElement | null) => h('div', { class: 'mech-commit' }, main, extra ?? null, cancel);
+      const bar = (main: HTMLElement, extra?: HTMLElement | null, test?: HTMLElement | null) => h('div', { class: `mech-commit${test ? ' has-test' : ''}` }, main, extra ?? null, test ?? null, cancel);
+      // 1.10 Test & Compare: drive the previewed part (owned, or a tier to order) against the current build first
+      const testBtn = (opts: TestDriveOpts) => h('button', { class: 'btn test', 'aria-label': 'Test it on track against your current build', onclick: () => openTestDrive(app, { car, ...opts }) },
+        h('span', { class: 'stack' }, 'Test', h('small', {}, 'vs now')));
       const primary = (label: string, sub: string, ok: boolean, run: () => void, aria?: string) => h('button', {
         class: `btn primary go${ok ? '' : ' off'}`, 'aria-disabled': String(!ok), 'aria-label': aria ?? `${label}. ${sub}`, onclick: run,
       }, h('span', { class: 'stack' }, label, h('small', {}, sub)));

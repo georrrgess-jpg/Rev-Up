@@ -68,11 +68,9 @@ describe('economy audit (simulation)', () => {
       console.log(lines.join('\n')); lines.length = 0; // print before asserting, so a failure shows the table
       expect(L.milestones.sovereign).toBeGreaterThan(0);
       expect(L.maxRepeat).toBeLessThanOrEqual(5);
-      // something meaningful at least every 8 minutes — except the Rep run from the Strata GTR to the Halcyon X, which
-      // measures 9–10.5 min for the bot (it buys no cosmetics) now that the run goes past the Halcyon; it ended at the
-      // Halcyon unlock before, so that last stretch was never counted. Known gap, listed in the report.
-      expect(gaps[gaps.length - 1]).toBeLessThan(11 * 60);
-      expect(gaps.filter((g) => g >= 8 * 60).length).toBeLessThanOrEqual(1);
+      // something meaningful at least every 6 minutes for every player type (1.10: measured 4:09 / 2:20 / 4:21; was
+      // 4:28 / 5:00 / 5:18 before the 1.10 milestones, and up to 10.5 min in 1.9's first measurement)
+      expect(gaps[gaps.length - 1]).toBeLessThan(6 * 60);
     }
     lines.push('\n== payout by placement (cash, live; all on $5 / $10 / $50 steps) ==');
     for (const e of EVENTS.filter((x) => !x.heatOf)) lines.push(`${e.id.padEnd(18)} ${e.payout.cash.map(roundCash).join(' / ')}${e.firstClear?.cash ? `  first win +$${e.firstClear.cash}` : ''}${e.boss ? `  rival +$${e.boss.reward.cash}` : ''}`);
