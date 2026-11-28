@@ -1,11 +1,11 @@
 /* Rev Up service worker — generated at build time from src/sw/sw-template.js.
  * Precaches one immutable revision of the app. Updates wait until the page asks
  * (after saving, on a safe screen), so HTML and hashed assets never mix versions. */
-const VERSION = '14d2e9785b0a';
+const VERSION = '0c6e88ab72d1';
 const SCOPE = '/Rev-Up/';
 const PREFIX = 'revup:' + SCOPE + ':';
 const CACHE = PREFIX + VERSION;
-const ASSETS = ["./","assets/barlow-latin-400-normal-qiz4-Cze.woff2","assets/barlow-latin-600-normal-DILqtrty.woff2","assets/barlow-latin-800-normal-s1sAMnoV.woff2","assets/index-CawAoKKj.js","assets/index-JLD-hJ-f.css","assets/intro-C_wNAcrT.css","assets/intro-DTgEKp6g.js","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","manifest.webmanifest","index.html"];
+const ASSETS = ["./","assets/barlow-latin-400-normal-qiz4-Cze.woff2","assets/barlow-latin-600-normal-DILqtrty.woff2","assets/barlow-latin-800-normal-s1sAMnoV.woff2","assets/index-0x_JZcy4.js","assets/index-CPRItabI.css","assets/intro-C_wNAcrT.css","assets/intro-DU6xJOtF.js","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","manifest.webmanifest","index.html"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
