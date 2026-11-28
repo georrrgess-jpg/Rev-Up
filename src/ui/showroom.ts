@@ -13,6 +13,14 @@ import { openFitParts } from './fit';
 import type { App, View } from './app';
 import { h } from './dom';
 import { icon } from './icons';
+import { drivetrainFor } from '../data/drivetrain';
+
+/** How hard the car punishes a poor shift (the bog after a late or missed one), in one word. */
+function gearboxChip(id: CarId): HTMLElement {
+  const k = drivetrainFor(id).poorShift ?? 1;
+  const word = k <= 0.9 ? 'forgiving' : k >= 1.3 ? 'punishing' : 'steady';
+  return h('span', { class: `chip gearbox ${word}`, title: 'How much a late or missed shift costs in this car' }, `Gearbox: ${word}`);
+}
 import { fmt } from './dom';
 
 const STAGES: Record<string, { wall: [string, string, string, string]; light: string; floor?: string }> = {
@@ -603,7 +611,8 @@ export class ShowroomView implements View {
       h('div', { class: 'statrow' },
         h('span', { class: 'chip' }, `${mph(loadout.top)} mph`),
         h('span', { class: 'chip' }, `Accel ${loadout.accel.toFixed(1)}`),
-        h('span', { class: 'chip' }, `Grip ${loadout.grip.toFixed(2)}`)),
+        h('span', { class: 'chip' }, `Grip ${loadout.grip.toFixed(2)}`),
+        gearboxChip(id)),
       finishName, finishButtons,
       sig && !state.livePodiums.includes(id) ? h('p', { class: 'finish-goal' }, `Earn ${sig.name}: finish top 3 in a live race with this car.`) : null,
       shop,
