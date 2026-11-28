@@ -9,6 +9,7 @@ import { JOB_REFILL_S, STREAK_IDLE_S, xpFor } from '../data/jobs';
 import { FAMILIES, carById } from '../data/tables';
 import type { App } from './app';
 import { h } from './dom';
+import { icon } from './icons';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const fam = (job: J.Job) => (job.family ? FAMILIES[job.family] : null);
@@ -161,7 +162,7 @@ export class JobsPill {
     this.sub = h('span', { class: 'jp-sub' });
     this.bar = h('i');
     this.el = h('button', { class: 'jobs-pill', 'data-coach': 'jobs-pill', onclick: () => openJobBoard(app) },
-      this.top, this.sub, h('span', { class: 'bar' }, this.bar));
+      icon('jobs', 'jp-i'), this.top, this.sub, h('span', { class: 'bar' }, this.bar));
   }
   render() {
     const s = this.app.game.state;
@@ -172,8 +173,8 @@ export class JobsPill {
     const open = j.slots.filter(Boolean) as J.Job[];
     const ready = open.filter((x) => x.kind === 'deliver' && J.deliverPreview(s, x)).length;
     const L = J.levelInfo(s);
-    this.top.textContent = `Jobs ${open.length}/${j.slots.length}`;
-    this.sub.textContent = ready ? `${ready} ready ✓` : `Lv ${L.level}${j.streak ? ` · 🔥${j.streak}` : ''}`;
+    this.top.textContent = `${open.length}/${j.slots.length}`;
+    this.sub.textContent = ready ? `${ready} ready` : `Lv ${L.level}${j.streak ? ` · ×${j.streak}` : ''}`;
     this.el.classList.toggle('ready', ready > 0);
     this.bar.style.width = `${Math.round(L.frac * 100)}%`;
     this.el.setAttribute('aria-label', `Job Board: ${open.length} of ${j.slots.length} jobs open${ready ? `, ${ready} ready to deliver` : ''}. Garage Level ${L.level}. Tap to open.`);

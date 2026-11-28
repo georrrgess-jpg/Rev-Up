@@ -15,6 +15,7 @@ import { openRivalBrief } from './rivalRuns';
 import { jobsResultBlock } from './jobs';
 import { currentGoal, explainFinish, hintFor, type GoalAction } from './contracts';
 import { runGoalAction } from './goalCard';
+import { icon } from './icons';
 
 const MEDAL_NAMES = ['', 'Bronze', 'Silver', 'Gold'];
 const MEDAL_KEYS = ['', 'bronze', 'silver', 'gold'] as const;
@@ -34,10 +35,10 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
   const s = game.state;
   const ev = eventById(r.eventId);
   const pills: HTMLElement[] = [
-    h('span', { class: 'chip cash' }, `+$${r.cash}`, h('small', {}, ' cash')),
-    h('span', { class: 'chip rep' }, `+${r.rep} Rep`),
+    h('span', { class: 'chip cash', 'aria-label': `${r.cash} cash` }, icon('cash'), `+$${r.cash}`),
+    h('span', { class: 'chip rep', 'aria-label': `${r.rep} Rep` }, icon('rep'), `+${r.rep} Rep`),
   ];
-  if (r.crates) pills.push(h('span', { class: 'chip' }, `📦 ${r.crates} crate${r.crates > 1 ? 's' : ''}`));
+  if (r.crates) pills.push(h('span', { class: 'chip' }, icon('crate'), `${r.crates} crate${r.crates > 1 ? 's' : ''}`));
   if (r.perfects) pills.push(h('span', { class: 'chip nitro' }, r.precision && r.perfects > 2 ? `Perfect ×${r.perfects} (2 paid, +$${r.precision})` : `Perfect ×${r.perfects}${r.precision ? ` (+$${r.precision})` : ''}`));
   if (r.firstClear) pills.push(h('span', { class: 'chip', style: 'color:var(--gold)' }, 'First win bonus'));
   const g = P.goalStatus(s);
@@ -79,9 +80,9 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
     chips.push(h('span', { class: 'chip star' }, `★ ${r.newStars.length} goal${r.newStars.length > 1 ? 's' : ''}`));
     notes.push(h('p', {}, `New goals: ${r.newStars.join(', ')} · ${P.starsIn(s, ev.district)} ${DISTRICTS[ev.district].name} star${P.starsIn(s, ev.district) === 1 ? '' : 's'}.`));
   }
-  if (r.trophy) { chips.push(h('span', { class: 'chip trophy' }, `🏆 ${r.trophy}`)); notes.push(h('p', {}, 'Class trophy added to the Showroom.')); }
+  if (r.trophy) { chips.push(h('span', { class: 'chip trophy' }, icon('trophy'), r.trophy)); notes.push(h('p', {}, 'Class trophy added to the Showroom.')); }
   if (r.earnedStyle?.length) {
-    chips.push(h('span', { class: 'chip style' }, `🎨 ${r.earnedStyle.map((id) => styleItem(id)?.name ?? id).join(', ')}`));
+    chips.push(h('span', { class: 'chip style' }, icon('paint'), r.earnedStyle.map((id) => styleItem(id)?.name ?? id).join(', ')));
     notes.push(h('p', {}, 'Earned style: apply it in the Showroom Paint shop.'));
   }
   if (finish) { chips.push(h('span', { class: 'chip style' }, h('span', { class: 'swatch', style: `--paint:${finish.paint}` }), finish.name)); notes.push(h('p', {}, `${finish.name}: signature finish unlocked in the Showroom.`)); }
@@ -122,18 +123,28 @@ export function resultCard(app: App, r: LastResult, o: ResultOpts): HTMLElement 
     r.heat ? h('div', { class: `heat-result${r.heat.champion ? ' champ' : r.heat.advanced ? ' through' : ' out'}` },
       r.heat.champion ? `Main Event champion!` : r.heat.advanced ? `Through! Next: ${r.heat.next}` : `Knocked out in ${r.heat.name}. Change cars, build, and start again from heat 1.`) : null,
     rewards,
-    // the next step and the buttons right under the rewards, so they are in reach without scrolling
-    coached ? null : h('div', { class: 'next' }, h('small', {}, nextLabel), advice),
+    // the one next step and the two ways out, right under the payoff (in reach without scrolling)
     next ? h('button', { class: 'btn primary wide next-act', onclick: next.run }, h('span', { class: 'stack' }, next.label, next.sub ? h('small', {}, next.sub) : null)) : null,
     h('div', { class: 'btns' },
-      s.pendingReveal ? null : h('button', { class: `btn${next ? '' : ' primary'}`, onclick: () => { close(); app.go('garage'); } }, 'Back to Garage'),
-      !s.pendingReveal ? h('button', { class: 'btn', onclick: () => o.onRetry(r.eventId) }, 'Race again') : null),
-    why?.reasons.length ? h('ul', { class: 'why-list' }, ...why.reasons.slice(0, 3).map((t) => h('li', {}, t))) : null,
-    o.extras?.length ? h('div', { class: 'extras' }, ...o.extras) : null,
-    jobsResultBlock(app, r.raceId),
-    h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`))),
+      s.pendingReveal ? null : h('button', { class: `btn${next ? '' : ' primary'}`, 'aria-label': 'Back to Garage', onclick: () => { close(); app.go('garage'); } }, icon('garage'), 'Back to Garage'),
+      !s.pendingReveal ? h('button', { class: 'btn', 'aria-label': 'Race again', onclick: () => o.onRetry(r.eventId) }, icon('flag'), 'Race again') : null),
+    // the advice, when no button above already carries it
+    coached || next ? null : h('div', { class: 'next' }, h('small', {}, nextLabel), advice),
+    // why it went that way, telemetry, jobs and the standings: one tap away
+    raceMore(
+      why?.reasons.length ? h('ul', { class: 'why-list' }, ...why.reasons.slice(0, 3).map((t) => h('li', {}, t))) : null,
+      coached || !next ? null : h('div', { class: 'next' }, h('small', {}, nextLabel), advice),
+      o.extras?.length ? h('div', { class: 'extras' }, ...o.extras) : null,
+      jobsResultBlock(app, r.raceId),
+      h('div', { class: 'standing' }, ...r.standings.map((st, i) => h('div', { class: st.isPlayer ? 'me' : '' }, `${i + 1}. ${st.name}${st.time ? ` — ${st.time.toFixed(2)} s` : ''}`)))),
   );
   return card;
+}
+
+/** "Race details": the why, telemetry, jobs and standings behind one tap, so the card leads with the payoff. */
+function raceMore(...kids: (HTMLElement | null)[]): HTMLElement {
+  const k = kids.filter((x): x is HTMLElement => !!x);
+  return h('details', { class: 'race-more' }, h('summary', {}, icon('compare'), 'Race details · standings'), ...k);
 }
 
 /** Rival Run result: objective met or not (with the numbers that decided it), the prize the first time, best

@@ -22,6 +22,7 @@ import { jobBoardSection } from './jobs';
 import { jobsUnlocked, readJobs } from '../core/jobs';
 import type { CarId } from '../data/tables';
 import { competitionSummary, hintFor } from './contracts';
+import { icon } from './icons';
 
 const fmtN = (n: number) => n.toLocaleString('en-US');
 
@@ -69,7 +70,7 @@ export class RaceView implements View {
     this.jump = h('nav', { class: 'race-jump', 'aria-label': 'Race menu sections' });
     this.el = h('section', { class: 'view race-view', 'aria-label': 'Race' },
       h('div', { class: 'racehead' }, this.headCanvas, this.head, h('span', { style: 'flex:1' }),
-        h('button', { class: 'btn sm', onclick: () => app.go('showroom') }, 'Change car')),
+        h('button', { class: 'btn sm secondary', 'aria-label': 'Change car in the Showroom', onclick: () => app.go('showroom') }, icon('showroom'), 'Change')),
       this.fitBar,
       this.jump,
       this.list);
@@ -86,6 +87,7 @@ export class RaceView implements View {
 
   private renderJump(s: GameState) {
     const links: [string, string, string?][] = [['top', 'Top pick']];
+    const ICONS: Record<string, Parameters<typeof icon>[0]> = { top: 'rep', jobs: 'jobs', runs: 'flag', all: 'race' };
     const jobs = this.list.querySelector('[data-jump="jobs"]');
     if (jobs) {
       const J = jobsUnlocked(s) ? readJobs(s) : null;
@@ -99,7 +101,7 @@ export class RaceView implements View {
     this.jump.dataset.k = key;
     this.jump.hidden = links.length < 3;
     this.jump.replaceChildren(...links.map(([k, label, badge]) => h('button', { class: `jump${k === 'jobs' ? ' jobs' : ''}`, 'data-coach': k === 'jobs' ? 'jobs-jump' : null, onclick: () => this.jumpTo(k) },
-      label, badge ? h('span', { class: 'jb-n num' }, badge) : null)));
+      icon(ICONS[k] ?? 'next'), label, badge ? h('span', { class: 'jb-n num' }, badge) : null)));
   }
 
   /** Save revision of the last render: coming back to the tab with nothing changed skips the rebuild. */
@@ -125,7 +127,7 @@ export class RaceView implements View {
     const cls = carById(s.activeCar);
     const lo = computeLoadout(s);
     this.head.replaceChildren(h('strong', {}, cls.model),
-      h('div', { class: 'head-stats' }, h('span', {}, `${mph(lo.stats.top)} mph top`), h('span', {}, `Nitro ${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`)));
+      h('div', { class: 'head-stats' }, h('span', {}, `${mph(lo.stats.top)} mph top`), h('span', { 'aria-label': `Nitro ${s.nitro} of ${nitroCapFor(s.upgrades.nitroTank)}` }, icon('nitro'), `${s.nitro}/${nitroCapFor(s.upgrades.nitroTank)}`)));
     const { w, h: hh } = fitCanvas(this.headCanvas);
     const ctx = this.headCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, hh);
@@ -217,16 +219,16 @@ export class RaceView implements View {
     const hint = hintFor(s, 'race');
     const tip = hint && !(hint.action?.kind === 'race' && hint.action.eventId === rec.id) ? hint.text : null;
     const featured = h('section', { class: 'featured lead', 'aria-label': 'Recommended race', 'data-jump': 'top' },
-      h('div', { class: 'feat-label' }, 'Recommended for you'),
+      h('div', { class: 'feat-label' }, icon('rep'), 'Recommended for you'),
       h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), stateBadge(rec), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null, h('span', { class: `diff ${d.cls}` }, d.label)),
       h('p', { class: 'reason' }, reasonFor(rec)),
-      h('div', { class: 'feat-reward' }, h('small', {}, shown.timeAttack ? 'Pays' : pz.firstClear ? 'First win pays' : 'Win pays'), h('b', { class: 'num' }, reward)),
+      h('div', { class: 'feat-reward' }, icon('trophy'), h('small', {}, shown.timeAttack ? 'Pays' : pz.firstClear ? 'First win pays' : 'Win pays'), h('b', { class: 'num' }, reward)),
       rec.goals ? goalList(s, rec) : null,
       rec.knockout ? heatList(s, rec) : null,
       h('button', { class: `btn primary race-live feat-go${q && q.eventId === rec.id ? ' off' : ''}`, 'data-coach': 'race-live', onclick: () => this.startLive(rec.id) },
-        h('span', { class: 'stack' }, 'Race live', h('small', {}, `you drive · full purse · ${nitroNote}`))),
+        icon('flag'), h('span', { class: 'stack' }, 'Race', h('small', {}, `you drive · full purse · ${nitroNote}`))),
       h('div', { class: 'feat-more' },
-        h('button', { class: 'btn sm pit-btn', 'data-pit': rec.id, onclick: () => this.openPit(rec.id) }, 'Pit Setup'),
+        h('button', { class: 'btn sm pit-btn', 'data-pit': rec.id, onclick: () => this.openPit(rec.id) }, icon('pit'), 'Pit Setup'),
         quickPart(rec, true)),
       tip ? h('p', { class: 'feat-tip' }, tip) : null,
       q?.eventId === rec.id ? h('div', { class: 'quickbar' }, h('i', { style: `width:${Math.min(100, ((Date.now() - q!.startedAt) / (q!.endsAt - q!.startedAt)) * 100)}%` })) : null,
@@ -245,10 +247,11 @@ export class RaceView implements View {
     const alts = P.alternatives(s, rec);
     const altBox = alts.length ? h('section', { class: 'alts', 'aria-label': 'Also worth racing' }, h('div', { class: 'feat-label' }, 'Or try'),
       ...alts.map(({ e }) => h('div', { class: `alt st-${raceState(e).st}` }, h('div', { class: 'grow' }, h('b', {}, e.name), ' ', stateBadge(e), ' ', diffTag(e), h('div', { class: 'd' }, reasonFor(e))),
-        h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'),
-        h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
+        h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, icon('pit')),
+        h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, 'aria-label': `Race ${e.name}`, onclick: () => this.startLive(e.id) }, icon('flag'), P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
     const comp = competitionStrip(s, (id) => this.jumpToEvent(id));
-    const out: HTMLElement[] = [...(comp ? [comp] : []), featured, ...(altBox ? [altBox] : [])];
+    // lead with the pick and its Race button; the competition summary is context, so it follows the choices
+    const out: HTMLElement[] = [featured, ...(altBox ? [altBox] : []), ...(comp ? [comp] : [])];
     const jobs = jobBoardSection(this.app); // Job Board: short jobs, right under the races they ask for
     if (jobs) { jobs.dataset.jump = 'jobs'; out.push(jobs); }
     const runs = rivalRunsSection(this.app, (id, car) => this.startRivalRun(id, car));
@@ -279,7 +282,7 @@ export class RaceView implements View {
       if (dist === 'downtown') summary = `★ ${P.starsIn(s, dist)}/${evs.filter((e) => e.goals).length * 3 + evs.filter((e) => e.speedTrap).length * 3} · ${doneN}/${evs.length} done`;
       else if (dist !== 'trials' && dist !== 'meets') summary = `${doneN}/${evs.length} won`;
       const locked = !open.length;
-      if (locked) summary = `🔒 ${P.eventUnlocked(s, evs[0]).why}`;
+      if (locked) summary = `Locked · ${P.eventUnlocked(s, evs[0]).why}`;
       else summary = leftN ? `${summary} · ${leftN} to go` : `✓ All complete · ${summary}`;
       const bar = locked ? null : h('span', { class: `dist-bar${leftN ? '' : ' full'}`, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round((doneN / evs.length) * 100)}%` }));
       const rows: HTMLElement[] = [];
@@ -288,7 +291,7 @@ export class RaceView implements View {
         const u = P.eventUnlocked(s, e);
         const r = s.events[e.id];
         const medal = s.medals?.[e.id] ?? 0;
-        const status = !u.ok && !u.switchCar ? `🔒 ${u.why}`
+        const status = !u.ok && !u.switchCar ? `Locked · ${u.why}`
           : e.knockout ? (s.knockout ? `Through to heat ${s.knockout.heat + 1} of ${e.knockout.heats.length}` : r?.wins ? `✓ Champion ×${r.wins}` : 'Three heats · knockout')
           : e.speedTrap ? `${medal ? `${medalName[medal]} · ` : ''}${medal < 3 ? `${medalName[medal + 1]} at ${[e.speedTrap.bronze, e.speedTrap.silver, e.speedTrap.gold][medal]} mph` : 'all medals'}${r && P.bestTrapMph(r) ? ` · best ${P.bestTrapMph(r)} mph` : ''}`
           : e.timeAttack ? (medal ? `${medalName[medal]}${medal < 3 ? ` · ${medalName[medal + 1]} at ${[e.timeAttack.bronze, e.timeAttack.silver, e.timeAttack.gold][medal].toFixed(2)} s` : ' · all medals'}` : `Bronze at ${e.timeAttack.bronze.toFixed(2)} s`) + (r?.bestTime ? ` · record ${r.bestTime.toFixed(2)} s` : '')
@@ -296,9 +299,9 @@ export class RaceView implements View {
           : r?.wins ? `✓ Won · win pays $${e.payout.cash[0]} and ${e.payout.rep[0]} Rep`
           : r ? `Best ${ordinal(r.bestPlace)} · first win +$${e.firstClear.cash}` : e.boss ? `Rival race · ${e.boss.reward.blueprint} paint` : `Win: $${e.payout.cash[0] + e.firstClear.cash} and ${e.payout.rep[0]} Rep the first time`;
         const action = u.ok
-          ? h('div', { class: 'row-btns' }, quickPart(e, true), h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'), h('button', { class: `btn sm primary-lite${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, 'Race'))
+          ? h('div', { class: 'row-btns' }, quickPart(e, true), h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, icon('pit')), h('button', { class: `btn sm primary-lite${q?.eventId === e.id ? ' off' : ''}`, 'aria-label': `Race ${e.name}`, onclick: () => this.startLive(e.id) }, icon('flag'), 'Race'))
           : u.switchCar && s.owned.includes(u.switchCar)
-            ? h('div', { class: 'row-btns' }, h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'), h('button', { class: 'btn sm', onclick: () => this.startLive(e.id) }, `Race · ${carById(u.switchCar).model.split(' ')[0]}`))
+            ? h('div', { class: 'row-btns' }, h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, icon('pit')), h('button', { class: 'btn sm', 'aria-label': `Race ${e.name} in the ${carById(u.switchCar).model}`, onclick: () => this.startLive(e.id) }, icon('flag'), carById(u.switchCar).model.split(' ')[0]))
             : null;
         const tags = [
           e.series ? h('span', { class: 'tag' }, `Round ${e.series.round}/${e.series.of}`) : null,
@@ -308,7 +311,7 @@ export class RaceView implements View {
           e.partCap ? h('span', { class: 'tag' }, `Stock · T${e.partCap}`) : null,
           e.knockout ? h('span', { class: 'tag boss' }, 'Knockout') : null,
           e.goals ? starTag(s.stars?.[e.id] ?? 0) : null,
-          e.trophy && s.badges.includes(e.trophy) ? h('span', { class: 'tag done' }, `🏆 ${e.trophy}`) : null,
+          e.trophy && s.badges.includes(e.trophy) ? h('span', { class: 'tag done' }, icon('trophy'), e.trophy) : null,
         ];
         const rs = raceState(e);
         rows.push(h('div', { class: `evt-row st-${rs.st}${u.ok ? '' : ' locked'}`, 'data-state': rs.st },

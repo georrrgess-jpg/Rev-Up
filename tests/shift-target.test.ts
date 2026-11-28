@@ -114,7 +114,8 @@ describe('steady shift target', () => {
       const t = (p: ShiftPolicy) => runRace(setup(ev, car, p)).playerTime!;
       const clean = t('clean'), early = t('early'), missed = t('missed');
       expect(missed - clean, `${ev} ${car} missed`).toBeGreaterThan(0.2);
-      expect(missed - clean, `${ev} ${car} missed`).toBeLessThan(1.4);
+      expect(missed - clean, `${ev} ${car} missed`).toBeLessThan(2.0); // skill-first: was 1.4 (a miss now costs more)
+      expect(missed / clean, `${ev} ${car} missed`).toBeLessThan(1.08); // ...and stays recoverable
       expect(early - clean, `${ev} ${car} early`).toBeGreaterThan(0.05);
       // a live player who taps on the visible green matches the clean reference
       const live = drive(ev, car, 60, 0).sim.player.finishTime!;
@@ -144,7 +145,7 @@ describe('steady shift target', () => {
       const clean = runRace(setup(ev, car, 'clean')).playerTime!;
       const lost = sim.player.finishTime! - clean;
       expect(lost, `${ev} ${car}`).toBeGreaterThan(0.08);
-      expect(lost, `${ev} ${car}`).toBeLessThan(0.6);
+      expect(lost, `${ev} ${car}`).toBeLessThan(0.75); // skill-first: was 0.6
     }
   });
 

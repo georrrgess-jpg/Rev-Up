@@ -1,5 +1,5 @@
 import { RACE, RIVALS, STAT_SCALE, Segment, TIER_STAT, Track, TRACKS, carById, eventById, trackLength, CarId } from '../data/tables';
-import { Drivetrain, drivetrainFor } from '../data/drivetrain';
+import { Drivetrain, GEARBOX_SETUPS, GearboxId, GearboxSetup, drivetrainFor } from '../data/drivetrain';
 import { LAUNCH_CONTROL } from '../data/circuit';
 import { makeRng } from './rng';
 import type { LeanOutcome } from './state';
@@ -20,7 +20,7 @@ export type ShiftGrade = 'clean' | 'early' | 'late' | 'missed' | 'assist';
 export interface RaceSetup {
   eventId: string;
   seed: number;
-  player: { name: string; car: CarId; stats: RacerStats; paint: string; perfectMul?: number };
+  player: { name: string; car: CarId; stats: RacerStats; paint: string; perfectMul?: number; gearbox?: GearboxId };
   nitroCharges: number;
   /** Practice runs widen each nitro window (1 = normal). */
   windowScale?: number;
@@ -81,6 +81,12 @@ export interface Racer {
   slip: number;
   /** Launch control engaged for this start (Tempest E4: more traction and pull through the launch segment). */
   lc?: boolean;
+  /** Skill-first: seconds left of the bog after a poor (early / late / missed) upshift, and how deep it started
+   *  (share of engine pull lost; it lifts as the revs build SHIFT.bogRev, or within SHIFT.bogS). See SHIFT.bog. */
+  bogT?: number;
+  bogDepth?: number;
+  /** Engine speed (fraction of the redline) the bog started at: it lifts as the revs build from there. */
+  bogF0?: number;
   /** Rivals' race craft for this start (see CRAFT; deterministic per seed and rival). */
   craft?: RivalCraft;
   /** Defending: seconds left of the push, and the segment it was used on (once per straight). */
@@ -243,6 +249,18 @@ export function fullTop(car: CarId): number {
 export const SHIFT = {
   /** Extra torque-cut seconds by grade, on top of the car's clean shift time. */
   cutExtra: { clean: 0, early: 0.16, late: 0.18, missed: 0.13, assist: 0 } as Record<ShiftGrade, number>,
+  /** Skill-first: after a poor upshift the new gear pulls short of full power and recovers over bogS (the clutch is
+   *  dumped off the limiter or into a lug, and the boost has dropped). Depth by grade, as a share of engine pull, × the
+   *  car's drivetrain `poorShift`... */
+  bog: { clean: 0, early: 0.25, late: 0.4, missed: 0.3, assist: 0 } as Record<ShiftGrade, number>,
+  /** ...plus this much per share of the car's acceleration that comes from its Turbo part: a clean shift keeps the
+   *  turbo spooled, a poor one lets the boost fall away, so the bigger the turbo, the more a poor shift costs. */
+  bogTurbo: 0.25,
+  /** The bog lifts (linearly) as the revs build this share of the redline in the new gear: a tall gear, where the needle
+   *  climbs slowly, carries a poor shift's cost longer (few shifts, each one matters)... */
+  bogRev: 0.12,
+  /** ...or after this many seconds at most (a bog never outlasts a bend). */
+  bogS: 1.2,
   /** Seconds on the limiter (no pull, needle red) before the box shifts itself: the forgiving fallback, slow on purpose. */
   autoDelay: 0.43,
   /** `ordinary` shifting: this long on the limiter, then a late shift. */
@@ -274,9 +292,18 @@ export const SHIFT = {
   topLift: 0.5,
   /** Seconds the green window stays open when the car sets none (drivetrain `windowS`). */
   windowS: 0.45,
+  /** No setup makes the window shorter than this (seconds). */
+  minWindowS: 0.45,
   /** The window never opens below this fraction of the redline. */
   floorLo: 0.55,
 };
+
+/** Share of a racer's acceleration stat that its Turbo part supplies (0 for a stock car; rivals: against the car's
+ *  base line). A poor shift loses part of it for a moment (SHIFT.bogTurbo). */
+export function turboShare(r: { car: CarId; stats: RacerStats }): number {
+  const base = carById(r.car).base.accel;
+  return Math.max(0, Math.min(0.8, 1 - base / Math.max(1e-6, r.stats.accel)));
+}
 
 /** Engine pull at a fraction of the redline: lugs low, full in the power band, nothing on the limiter. */
 export function torqueAt(f: number, bandTop = 0.95, low = 0.72): number {
@@ -329,6 +356,7 @@ export class RaceSim {
     this.nitroStart = setup.nitroCharges;
     this.practice = setup.practice ?? (setup.windowScale ?? 1) > 1;
     this.perfectMul = setup.player.perfectMul ?? RACE.perfectMul;
+    this.gearbox = GEARBOX_SETUPS[setup.player.gearbox ?? 'standard'] ?? GEARBOX_SETUPS.standard;
     const rng = makeRng(setup.seed);
     const mk = (id: string, name: string, car: CarId, paint: string, stats: RacerStats, isPlayer: boolean, policy: ShiftPolicy): Racer => ({
       id, name, car, paint, isPlayer, stats, x: 0, v: 0, finishTime: null, nitroLeft: 0, nitroMul: 1, splits: [], gear: 0, cut: 0, limiterT: 0, policy, peak: 0, braking: false,
@@ -362,6 +390,8 @@ export class RaceSim {
 
   ghost!: Racer;
   perfectMul: number;
+  /** The player's gearbox setup (skill-first experiment; `standard` unless the setup names one). */
+  gearbox: GearboxSetup;
   trapSpeed: number | null = null;
   /** Seconds gained by the most recent boost, measured against the no-nitro ghost (set when it ends). */
   lastBoostGain: { seconds: number; perfect: boolean } | null = null;
@@ -442,7 +472,8 @@ export class RaceSim {
     const d = drivetrainFor(r.car);
     const b = this.band(r);
     const hi = b[1] + (1 - b[1]) * SHIFT.topLift;
-    const T = d.windowS ?? SHIFT.windowS;
+    const base = d.windowS ?? SHIFT.windowS;
+    const T = r.isPlayer ? Math.max(Math.min(base, SHIFT.minWindowS), base * this.gearbox.window) : base;
     const vr = this.gearTop(r) * d.gears[gear];
     const rate = (fr: number) => this.maxAccel(r, fr * vr) / vr; // needle speed, fractions of the redline per second
     let lo = hi;
@@ -585,13 +616,20 @@ export class RaceSim {
     const d = drivetrainFor(r.car);
     const f = this.rpmFrac(r);
     r.gear = Math.min(d.gears.length - 1, r.gear + 1);
-    r.cut = d.shiftS + SHIFT.cutExtra[grade];
+    const gb = r.isPlayer ? this.gearbox : GEARBOX_SETUPS.standard;
+    const harsh = (d.poorShift ?? 1) * gb.poor;
+    const cleanS = d.shiftS * gb.shift;
+    r.cut = cleanS + SHIFT.cutExtra[grade] * harsh;
     r.limiterT = 0;
+    const bog = SHIFT.bog[grade] * harsh;
+    r.bogT = bog > 0 ? SHIFT.bogS : 0;
+    r.bogF0 = this.rpmFrac(r);
+    r.bogDepth = bog > 0 ? Math.min(0.85, bog + SHIFT.bogTurbo * turboShare(r)) : 0;
     r.gearT = this.t;
     if (!r.isPlayer) return;
     // the double-tap guard follows the player's own taps only: after an automatic shift the next green is live at once
     if (grade !== 'missed' && grade !== 'assist') this.lastShiftT = this.t;
-    const rec: ShiftRecord = { t: this.t, into: r.gear, grade, rpm: f, cost: this.pendingCost + r.cut - d.shiftS };
+    const rec: ShiftRecord = { t: this.t, into: r.gear, grade, rpm: f, cost: this.pendingCost + r.cut - cleanS };
     this.pendingCost = 0;
     this.shiftLog.push(rec);
     this.lastShift = rec;
@@ -714,7 +752,15 @@ export class RaceSim {
     const f = this.rpmFrac(r);
     let pull: number;
     if (r.cut > 0) { pull = 0; r.cut = Math.max(0, r.cut - dt); }
-    else pull = torqueAt(f, d.band[1], d.lowPull);
+    else {
+      pull = torqueAt(f, d.band[1], d.lowPull);
+      // skill-first: a poor shift's bog, recovering as the revs build in the new gear
+      if ((r.bogT ?? 0) > 0) {
+        const lift = Math.max(1 - r.bogT! / SHIFT.bogS, (f - (r.bogF0 ?? f)) / SHIFT.bogRev);
+        if (lift >= 1) r.bogT = 0;
+        else { pull *= 1 - (r.bogDepth ?? 0) * (1 - Math.max(0, lift)); r.bogT = Math.max(0, r.bogT! - dt); }
+      }
+    }
     if (f >= 0.999 && !this.topGear(r)) r.limiterT += dt;
     else r.limiterT = 0;
     if (r.isPlayer && pull < 1 && a > 0) {

@@ -23,6 +23,7 @@ import { artOf, rivalLook } from '../data/rivalCars';
 import type { Racer } from '../core/race';
 import type { App } from './app';
 import { h, ordinal } from './dom';
+import { icon } from './icons'; // Skill-First UI icon set (pause, nitro)
 
 /** Track canvas resolution tiers (device pixels per CSS pixel, capped by the screen's own): full, then two steps a
  *  slow phone falls back to — chosen in the countdown, or after two slow seconds mid-race. */
@@ -269,7 +270,7 @@ export class RaceScreen {
     this.shiftBtn.addEventListener('click', (e) => { if ((e as PointerEvent).pointerType === '' || e.detail === 0) this.tapShift(); });
     this.gradeEl = h('div', { class: 'shiftgrade', role: 'status', 'aria-live': 'polite' });
     this.gauge = new Gauge(setup.player.car, this.reduced, this.sim.band(), gaugeRange(setup.player.car, setup.player.stats, this.sim.perfectMul));
-    const pauseBtn = h('button', { class: 'iconbtn pausebtn', 'aria-label': 'Pause', onclick: () => this.setPaused(true) }, 'Ⅱ');
+    const pauseBtn = h('button', { class: 'iconbtn pausebtn', 'aria-label': 'Pause', onclick: () => this.setPaused(true) }, icon('pause'));
     this.el = h('div', { class: 'racescreen', role: 'dialog', 'aria-label': `Race: ${this.eventName}` },
       this.canvas,
       h('div', { class: 'hud' },
@@ -754,7 +755,7 @@ export class RaceScreen {
     const labelKey = `${c}:${nitroLabel}`;
     if (this.nitroBtn.dataset.key !== labelKey) {
       this.nitroBtn.dataset.key = labelKey;
-      this.nitroBtn.replaceChildren(h('span', { class: 'n num' }, c), nitroLabel);
+      this.nitroBtn.replaceChildren(h('span', { class: 'nrow' }, icon('nitro', 'nico'), h('span', { class: 'n num' }, c)), h('span', { class: 'nl' }, nitroLabel));
     }
     this.nitroBtn.classList.toggle('empty', c === 0);
     this.nitroBtn.setAttribute('aria-label', `Nitro, ${c} left`);

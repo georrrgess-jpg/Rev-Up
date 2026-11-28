@@ -22,6 +22,9 @@ export interface Drivetrain {
   /** Engine pull below the power band as a share of peak (default 0.72): a turbo midrange keeps pulling when you
    *  short-shift, a peaky engine bogs. */
   lowPull?: number;
+  /** Skill-first: how hard this box punishes a poor (early / late / missed) upshift, × the SHIFT cut and bog (default 1).
+   *  Cars with few shifts a race (each one matters) or a tired, crunchy box punish more. */
+  poorShift?: number;
   /** Seconds of torque cut for a clean shift (a sequential box is quicker than a tired H-pattern). */
   shiftS: number;
   /** Speedometer full scale (mph). Grows with the car. */
@@ -44,23 +47,23 @@ export const BENCHMARK_MPH: Partial<Record<CarId, number>> = {
 
 export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Tapeback 1.1: a tired four-speed. Slow shifts, narrow band, it bogs if you short-shift.
-  junker: { windowS: 0.5, gears: [0.36, 0.58, 0.82, 1.3], idle: 850, redline: 6200, band: [0.8, 0.95], shiftS: 0.06, gaugeMph: 100, topScale: 0.925, accelScale: 1.225 },
+  junker: { windowS: 0.5, poorShift: 1.3, gears: [0.36, 0.58, 0.82, 1.3], idle: 850, redline: 6200, band: [0.8, 0.95], shiftS: 0.06, gaugeMph: 100, topScale: 0.925, accelScale: 1.225 },
   // Corsa Rojo: five-speed sedan box, honest and forgiving.
   beater: { windowS: 0.5, gears: [0.3, 0.48, 0.66, 0.86, 1.3], idle: 800, redline: 6500, band: [0.78, 0.95], shiftS: 0.055, gaugeMph: 120, topScale: 1.075, accelScale: 0.95 },
   // Vexa GTi: short-geared five-speed that wants to live near the limiter.
   hothatch: { windowS: 0.5, gears: [0.29, 0.46, 0.63, 0.82, 1.3], idle: 900, redline: 7400, band: [0.82, 0.96], shiftS: 0.045, gaugeMph: 150, topScale: 1.225, accelScale: 0.875 },
   // Ironhorse 455: big V8, long gears, low redline. Fewer shifts, each one matters.
-  muscle: { gears: [0.33, 0.54, 0.77, 1.3], idle: 700, redline: 5800, band: [0.76, 0.94], shiftS: 0.06, gaugeMph: 170, topScale: 1.225, accelScale: 0.9 },
+  muscle: { poorShift: 1.4, gears: [0.33, 0.54, 0.77, 1.3], idle: 700, redline: 5800, band: [0.76, 0.94], shiftS: 0.06, gaugeMph: 170, topScale: 1.225, accelScale: 0.9 },
   // Altamar GT: long-legged five-speed grand tourer, tall top gear.
   tourer: { gears: [0.3, 0.47, 0.65, 0.86, 1.3], idle: 750, redline: 6800, band: [0.78, 0.95], shiftS: 0.045, gaugeMph: 190, topScale: 1.1, accelScale: 0.95, pullExp: 2.5 },
   // Kestrel 1600: a screaming four that lives high on the tach; a narrow band, quick shifts.
-  tuner: { gears: [0.44, 0.66, 0.86, 1.3], idle: 1100, redline: 9000, band: [0.86, 0.97], shiftS: 0.035, gaugeMph: 160, topScale: 0.925, accelScale: 1.175 },
+  tuner: { poorShift: 1.2, gears: [0.44, 0.66, 0.86, 1.3], idle: 1100, redline: 9000, band: [0.86, 0.97], shiftS: 0.035, gaugeMph: 160, topScale: 0.925, accelScale: 1.175 },
   // Lumen RS: six-speed dual clutch; quick shifts, wide band.
-  super: { gears: [0.28, 0.43, 0.58, 0.74, 0.92, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 240, topScale: 1.625, accelScale: 0.8 },
+  super: { poorShift: 0.85, gears: [0.28, 0.43, 0.58, 0.74, 0.92, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 240, topScale: 1.625, accelScale: 0.8 },
   // Corvo Rally: five-speed AWD gearing; quick to its (modest) top speed.
   rally: { gears: [0.36, 0.56, 0.76, 0.96, 1.3], idle: 950, redline: 7800, band: [0.8, 0.95], shiftS: 0.035, gaugeMph: 170, topScale: 1.08, accelScale: 0.95, pullExp: 3 },
   // Strata GTR: five-speed sequential endurance box.
-  gt: { gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.2, accelScale: 0.8, pullExp: 2.5 },
+  gt: { poorShift: 1.15, gears: [0.32, 0.5, 0.67, 0.84, 1.3], idle: 1000, redline: 8600, band: [0.82, 0.96], shiftS: 0.025, gaugeMph: 220, topScale: 1.2, accelScale: 0.8, pullExp: 2.5 },
   // Halcyon X: six-speed paddle box with the narrowest band in the game — the hardest car to master.
   proto: { gears: [0.3, 0.48, 0.64, 0.79, 0.93, 1.3], idle: 1200, redline: 11000, band: [0.88, 0.97], shiftS: 0.02, gaugeMph: 260, topScale: 1.29, accelScale: 0.8, pullExp: 2.6 },
   // 1.8 supercars (placeholders; the progression and racing agents tune these).
@@ -86,7 +89,7 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Tempest E4: four electric motors and a three-speed box (two shifts a race): full torque from zero rpm (lowPull 1),
   // a 15,500 rpm motor redline, the quickest shifts in the game and a wide green. Its signature is launch control
   // (data/circuit.ts LAUNCH_CONTROL): tap LAUNCH on GO for more traction and pull through the launch segment.
-  tempest: { gears: [0.45, 0.78, 1.32], idle: 600, redline: 15500, band: [0.8, 0.97], windowS: 0.55, shiftS: 0.012, lowPull: 1, gaugeMph: 300, topScale: 1.4, accelScale: 0.9, pullExp: 2.6 },
+  tempest: { poorShift: 2, gears: [0.45, 0.78, 1.32], idle: 600, redline: 15500, band: [0.8, 0.97], windowS: 0.55, shiftS: 0.012, lowPull: 1, gaugeMph: 300, topScale: 1.4, accelScale: 0.9, pullExp: 2.6 },
   // ---- 1.10 Redline (Progression workstream, clearly marked; the Racing workstream may retune the gearing): the
   // Kestrel 1600 R. The Kestrel's screaming four, rebuilt: six short, close gears and a 10,500 rpm redline, peaky
   // (bogs if you short-shift), a quick sequential box. Top speed is deliberately the lowest of the late cars.
@@ -95,5 +98,20 @@ export const DRIVETRAINS: Record<CarId, Drivetrain> = {
   // Legacy placeholder id kept for old data.
   hyper: { gears: [0.25, 0.38, 0.5, 0.62, 0.75, 0.9, 1.3], idle: 1000, redline: 9200, band: [0.8, 0.96], shiftS: 0.025, gaugeMph: 260, topScale: 1.625, accelScale: 0.8 },
 };
+
+/**
+ * Skill-first: gearbox setups (an experiment the race sim supports; see tests/skill-first.test.ts). A setup scales the
+ * player's green window (seconds), the clean shift's torque cut and the penalty of a poor shift. `standard` is the game
+ * as it ships; nothing in the save picks another one yet (no part or tune carries it).
+ */
+export interface GearboxSetup { label: string; window: number; shift: number; poor: number }
+export const GEARBOX_SETUPS = {
+  /** A wider green and a softer penalty for a poor shift; slower clean shifts. */
+  forgiving: { label: 'Forgiving', window: 1.35, shift: 1.6, poor: 0.75 },
+  standard: { label: 'Standard', window: 1, shift: 1, poor: 1 },
+  /** A narrower green (never under SHIFT.minWindowS) and a harder penalty; quicker clean shifts. */
+  performance: { label: 'Performance', window: 0.8, shift: 0.5, poor: 1.25 },
+} satisfies Record<string, GearboxSetup>;
+export type GearboxId = keyof typeof GEARBOX_SETUPS;
 
 export const drivetrainFor = (car: CarId): Drivetrain => DRIVETRAINS[car] ?? DRIVETRAINS.beater;

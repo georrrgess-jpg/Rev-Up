@@ -203,6 +203,10 @@ export class Gauge {
       const col = m.shape === 'bracket' ? (fr.launchArmed ? '#5ef2ff' : '#5dff8a') : m.shape === 'late' ? '#ff6a5a' : m.shape === 'outline' ? '#ffc457' : 'rgba(150,170,160,0.55)';
       if (m.shape === 'bracket' || m.shape === 'late') arc(lo, hi, col, tw + 2 * s, tr);
       else if (m.shape === 'held') arc(lo, hi, col, tw, tr, [3, 3]);
+      // Skill-First UI: a coming window is a tinted band between its brackets, so its width (per car and setup) reads
+      // before it opens; a live one is the solid band above, and a thin outer edge marks the span in every state
+      else if (m.shape === 'outline') arc(lo, hi, 'rgba(255,196,87,0.32)', tw, tr);
+      if (m.shape !== 'held') { ctx.globalAlpha = 0.85; arc(lo, hi, col, 1.6 * s, tr + tw / 2 + 2.2 * s); ctx.globalAlpha = 1; }
       // brackets: a stroke across the ring at each end, longer on a live window
       const ext = m.shape === 'bracket' || m.shape === 'late' ? 6 : 4;
       ctx.strokeStyle = col;

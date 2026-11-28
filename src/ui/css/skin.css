@@ -1,0 +1,279 @@
+/* =====================================================================================================================
+   Skill-First UI · the shared design system (UI workstream). Loaded after every screen's own stylesheet.
+   One type scale (style.css --fs-*), one spacing scale (--sp-*), three radii, one icon family (src/ui/icons.ts) and one
+   set of button states: default · pressed · disabled · primary · secondary. Each screen has one primary action; the
+   rest are quiet tools, with details behind a tap. Fixed chrome (top bar, bottom nav, action bars) never moves; only
+   the panels inside it scroll, and they never rubber-band past their ends.
+   ===================================================================================================================== */
+:root {
+  --surface-1: #19212b;  /* panels */
+  --surface-2: #222b37;  /* raised controls */
+  --surface-3: #2c3746;  /* pressed / selected */
+  --stroke: #3d4a5a;
+  --stroke-hi: #586a80;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+  --ink-amber: var(--amber-ink);
+  --focus: var(--amber2);
+}
+
+/* ---------------------------------------------------------------- icons */
+.ico { display: inline-grid; place-items: center; flex: none; line-height: 0; }
+.ico-svg { width: 20px; height: 20px; display: block; }
+.btn .ico-svg { width: 20px; height: 20px; }
+
+/* ---------------------------------------------------------------- buttons: one set of states everywhere */
+.btn { border-radius: var(--r-md); transition: transform .08s ease, filter .12s ease, background-color .12s ease, border-color .12s ease; }
+.btn:not(.primary) { background: var(--surface-2); border-color: var(--stroke); }
+.btn:not([disabled]):not(.off):active { transform: translateY(1px) scale(.98); filter: brightness(.9); }
+.btn.primary:not([disabled]):not(.off):active { transform: translateY(2px); box-shadow: 0 2px 0 #a5641a; filter: none; }
+.btn[disabled], .btn.off { background: var(--bg2); color: var(--dim); border-color: var(--line); box-shadow: none; opacity: .78; }
+.btn.secondary { background: transparent; border: 1.5px solid var(--stroke-hi); color: var(--text); }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.iconbtn:active, .nav button:active, .chip:active { filter: brightness(.88); }
+@media (hover: hover) { .btn:not([disabled]):not(.off):not(.primary):hover { border-color: var(--stroke-hi); } }
+
+/* a "tool" button: icon over a one-word label (secondary actions in the Garage and the selection bar) */
+.btn.tool { flex-direction: column; gap: 2px; padding: 5px 2px 4px; min-height: 52px; min-width: 0; font-size: var(--fs-xs); font-weight: var(--w-heavy); line-height: 1.1; color: var(--text); }
+.btn.tool .ico-svg { width: 22px; height: 22px; }
+.btn.tool .tl { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn.tool small { display: block; max-width: 100%; font-size: 0.6875rem; font-weight: var(--w-strong); color: inherit; opacity: .78; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.btn.tool .count { position: absolute; top: 3px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 0.6875rem; font-weight: var(--w-heavy); line-height: 1; background: var(--amber2); color: var(--amber-ink); box-shadow: 0 0 0 2px var(--surface-2); }
+.btn.tool .count.full { background: var(--red); color: #fff; }
+.btn.tool .dot { position: absolute; top: 5px; left: calc(50% + 9px); width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 2px var(--surface-2); }
+
+/* ---------------------------------------------------------------- app shell: html/body are never scroll roots */
+html, body { overflow: clip; overscroll-behavior: none; }
+#app { overflow: clip; overscroll-behavior: none; }
+/* the panels are the only scrollers: they scroll naturally but never rubber-band past their ends or hand the swipe
+   on to the page (that is what dragged the top bar and nav and showed blank space on iOS) */
+.scroll, .sheet, .result .card, .inspect .info, .mech-scroll, .workshop, [data-scroll] { overscroll-behavior: none; }
+.race-jump, .comp-strip, .fit-cars, .finish-options { overscroll-behavior-x: none; }
+/* a view is a frame, never a scroller (overflow-x: hidden made the Showroom a vertical scroll container of its own,
+   so a swipe at the end of its list moved the whole screen) */
+.view, .showroom-view { overflow: clip; overscroll-behavior: none; }
+.showroom-view .scroll { overflow-x: clip; overflow-y: auto; }
+/* fixed chrome takes no pan gestures: a swipe that starts on it cannot drag the page or a panel under it (taps work) */
+.topbar, .nav, .garage .actions, .racescreen .hud, .racescreen .racebar { touch-action: none; }
+.topbar button, .nav button, .garage .actions button { touch-action: none; }
+
+/* ---------------------------------------------------------------- top bar */
+.topbar { gap: 6px; }
+.topbar .chip { gap: 5px; }
+.topbar .chip .cico .ico-svg { width: 17px; height: 17px; }
+.topbar .chip.cash .cico { color: var(--amber2); }
+.topbar .chip.scrap .cico { color: var(--silver); }
+.topbar .chip.earned .cico { color: var(--gold); }
+.topbar .chip .ico.w, .topbar .chip .ico.g { display: none !important; }
+.topbar .iconbtn { color: var(--muted); background: var(--surface-1); border-color: var(--stroke); }
+.topbar .iconbtn .ico-svg { width: 22px; height: 22px; }
+@media (max-width: 359px) { .topbar .chip .cico .ico-svg { width: 15px; height: 15px; } .topbar .chip { gap: 3px; } .topbar .iconbtn .ico-svg { width: 20px; height: 20px; } }
+
+/* ---------------------------------------------------------------- bottom nav: icon + short label, one clear "you are here" */
+.nav { background: #0f141b; border-top: 1px solid #2c3644; }
+.nav button { gap: 3px; color: var(--dim); font-size: var(--fs-2xs); font-weight: var(--w-heavy); letter-spacing: .02em; }
+.nav button .ni .ico-svg { width: 24px; height: 24px; }
+.nav button.on { color: var(--amber2); background: transparent; box-shadow: none; }
+.nav button.on::before { content: ''; position: absolute; top: 3px; left: 50%; width: 56px; height: 32px; margin-left: -28px; border-radius: 16px; background: rgba(255,206,135,.14); }
+.nav button > * { position: relative; }
+.nav button .ni { margin-top: 2px; }
+@media (max-height: 660px) { .nav button .ni .ico-svg { width: 22px; height: 22px; } .nav button.on::before { height: 28px; top: 2px; } .nav button .ni { margin-top: 0; } }
+
+/* =====================================================================================================================
+   Garage: the board gets the room; the goal and its one action on top; your car, spares and tools in thumb reach.
+   ===================================================================================================================== */
+.garage .goal-row { display: flex; gap: 6px; align-items: stretch; }
+.garage .goal-row > .goal { flex: 1 1 auto; min-width: 0; margin: 0; }
+.garage .goal { border-radius: var(--r-md); background: linear-gradient(180deg, #2a3442, #1f2732); border-color: #46556a; }
+.garage .goal .gt { font-size: 0.6875rem; letter-spacing: .06em; color: var(--muted); }
+.garage .goal .gt::before { content: 'Next · '; color: var(--dim); }
+.garage .goal .gl .need { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
+.garage .goal .goal-act { max-width: 38%; border-radius: var(--r-sm); }
+/* the Job Board: a compact icon tile beside the goal (count and Garage Level), not a second card */
+.garage .goal-row > .jobs-pill { width: 58px; padding: 4px 4px 5px; display: grid; grid-template-columns: auto auto; justify-content: center; align-content: center; column-gap: 3px; row-gap: 1px; border-radius: var(--r-md); }
+.garage .jobs-pill .jp-i { grid-row: 1; color: var(--amber2); }
+.garage .jobs-pill .jp-i .ico-svg { width: 17px; height: 17px; }
+.garage .jobs-pill .jp-top { grid-row: 1; align-self: center; font-size: var(--fs-xs); letter-spacing: 0; color: var(--text); }
+.garage .jobs-pill .jp-sub { grid-column: 1 / -1; text-align: center; font-size: 0.6875rem; }
+.garage .jobs-pill .bar { grid-column: 1 / -1; margin-top: 2px; }
+.garage .goal-row:has(.jobs-pill:not([hidden])) > .goal canvas { width: 58px; height: 32px; }
+
+/* your car + its slots */
+.garage .mycar { border-radius: var(--r-md); }
+.garage .mycar:not(.fitnow)::before { content: none; }
+.garage .mycar .mycar-fit { position: absolute; top: -1px; right: -1px; width: 20px; height: 20px; border-radius: 0 var(--r-md) 0 8px; background: #3a2a12; border: 1px solid var(--amber); color: var(--amber2); }
+.garage .mycar .mycar-fit .ico-svg { width: 13px; height: 13px; }
+.garage .mycar.fitnow .mycar-fit { display: none; }
+.fitstrip .eq { border-radius: var(--r-md); }
+
+/* spare rack row: Spares (shelf icon + free slots) · the rack · Recycle press */
+.garage .trayrow .traycaption.sort-spares { gap: 1px; border-radius: var(--r-md); background: var(--surface-2); border-color: var(--stroke); }
+.garage .trayrow .sort-spares .tc-i { color: var(--muted); }
+.garage .trayrow .sort-spares .tc-i .ico-svg { width: 18px; height: 18px; }
+.garage .trayrow .sort-spares .tc-t { display: none; }
+.garage .trayrow .sort-spares .num { font-size: 0.6875rem; white-space: nowrap; }
+.garage .trayrow .sort-spares.full .tc-i { color: var(--amber2); }
+.garage .press { border-radius: var(--r-md); gap: 1px; }
+.garage .press .pi .ico-svg { width: 20px; height: 20px; }
+.garage .press .pl { font-size: 0.6875rem; }
+.garage .tray { border-radius: var(--r-md); }
+
+/* the hint is a quiet single line; a refusal reads in the error colour */
+.garage .hint { font-size: var(--fs-xs); color: var(--amber2); }
+
+/* action bar: three quiet tools, then Race — the one primary action, the widest, under the right thumb */
+.garage .actions { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.75fr); gap: 6px; padding-top: 6px; }
+.garage .actions .btn.tool { background: var(--surface-2); border-color: var(--stroke); }
+.garage .actions .btn.tool.off { opacity: .62; }
+.garage .actions .btn.crates.pulse { border-color: var(--amber); }
+.garage .actions .btn.crates .printer { left: 10px; right: 10px; bottom: 4px; height: 3px; }
+.garage .actions .btn.race { flex-direction: row; gap: 8px; justify-content: center; padding-inline: 8px; min-height: 56px; font-size: var(--fs-lg); }
+.garage .actions .btn.race > .ico .ico-svg { width: 24px; height: 24px; }
+.garage .actions .btn.race .stack { align-items: flex-start; }
+.garage .actions .btn.race small { font-size: 0.6875rem; }
+.garage .actions .btn.race .nitro-badge { display: inline-flex; align-items: center; gap: 1px; padding: 1px 6px 1px 3px; top: -10px; left: 8px; }
+.garage .actions .btn.race .nitro-badge .ico-svg { width: 12px; height: 12px; }
+/* selection bar (a part picked up): Fit · Store · Recycle · Test, each an icon with its one-line effect */
+.garage .actions .selbar { gap: 5px; }
+.garage .actions .selbar .btn.tool { min-height: 56px; padding-inline: 1px; }
+.garage .actions .selbar .btn.tool .ico-svg { width: 20px; height: 20px; }
+@media (max-width: 359px) {
+  .garage .actions { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr); gap: 4px; }
+  .btn.tool { font-size: 0.6875rem; }
+  .garage .actions .btn.race { gap: 5px; padding-inline: 4px; }
+  .garage .actions .btn.race > .ico .ico-svg { width: 20px; height: 20px; }
+  .garage .actions .selbar { gap: 3px; }
+  .garage .goal-row > .jobs-pill { width: 50px; }
+}
+@media (max-height: 700px) {
+  .garage .actions .btn.tool { min-height: 46px; padding-block: 3px 2px; }
+  .garage .actions .btn.tool .ico-svg { width: 20px; height: 20px; }
+  .garage .actions .btn.race { min-height: 48px; font-size: var(--fs-md); }
+  .garage .actions .selbar .btn.tool { min-height: 48px; }
+  .garage .actions .selbar .btn.tool small { display: none; }
+}
+/* short phones: the plain hint line gives its row to the board (the coach, the glow on matching parts and the goal
+   card say the same thing); a board-full recovery keeps its row, and a refusal's reason also shows as a toast */
+@media (max-height: 700px) {
+  .garage .garage-body > .hint:not(:has(.recover)) { display: none; }
+}
+
+/* =====================================================================================================================
+   Race menu: your car in one slim row, then the recommended race and its reward with one big Race button; everything
+   else (competition, jobs, runs, the full list) below and behind a tap.
+   ===================================================================================================================== */
+.race-view .racehead { border-radius: var(--r-md); background: var(--surface-1); border-color: var(--stroke); min-height: 52px; padding: 2px 6px 2px 2px; }
+.race-view .racehead canvas { width: 86px; height: 42px; }
+.race-view .racehead .stats strong { font-size: var(--fs-md); }
+.race-view .racehead .head-stats { font-size: var(--fs-2xs); }
+.race-view .racehead .head-stats .ico-svg { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 2px; color: var(--blue); }
+.race-view .racehead > .btn { gap: 4px; padding-inline: 10px; }
+.race-view .racehead > .btn .ico-svg { width: 18px; height: 18px; }
+.race-view .race-jump { margin: 6px 0 6px; }
+.race-view .race-jump .jump { border-radius: 999px; background: var(--surface-1); border-color: var(--stroke); }
+.race-view .race-jump .jump .ico-svg { width: 16px; height: 16px; }
+.race-view .race-jump .jump.on { background: rgba(255,206,135,.14); border-color: var(--amber); color: var(--amber2); }
+
+.featured.lead { border-radius: var(--r-lg); padding: 12px 14px 10px; margin-top: 0; }
+.featured.lead .feat-label { display: flex; align-items: center; gap: 6px; }
+.featured.lead .feat-label .ico-svg { width: 14px; height: 14px; }
+.featured.lead .top .name { font-size: var(--fs-xl); line-height: 1.1; }
+.featured.lead .reason { margin: 4px 0 8px; font-size: var(--fs-sm); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.featured .feat-reward { align-items: center; }
+.featured .feat-reward .ico-svg { width: 20px; height: 20px; color: var(--amber2); }
+.featured .feat-go { flex-direction: row; gap: 10px; min-height: 60px; border-radius: var(--r-md); }
+.featured .feat-go > .ico .ico-svg { width: 26px; height: 26px; }
+.featured .feat-go .stack { align-items: flex-start; }
+.featured .feat-go .stack > b, .featured .feat-go .stack { font-size: var(--fs-xl); }
+.featured .feat-go small { font-size: var(--fs-2xs); font-weight: var(--w-strong); }
+.featured .feat-more .btn { gap: 6px; }
+.featured .feat-more .btn .ico-svg { width: 18px; height: 18px; }
+.featured .feat-rules > summary { gap: 6px; }
+.race-view .comp-strip { margin-top: 10px; }
+.race-view .comp-strip .cs-item { border-radius: var(--r-md); }
+.evt-row { border-radius: var(--r-md); }
+.evt-row .row-btns .btn { gap: 4px; }
+.evt-row .row-btns .btn .ico-svg { width: 16px; height: 16px; }
+.alts { border-radius: var(--r-lg); }
+.alts .alt .btn .ico-svg { width: 16px; height: 16px; }
+.alts .feat-label { color: var(--muted); }
+
+/* =====================================================================================================================
+   Results: the place and the payoff, one next step, then Garage / Race again. Why, telemetry and standings sit
+   behind "Race details".
+   ===================================================================================================================== */
+.result .card { border-radius: 20px; }
+.result .rewards .pays .chip { display: inline-flex; align-items: center; gap: 4px; }
+.result .rewards .pays .chip .ico-svg { width: 15px; height: 15px; }
+.result .next-act { flex-direction: row; gap: 8px; }
+.result .btns .btn { gap: 6px; }
+.result .btns .btn .ico-svg { width: 18px; height: 18px; }
+.result .race-more { margin: 0 0 4px; border-top: 1px solid var(--line); }
+.result .race-more > summary { min-height: 44px; display: flex; align-items: center; gap: 6px; font-weight: var(--w-heavy); font-size: var(--fs-sm); color: var(--muted); cursor: pointer; list-style: none; }
+.result .race-more > summary::-webkit-details-marker { display: none; }
+.result .race-more > summary::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s; }
+.result .race-more[open] > summary::after { transform: rotate(225deg); }
+.result .race-more > summary .ico-svg { width: 18px; height: 18px; }
+.result .race-more > :not(summary) { margin-top: 6px; }
+
+/* =====================================================================================================================
+   Showroom: the car takes the stage; Inspect · Customize · Race sit right under it.
+   ===================================================================================================================== */
+.show-hero .hero-nav { display: grid; place-items: center; padding: 0; }
+.show-hero .hero-nav .ico-svg { width: 26px; height: 26px; }
+.show-hero .hero-stats { display: grid; grid-template-columns: repeat(4, auto); justify-content: start; gap: 2px 14px; }
+.show-hero .hero-stats span { display: flex; flex-direction: column; line-height: 1.15; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.show-hero .hero-stats b { font-size: var(--fs-lg); letter-spacing: 0; text-transform: none; }
+.show-hero .hero-lines p { grid-template-columns: 84px 1fr; font-size: var(--fs-sm); }
+.show-hero .hero-acts { grid-template-columns: 1fr 1fr 1.4fr; }
+.show-hero .hero-acts .btn { flex-direction: column; gap: 2px; min-height: 58px; }
+.show-hero .hero-acts .btn .ico-svg { width: 22px; height: 22px; }
+.show-hero .hero-acts .btn.primary { flex-direction: row; gap: 8px; font-size: var(--fs-lg); }
+.show-hero .hero-acts .btn.primary .ico-svg { width: 24px; height: 24px; }
+.show-hero .hero-acts .btn.primary .stack { align-items: flex-start; }
+.show-hero .hero-more { display: flex; gap: 8px; flex-wrap: wrap; }
+.show-hero .hero-more .btn { min-height: 44px; gap: 6px; flex: 1 1 0; font-size: var(--fs-sm); }
+.show-hero .hero-more .btn .ico-svg { width: 18px; height: 18px; }
+/* the collection: the active car is already on the stage, so its card is a normal tile */
+.carcard.active { grid-column: auto; order: 0; }
+.carcard.active canvas { height: clamp(100px, 27vw, 172px); }
+.carcard.active .cn { font-size: var(--fs-md); }
+.carcard { border-radius: var(--r-lg); }
+.carcard canvas { background: radial-gradient(80% 70% at 50% 60%, #263142, #161c25); }
+.inspect .topx, .inspect-stage .btn { gap: 4px; }
+.inspect .topx .ico-svg, .inspect-stage .btn .ico-svg { width: 18px; height: 18px; }
+
+/* =====================================================================================================================
+   Sheets: a grab handle and a consistent header
+   ===================================================================================================================== */
+.sheet { border-radius: 20px 20px 0 0; }
+.sheet::before { content: ''; display: block; width: 40px; height: 4px; margin: -6px auto 8px; border-radius: 2px; background: #4a5668; }
+
+/* reduced motion: no pressed-state motion */
+.reduced .btn:active, .reduced .btn.primary:active { transform: none; }
+
+/* the goal button: icon + verb, one line (the card already says what and where) */
+.garage .goal .goal-act { flex-direction: column; gap: 1px; padding: 4px 12px; min-width: 64px; max-width: 30%; font-size: var(--fs-sm); }
+.garage .goal .goal-act .ico-svg { width: 20px; height: 20px; }
+.garage .goal .goal-act .act-verb { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-height: 700px) { .garage .goal .goal-act { flex-direction: row; gap: 5px; } .garage .goal .goal-act .ico-svg { width: 18px; height: 18px; } }
+@media (max-width: 359px) { .garage .goal .goal-act { max-width: none; flex: none; padding-inline: 8px; } }
+/* very short phones (320×568): every chrome row as thin as a 44 px target allows, so a full board fits unscrolled */
+@media (max-height: 660px) {
+  .garage .goal-row > .goal { min-height: 44px; padding-block: 2px; }
+  .garage .goal .gl .need { font-size: var(--fs-2xs); }
+  .garage .goal .goal-open { min-height: 40px; }
+  .garage .goal-row > .jobs-pill { padding-block: 2px; }
+  .garage .actions { padding-top: 4px; padding-bottom: 2px; }
+  .garage .actions .btn.tool, .garage .actions .btn.race, .garage .actions .selbar .btn.tool { min-height: 44px; }
+  .garage .garage-body > .trayrow { padding-block: 2px 1px; }
+  :root { --nav-h: 44px; }
+}
+@media (max-height: 660px) {
+  .garage .goal-row > .goal { padding-block: 0; }
+  .garage .goal-row > .jobs-pill { padding-block: 0; }
+  .garage .garage-body > .trayrow { padding-block: 0; }
+}
+.btn.tool .count { left: auto; right: 4px; top: 4px; }
+.btn.tool .dot { left: auto; right: 7px; top: 7px; }
+.carcard { overflow: clip; }

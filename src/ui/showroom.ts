@@ -12,6 +12,7 @@ import { mph } from '../core/units';
 import { openFitParts } from './fit';
 import type { App, View } from './app';
 import { h } from './dom';
+import { icon } from './icons';
 import { fmt } from './dom';
 
 const STAGES: Record<string, { wall: [string, string, string, string]; light: string; floor?: string }> = {
@@ -253,28 +254,32 @@ export class ShowroomView implements View {
     const step = (d: number) => { this.heroId = owned[(idx + d + owned.length) % owned.length]; this.renderHero(); };
     const active = s.activeCar === id;
     this.heroInfo.replaceChildren(...([
-      owned.length > 1 ? h('button', { class: 'hero-nav prev', 'aria-label': 'Previous car', onclick: () => step(-1) }, '‹') : null,
-      owned.length > 1 ? h('button', { class: 'hero-nav next', 'aria-label': 'Next car', onclick: () => step(1) }, '›') : null,
+      owned.length > 1 ? h('button', { class: 'hero-nav prev', 'aria-label': 'Previous car', onclick: () => step(-1) }, icon('prev')) : null,
+      owned.length > 1 ? h('button', { class: 'hero-nav next', 'aria-label': 'Next car', onclick: () => step(1) }, icon('next')) : null,
       h('div', { class: 'hero-id' },
         h('small', {}, `${car.name} · ${DISTRICTS[car.district].name}${active ? ' · racing now' : ''}`),
         h('h1', {}, car.model),
         h('div', { class: 'hero-stats' },
-          h('span', {}, h('b', { class: 'num' }, `${mph(lo.top)}`), ' mph'),
-          h('span', {}, 'Accel ', h('b', { class: 'num' }, lo.accel.toFixed(1))),
-          h('span', {}, 'Grip ', h('b', { class: 'num' }, lo.grip.toFixed(2))),
-          h('span', {}, 'Parts ', h('b', {}, `T${car.cap}`)))),
-      h('div', { class: 'hero-lines' },
-        h('p', {}, h('small', {}, 'Next to earn'), this.nextCollectible(id)),
-        h('p', {}, h('small', {}, 'Race it'), why.text)),
+          h('span', {}, h('b', { class: 'num' }, `${mph(lo.top)}`), 'mph'),
+          h('span', {}, h('b', { class: 'num' }, lo.accel.toFixed(1)), 'Accel'),
+          h('span', {}, h('b', { class: 'num' }, lo.grip.toFixed(2)), 'Grip'),
+          h('span', {}, h('b', {}, `T${car.cap}`), 'Parts'))),
+      // the three things to do with the car on stage, right under it: look it over, make it yours, race it
       h('div', { class: 'hero-acts' },
-        h('button', { class: 'btn', onclick: () => this.inspect(id) }, h('span', { class: 'stack' }, 'Customize', h('small', {}, 'paint · wheels'))),
-        h('button', { class: 'btn', onclick: () => this.compare(id) }, h('span', { class: 'stack' }, 'Compare', h('small', {}, 'vs your cars'))),
-        h('button', { class: 'btn primary', onclick: () => {
+        h('button', { class: 'btn', 'aria-label': `Inspect the ${car.model}`, onclick: () => this.inspect(id) }, icon('inspect'), 'Inspect'),
+        h('button', { class: 'btn', 'aria-label': `Customize the ${car.model}: paint and wheels`, onclick: () => this.inspect(id, true) }, icon('paint'), 'Customize'),
+        h('button', { class: 'btn primary', 'aria-label': `${active ? 'Race it' : 'Race this car'}: ${why.text}`, onclick: () => {
           if (!active) { this.app.game.setActiveCar(id); this.app.toast(`Racing the ${car.model}`); }
           const race = this.app.views.race as unknown as { jumpToEvent?(id: string): void };
           this.app.go('race');
           if (why.eventId) requestAnimationFrame(() => race.jumpToEvent?.(why.eventId!));
-        } }, h('span', { class: 'stack' }, active ? 'Race it' : 'Race this car', h('small', {}, why.eventId ? 'see the race' : 'Race menu')))),
+        } }, icon('flag'), h('span', { class: 'stack' }, active ? 'Race it' : 'Race', h('small', {}, why.eventId ? 'see the race' : 'Race menu')))),
+      h('div', { class: 'hero-lines' },
+        h('p', {}, h('small', {}, 'Best race'), why.text),
+        h('p', {}, h('small', {}, 'To earn'), this.nextCollectible(id))),
+      h('div', { class: 'hero-more' },
+        h('button', { class: 'btn sm secondary', onclick: () => this.compare(id) }, icon('compare'), 'Compare'),
+        h('button', { class: 'btn sm secondary', onclick: () => openFitParts(this.app, id) }, icon('fit'), 'Fit parts')),
     ] as (HTMLElement | null)[]).filter((x): x is HTMLElement => !!x));
     this.hero.style.setProperty('--hero-tint', (STAGES[id]?.light ?? '#b2d3e046').slice(0, 7));
     requestAnimationFrame(() => this.drawHero());
@@ -402,7 +407,7 @@ export class ShowroomView implements View {
     );
   }
 
-  private inspect(id: CarId) {
+  private inspect(id: CarId, customize = false) {
     this.closeDialog?.();
     const state = this.app.game.state;
     const car = carById(id);
@@ -478,7 +483,7 @@ export class ShowroomView implements View {
           if (!finishPreview) updateFinish();
           draw();
         },
-      }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), `🔒 ${item.name}`);
+      }, h('span', { class: 'swatch', style: `--paint:${item.paint}`, 'aria-hidden': 'true' }), icon('lock', 'lk'), item.name);
       finishButtons.append(btn);
     }
     const updateFinish = () => {
@@ -583,7 +588,7 @@ export class ShowroomView implements View {
       } else buyBar.hidden = true;
     };
     renderShop();
-    const closeBtn = h('button', { class: 'btn sm topx', onclick: () => close() }, 'Close');
+    const closeBtn = h('button', { class: 'btn sm topx', 'aria-label': 'Close', onclick: () => close() }, icon('close'), 'Close');
     const active = state.activeCar === id;
     const dialog = h('div', {
       class: 'inspect', role: 'dialog', 'aria-modal': 'true', 'aria-label': car.model,
@@ -636,5 +641,7 @@ export class ShowroomView implements View {
     draw();
     if (turn < 1) turnRaf = requestAnimationFrame((t0) => { turnRaf = requestAnimationFrame(spin(t0)); });
     closeBtn.focus({ preventScroll: true });
+    // Customize: open straight at the paint shop (finishes first)
+    if (customize) requestAnimationFrame(() => { const info = dialog.querySelector<HTMLElement>('.info'); const at = finishName; if (info && at) info.scrollTop = Math.max(0, at.offsetTop - info.offsetTop - 8); });
   }
 }

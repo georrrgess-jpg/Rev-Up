@@ -909,17 +909,17 @@ export const EVENTS: RaceEvent[] = [
   },
   // ---- Time attack: beat the clock on courses you know (no rivals, medals pay once)
   {
-    id: 'ta-strip', name: 'Strip Time Attack', district: 'trials', track: 'scrapyard', rivals: [], timeAttack: { bronze: 16.4, silver: 15.9, gold: 15.5 },
+    id: 'ta-strip', name: 'Strip Time Attack', district: 'trials', track: 'scrapyard', rivals: [], timeAttack: { bronze: 16.7, silver: 15.9, gold: 15.5 },
     payout: { cash: [40, 40, 40, 40], rep: [6, 6, 6, 6], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { beatBoss: 'ray' }, blurb: 'Solo run on Scrapyard Strip. Launch hard and hit both windows.',
   },
   {
-    id: 'ta-maple', name: 'Highway Time Attack', district: 'trials', track: 'maple', rivals: [], timeAttack: { bronze: 18.8, silver: 18.4, gold: 17.9 },
+    id: 'ta-maple', name: 'Highway Time Attack', district: 'trials', track: 'maple', rivals: [], timeAttack: { bronze: 19.2, silver: 18.4, gold: 17.9 },
     payout: { cash: [50, 50, 50, 50], rep: [8, 8, 8, 8], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'hothatch' }, blurb: 'Solo run on Maple Highway. Top speed and two clean boosts.',
   },
   {
-    id: 'ta-cliffs', name: 'Esses Time Attack', district: 'trials', track: 'cliffs', rivals: [], timeAttack: { bronze: 20.6, silver: 20.3, gold: 20.0 },
+    id: 'ta-cliffs', name: 'Esses Time Attack', district: 'trials', track: 'cliffs', rivals: [], timeAttack: { bronze: 20.8, silver: 20.3, gold: 20.0 },
     payout: { cash: [60, 60, 60, 60], rep: [10, 10, 10, 10], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { afterWin: 'harbor-launch' }, blurb: 'Solo run through Cliffside Esses. Every bend exit counts.',
   },
@@ -927,25 +927,25 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'neon-mile', name: 'Neon Mile', district: 'downtown', track: 'downtown', rivals: ['jules', 'kai', 'rhea'],
     payout: { cash: [420, 300, 220, 160], rep: [60, 42, 30, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 500, crates: 3 },
-    requires: { car: 'tourer' }, goals: { par: 23.1 },
+    requires: { car: 'tourer' }, goals: { par: 23.2 },
     blurb: 'A night street circuit under shop signs. Four corners; the Altamar is wide for them.',
   },
   {
     id: 'bridge-trap', name: 'Bridge Speed Trap', district: 'downtown', track: 'bridge', rivals: [],
     payout: { cash: [90, 90, 90, 90], rep: [12, 12, 12, 12], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'tourer' }, speedTrap: { bronze: 150, silver: 195, gold: 208 },
+    requires: { car: 'tourer' }, speedTrap: { bronze: 149, silver: 189, gold: 208 },
     blurb: 'One run across the harbor bridge. Scored on your speed through the gate, not your time.',
   },
   {
     id: 'stock-cup', name: 'Stock Cup', district: 'downtown', track: 'downtown', rivals: ['stock1', 'stock2', 'stock3'],
     payout: { cash: [380, 270, 200, 150], rep: [40, 28, 20, 15], crates: [2, 1, 1, 0] }, firstClear: { cash: 450, crates: 2 },
-    requires: { afterWin: 'neon-mile' }, partCap: 4, trophy: 'Stock Cup', goals: { par: 23.4 },
+    requires: { afterWin: 'neon-mile' }, partCap: 4, trophy: 'Stock Cup', goals: { par: 23.5 },
     blurb: 'Every part runs as T4 at most, on any car. The base car decides it: light and grippy wins the corners.',
   },
   {
     id: 'skyline-run', name: 'Skyline Run', district: 'downtown', track: 'skyline', rivals: ['mina', 'rhea', 'ozzy'],
     payout: { cash: [480, 340, 250, 190], rep: [66, 46, 33, 25], crates: [3, 2, 1, 1] }, firstClear: { cash: 600, crates: 3 },
-    requires: { afterWin: 'neon-mile' }, goals: { par: 24.1 },
+    requires: { afterWin: 'neon-mile' }, goals: { par: 24.4 },
     blurb: 'Expressway sweepers into one tight exit ramp. Top speed first, then grip.',
   },
   {
@@ -974,20 +974,20 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'midnight-run', name: 'Midnight Run', district: 'downtown', track: 'bridge', rivals: ['nova2', 'rhea', 'mina'],
     payout: { cash: [700, 500, 360, 260], rep: [80, 56, 40, 30], crates: [4, 3, 2, 1] }, firstClear: { cash: 1000, crates: 4 },
-    requires: { car: 'super' }, goals: { par: 11.8 },
+    requires: { car: 'super' }, goals: { par: 12.1 },
     blurb: 'Bridge drag at 2 a.m. against the fastest cars in the city. Where a Surge-boosted Lumen belongs.',
   },
   // ---------------- Desert Proving Ground (after the Lumen RS): the Corvo Rally and the Canyon Rally ----------------
   {
     id: 'canyon-qualifier', name: 'Canyon Qualifier', district: 'desert', track: 'dunes', rivals: ['odin', 'yara', 'tomas'],
     payout: { cash: [600, 430, 320, 240], rep: [70, 50, 36, 26], crates: [3, 2, 1, 1] }, firstClear: { cash: 800, crates: 4 },
-    requires: { car: 'super' }, goals: { par: 21.9 },
+    requires: { car: 'super' }, goals: { par: 22.1 },
     blurb: 'Gravel, two loose bends, and rally cars that launch like catapults. Win it to earn a Corvo Rally.',
   },
   {
     id: 'mesa-trap', name: 'Mesa Speed Trap', district: 'desert', track: 'mesa', rivals: [],
     payout: { cash: [150, 150, 150, 150], rep: [16, 16, 16, 16], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'super' }, speedTrap: { bronze: 185, silver: 200, gold: 215 },
+    requires: { car: 'super' }, speedTrap: { bronze: 183, silver: 200, gold: 215 },
     blurb: 'Salt flats and a gate at the far end. Scored on your speed through it — bring your fastest car.',
   },
   {
@@ -1016,7 +1016,7 @@ export const EVENTS: RaceEvent[] = [
     requires: { car: 'rally' }, blurb: 'Ironhorse 455s only, flat out across the salt. A T5 V8 with every boost still has a chance.',
   },
   {
-    id: 'ta-canyon', name: 'Canyon Time Attack', district: 'trials', track: 'canyon', rivals: [], timeAttack: { bronze: 26.6, silver: 26.1, gold: 25.9 },
+    id: 'ta-canyon', name: 'Canyon Time Attack', district: 'trials', track: 'canyon', rivals: [], timeAttack: { bronze: 26.8, silver: 26.1, gold: 25.9 },
     payout: { cash: [120, 120, 120, 120], rep: [14, 14, 14, 14], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'rally' }, blurb: 'Solo run through Red Canyon. Four hairpins, four clean exits.',
   },
@@ -1024,13 +1024,13 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'glacier-pass', name: 'Glacier Pass', district: 'summit', track: 'pass', rivals: ['mirelle', 'kenji', 'nova3'],
     payout: { cash: [900, 640, 480, 360], rep: [96, 68, 48, 36], crates: [4, 2, 1, 1] }, firstClear: { cash: 1200, crates: 4 },
-    requires: { car: 'gt' }, goals: { par: 22.9 },
+    requires: { car: 'gt' }, goals: { par: 23.1 },
     blurb: 'Three fast sweepers above the snow line. Aero grip is worth more than horsepower here.',
   },
   {
     id: 'summit-1000', name: 'Summit 1000', district: 'summit', track: 'summit', rivals: ['bex', 'kenji', 'mirelle'],
     payout: { cash: [1000, 720, 540, 400], rep: [104, 72, 52, 40], crates: [4, 3, 2, 1] }, firstClear: { cash: 1500, crates: 5 },
-    requires: { afterWin: 'glacier-pass' }, goals: { par: 34.0 },
+    requires: { afterWin: 'glacier-pass' }, goals: { par: 34.5 },
     blurb: 'The endurance classic: the full Summit Circuit against the GT teams. Win it and the Halcyon X is yours to build.',
   },
   {
@@ -1039,14 +1039,14 @@ export const EVENTS: RaceEvent[] = [
     requires: { car: 'gt' }, blurb: 'Altamar GTs only, over Glacier Pass. The coastal tourer was made for roads like this.',
   },
   {
-    id: 'ta-summit', name: 'Summit Time Attack', district: 'trials', track: 'summit', rivals: [], timeAttack: { bronze: 32.2, silver: 31.6, gold: 31.2 },
+    id: 'ta-summit', name: 'Summit Time Attack', district: 'trials', track: 'summit', rivals: [], timeAttack: { bronze: 32.6, silver: 31.6, gold: 31.2 },
     payout: { cash: [150, 150, 150, 150], rep: [16, 16, 16, 16], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'gt' }, blurb: 'One lap of the Summit Circuit, alone. The record board every car can chase.',
   },
   {
     id: 'summit-gala', name: 'Summit Gala', district: 'summit', track: 'summit', rivals: ['sable', 'nova3', 'iver'],
     payout: { cash: [1500, 1000, 750, 550], rep: [150, 100, 70, 50], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'proto' }, goals: { par: 32.0 },
+    requires: { car: 'proto' }, goals: { par: 32.4 },
     boss: { rival: 'iver', reward: { cash: 6000, crates: 8, blueprint: 'Summit Ice', badge: 'Summit Champion' } },
     blurb: 'The grand finale. Every champion you have beaten, and Anders Kvale in the other Halcyon. Clean shifts or nothing. Win it for an invitation to the Riviera — and a Vireo 9R.',
   },
@@ -1054,11 +1054,11 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'corniche', name: 'Corniche Hairpins', district: 'riviera', track: 'corniche', rivals: ['ilse', 'anouk', 'ravi'],
     payout: { cash: [1300, 920, 690, 520], rep: [120, 84, 60, 46], crates: [4, 3, 2, 1] }, firstClear: { cash: 1600, crates: 5 },
-    requires: { car: 'vireo' }, goals: { par: 25.4 },
+    requires: { car: 'vireo' }, goals: { par: 25.5 },
     blurb: 'Five hairpins on the cliff road. The Vireo changes direction quicker than anything; a Halcyon is too long for it. Win it to be offered a Mako TT.',
   },
   {
-    id: 'ta-corniche', name: 'Corniche Time Attack', district: 'trials', track: 'corniche', rivals: [], timeAttack: { bronze: 25.7, silver: 25.2, gold: 24.9 },
+    id: 'ta-corniche', name: 'Corniche Time Attack', district: 'trials', track: 'corniche', rivals: [], timeAttack: { bronze: 25.9, silver: 25.2, gold: 24.9 },
     payout: { cash: [160, 160, 160, 160], rep: [18, 18, 18, 18], crates: [0, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'vireo' }, blurb: 'Solo run down the Corniche. Five hairpins, five clean exits.',
   },
@@ -1070,13 +1070,13 @@ export const EVENTS: RaceEvent[] = [
   {
     id: 'port-sprint', name: 'Port Sprint', district: 'riviera', track: 'port', rivals: ['dario', 'teo', 'iver2'],
     payout: { cash: [1400, 1000, 750, 560], rep: [128, 90, 64, 48], crates: [4, 3, 2, 1] }, firstClear: { cash: 1800, crates: 5 },
-    requires: { car: 'mako' }, goals: { par: 18.1 },
+    requires: { car: 'mako' }, goals: { par: 18.2 },
     blurb: 'A long launch off the quay and three slow corners between the yachts. Twin-turbo shove wins it. Win it to be offered the Sovereign.',
   },
   {
     id: 'grand-riviera', name: 'Grand Riviera', district: 'riviera', track: 'grand', rivals: ['anouk', 'teo', 'aurelia'],
     payout: { cash: [1800, 1250, 900, 680], rep: [170, 115, 80, 60], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'sovereign' }, goals: { par: 20.5 },
+    requires: { car: 'sovereign' }, goals: { par: 20.7 },
     boss: { rival: 'aurelia', reward: { cash: 8000, crates: 8, blueprint: 'Riviera Gold', badge: 'Riviera Champion' } },
     blurb: 'The flagship final: three long straights and two fast sweepers along the sea, against Caroline Stern in the other Sovereign. Bring the T10 engine and clean shifts.',
   },
@@ -1105,40 +1105,42 @@ export const MEDAL_REWARDS: Record<Medal, { cash: number; crates: number }> = {
  * A boss is scaled in place (it races only its own event). Tuned with `tests/tune-ladder.test.ts` against the
  * shift × nitro targets in `tests/ladder.ts` (missed / ordinary / clean inputs at the build a player brings).
  */
+// Skill-first (Racing workstream): every value × the tuner's change after poor shifts were made to cost more (late and
+// missed shifts bog the next gear); goal pars and bronze / speed-trap medals moved by the same re-measurement.
 export const RIVAL_PACE: Record<string, number> = {
-  'yard-sprint': 0.992,
-  'crusher-run': 0.991,
+  'yard-sprint': 0.995,
+  'crusher-run': 0.979,
   'tapeback-trophy': 1.011,
-  'corsa-club': 1.011,
-  'rusty-ray': 1.031,
-  'cul-de-sac': 0.953,
-  'maple-mile': 1.020,
-  'foundry-sprint': 1.13, // 1.10: a real test in a T4 Vexa (clean shifts and the right tyres), not a farm
-  'foundry-final': 1.330,
-  'hatch-attack': 0.986,
-  'harbor-launch': 0.949,
+  'corsa-club': 1.013,
+  'rusty-ray': 1.041,
+  'cul-de-sac': 0.957,
+  'maple-mile': 1.030,
+  'foundry-sprint': 1.139, // 1.10: a real test in a T4 Vexa (clean shifts and the right tyres), not a farm
+  'foundry-final': 1.350,
+  'hatch-attack': 0.988,
+  'harbor-launch': 0.919,
   'cliff-esses': 0.976,
-  'coast-crown': 0.971,
-  'neon-mile': 0.952,
-  'stock-cup': 1.002,
-  'skyline-run': 0.967,
-  'main-event:1': 1.120, // 1.10: was 1.200 — a weak driver (missed shifts, no nitro) lost the top-3 street heat 15 times in a row
-  'main-event:2': 0.955, // 1.10: was 0.980 (with the 1.10 star routes a weak driver reaches the Main Event earlier, on a lighter build)
-  'main-event:3': 0.960, // 1.10: was 0.972
-  'midnight-run': 0.932,
-  'canyon-qualifier': 0.839,
-  'dust-stage': 0.990,
-  'canyon-stage': 1.007,
-  'rally-final': 0.968,
-  'ironhorse-revival': 0.910,
-  'glacier-pass': 1.094,
-  'summit-1000': 1.069,
+  'coast-crown': 0.949,
+  'neon-mile': 0.942,
+  'stock-cup': 0.995,
+  'skyline-run': 0.950,
+  'main-event:1': 1.100, // 1.10: was 1.200 — a weak driver (missed shifts, no nitro) lost the top-3 street heat 15 times in a row
+  'main-event:2': 0.928, // 1.10: was 0.980 (with the 1.10 star routes a weak driver reaches the Main Event earlier, on a lighter build)
+  'main-event:3': 0.937, // 1.10: was 0.972
+  'midnight-run': 0.905,
+  'canyon-qualifier': 0.831,
+  'dust-stage': 0.974,
+  'canyon-stage': 0.994,
+  'rally-final': 0.961,
+  'ironhorse-revival': 0.920,
+  'glacier-pass': 1.074,
+  'summit-1000': 1.041,
   'altamar-tour': 0.931,
-  'summit-gala': 1.054,
-  corniche: 1.074,
-  'riviera-night': 0.985,
-  'port-sprint': 0.926,
-  'grand-riviera': 0.949,
+  'summit-gala': 1.031,
+  corniche: 1.065,
+  'riviera-night': 0.989,
+  'port-sprint': 0.919,
+  'grand-riviera': 0.932,
   'launch-final': 1.03,
 };
 const scaleStats = (st: Rival['stats'], k: number) => ({ top: +(st.top * k).toFixed(3), accel: +(st.accel * k).toFixed(3), grip: +(st.grip * k).toFixed(4) });

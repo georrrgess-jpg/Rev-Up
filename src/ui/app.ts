@@ -18,6 +18,10 @@ import { openGuide } from './guide';
 import { openSettings } from './settings';
 import { ShowroomView } from './showroom';
 import { maybeOfflineClaim } from './offline';
+import { icon, type IconName } from './icons';
+// Skill-First UI: the shared design system (type, spacing, buttons, icons, app shell, overscroll), loaded after every
+// screen's own stylesheet so its tokens and states apply app-wide.
+import './css/skin.css';
 
 export type Route = 'garage' | 'race' | 'showroom';
 
@@ -51,8 +55,8 @@ export class App {
     applyAudioSettings(s.settings); // mute + music / effects volume
     document.documentElement.classList.toggle('reduced', s.settings.reducedMotion);
 
-    const chip = (key: string, cls: string, glyph: string, word: string, label: string, onTap?: () => void) => {
-      const kids = [h('span', { class: 'ico g', 'aria-hidden': 'true' }, glyph), h('span', { class: 'ico w', 'aria-hidden': 'true' }, word), h('span', { class: 'num v' }, '0'),
+    const chip = (key: string, cls: string, ico: IconName, label: string, onTap?: () => void) => {
+      const kids = [icon(ico, 'cico'), h('span', { class: 'num v' }, '0'),
         key === 'rep' ? h('span', { class: 'num of', 'aria-hidden': 'true' }) : null];
       // Cash and Rep explain themselves on tap: cash is spending money, Rep is earned progress.
       const el = onTap
@@ -65,17 +69,17 @@ export class App {
     // (cash and scrap, spent in the Shop): one reads as "how far I've come", the other as "what I can buy".
     this.lvEl = h('span', { class: 'lv num', 'aria-hidden': 'true' });
     this.repBar = h('i');
-    const rep = chip('rep', 'rep earned', '★', '★', 'Rep: earned progress. Tap for details', () => this.explainRep());
+    const rep = chip('rep', 'rep earned', 'rep', 'Rep: earned progress. Tap for details', () => this.explainRep());
     rep.prepend(this.lvEl);
     rep.append(h('span', { class: 'tb-bar', 'aria-hidden': 'true' }, this.repBar));
     const top = h('header', { class: 'topbar' },
       rep,
       h('div', { class: 'wallet', role: 'group', 'aria-label': 'Wallet: spending money' },
-        chip('cash', 'cash', '$', '$', 'Cash: spending money. Tap for details', () => this.explainCash()),
-        chip('scrap', 'scrap', '♻', 'Scrap', 'Scrap: spend it in the Shop')),
+        chip('cash', 'cash', 'cash', 'Cash: spending money. Tap for details', () => this.explainCash()),
+        chip('scrap', 'scrap', 'scrap', 'Scrap: spend it in the Shop')),
       h('span', { class: 'spacer' }),
-      h('button', { class: 'iconbtn', 'aria-label': 'How to play', title: 'How to play', onclick: () => openGuide(this) }, '?'),
-      h('button', { class: 'iconbtn', 'aria-label': 'Settings', onclick: () => openSettings(this) }, '⚙'),
+      h('button', { class: 'iconbtn', 'aria-label': 'How to play', title: 'How to play', onclick: () => openGuide(this) }, icon('help')),
+      h('button', { class: 'iconbtn', 'aria-label': 'Settings', title: 'Settings', onclick: () => openSettings(this) }, icon('settings')),
     );
 
     const views = h('main', { class: 'views' });
@@ -86,9 +90,9 @@ export class App {
     };
     for (const v of Object.values(this.views)) views.append(v.el);
 
-    const navBtn = (r: Route, icon: string, label: string) =>
-      h('button', { 'aria-label': label, onclick: () => this.go(r) }, h('span', { class: 'ni', 'aria-hidden': 'true' }, icon), label);
-    this.navBtns = { garage: navBtn('garage', '▦', 'Garage'), race: navBtn('race', '⚑', 'Race'), showroom: navBtn('showroom', '◇', 'Showroom') };
+    const navBtn = (r: Route, ico: IconName, label: string) =>
+      h('button', { 'aria-label': label, onclick: () => this.go(r) }, icon(ico, 'ni'), h('span', { class: 'nl' }, label));
+    this.navBtns = { garage: navBtn('garage', 'garage', 'Garage'), race: navBtn('race', 'race', 'Race'), showroom: navBtn('showroom', 'showroom', 'Showroom') };
     const nav = h('nav', { class: 'nav' }, this.navBtns.garage, this.navBtns.race, this.navBtns.showroom);
 
     this.root.append(top, views, nav);

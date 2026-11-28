@@ -153,9 +153,11 @@ describe('shift attempt: one state for the cue and the tap', () => {
       const missed = t('missed') - clean;
       const ordinary = t('ordinary') - clean;
       expect(missed, `${ev} ${car}`).toBeGreaterThan(0.5);
-      expect(missed, `${ev} ${car}`).toBeLessThan(1.25);
-      expect(ordinary, `${ev} ${car}`).toBeGreaterThan(0.15);
-      expect(ordinary, `${ev} ${car}`).toBeLessThan(0.6);
+      // skill-first: poor shifts cost more than before (missed was < 1.25 s, ordinary < 0.6 s), still recoverable
+      expect(missed, `${ev} ${car}`).toBeLessThan(1.6);
+      expect(ordinary, `${ev} ${car}`).toBeGreaterThan(0.3);
+      expect(ordinary, `${ev} ${car}`).toBeLessThan(1.0);
+      expect(missed, `${ev} ${car}`).toBeGreaterThan(ordinary);
       const live = drive(ev, car, 60, firstGreen).sim.player.finishTime!;
       expect(Math.abs(live - clean), `${ev} ${car} live ${live} clean ${clean}`).toBeLessThan(0.35);
     }

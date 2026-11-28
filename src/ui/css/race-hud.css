@@ -144,3 +144,12 @@
 .result .run-changes .rc.up small { color: #2f9e5a; font-weight: var(--w-heavy); }
 .result .run-changes .rc.down small { color: #c0392b; font-weight: var(--w-heavy); }
 .result .cx-earned.prize b { color: #b07a12; }
+
+/* ---- Skill-First UI: icon set on the race controls; the cluster sits fully on screen */
+.racescreen .pausebtn { color: #fff; background: rgba(8,10,14,.62); border-color: rgba(255,255,255,.22); }
+.racescreen .pausebtn .ico-svg { width: 20px; height: 20px; }
+.nitrobtn .nrow { display: inline-flex; align-items: center; gap: 1px; line-height: 1; }
+.nitrobtn .nico .ico-svg { width: 26px; height: 26px; }
+.nitrobtn .nl { font-size: var(--fs-md); }
+@media (max-width: 400px) { .nitrobtn .nico .ico-svg { width: 22px; height: 22px; } }
+.racescreen .racebar .gauge { margin-bottom: 0; }

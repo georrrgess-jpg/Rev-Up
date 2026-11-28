@@ -15,6 +15,10 @@ import { canPickGoal, currentGoal, goalOptions, openShelfOr, pickGoal, type Goal
 import { fmt, h } from './dom';
 import { openShop } from './shop';
 import { JobsPill, initJobsFeedback } from './jobs';
+import { icon, type IconName } from './icons';
+
+/** The goal button's icon per action kind. */
+const ACT_ICON: Partial<Record<GoalAction['kind'], IconName>> = { race: 'flag', run: 'flag', craft: 'merge', merge: 'merge', order: 'shop', upgrade: 'shop', workshop: 'fit', shelf: 'store' };
 
 /** The car a goal is about, when it names one we can draw. */
 const goalCar = (g: Goal | null): CarId | null => {
@@ -116,7 +120,9 @@ export class GoalCard {
         this.setText(g.title, [h('span', { class: 'need', 'data-car': `${g.title} ·` }, g.missing)], g.progress);
         this.open.setAttribute('aria-label', `Next goal: ${g.title}. Still needed: ${g.missing}. Reward: ${g.reward}. Tap for details or to change goal.`);
         // on the card the requirement is already shown beside the button: keep only the destination ("Race" / "Cul-de-sac Dash")
-        this.act.replaceChildren(actionLabel({ ...g.action, label: g.action.label.replace(/\s*[:·—]\s.*$/, '') }));
+        // the button is the verb and its icon ("Merge", "Race"): what and where is already on the card beside it
+        const verb = /^\S+/.exec(g.action.label.trim())?.[0] ?? g.action.label;
+        this.act.replaceChildren(icon(ACT_ICON[g.action.kind] ?? 'next'), h('span', { class: 'act-verb' }, verb));
         this.act.setAttribute('aria-label', g.action.label);
         this.act.setAttribute('aria-label', g.action.label);
         this.act.hidden = false;
@@ -136,8 +142,8 @@ export class GoalCard {
     this.line.replaceChildren(...line);
     this.bar.style.width = `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`;
   }
-  private setAct(main: string, sub: string, label: string) {
-    this.act.replaceChildren(h('span', { class: 'stack' }, main, sub ? h('small', {}, sub) : null));
+  private setAct(main: string, _sub: string, label: string) {
+    this.act.replaceChildren(icon(main === 'Reveal' ? 'inspect' : 'showroom'), h('span', { class: 'act-verb' }, main));
     this.act.setAttribute('aria-label', label);
     this.act.hidden = false;
   }

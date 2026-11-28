@@ -189,13 +189,13 @@ export const CIRCUIT_EVENTS: RaceEvent[] = [
   {
     id: 'causeway-run', name: 'Causeway Run', district: 'riviera', track: T('causeway'), rivals: ['teo2', 'aurelia2', 'lorne'],
     payout: pay([1800, 1250, 900, 680], [150, 105, 75, 56], [5, 3, 2, 1]), firstClear: { cash: 2200, crates: 5 },
-    requires: { car: 'meridian' }, goals: { par: 14.3 },
+    requires: { car: 'meridian' }, goals: { par: 14.6 },
     blurb: 'A kilometre of causeway over the lagoon and one fast kink. Lorne Gillespie’s Meridian has the tallest gears in the field: shift clean and save a Perfect boost for the second straight.',
   },
   {
     id: 'circuit-crown', name: 'Circuit Crown', district: 'riviera', track: T('airstrip'), rivals: ['lorne2', 'mika2', 'zara'],
     payout: pay([2200, 1500, 1100, 820], [180, 125, 88, 66], [5, 3, 2, 1]), firstClear: { cash: 0, crates: 0 },
-    requires: { car: 'tempest', afterWin: 'launch-final' }, goals: { par: 12.7 },
+    requires: { car: 'tempest', afterWin: 'launch-final' }, goals: { par: 13.2 },
     boss: { rival: 'zara', reward: { cash: 6000, crates: 6, blueprint: CIRCUIT_FINISHES.volt.name, badge: 'Circuit Champion' } },
     blurb: 'The top of the rival ladder: a runway drag against Imani Whitfield’s Tempest. A 250 m launch decides most of it — hit launch control on GO, then shift on every green.',
   },
@@ -212,17 +212,17 @@ export const CIRCUIT_EVENTS: RaceEvent[] = [
   },
   // ---- ghost time trials on the new courses (every time attack keeps a personal-best ghost)
   {
-    id: 'ta-esplanade', name: 'Esplanade Time Trial', district: 'trials', track: T('esplanade'), rivals: [], timeAttack: { bronze: 19.6, silver: 19.3, gold: 19.1 },
+    id: 'ta-esplanade', name: 'Esplanade Time Trial', district: 'trials', track: T('esplanade'), rivals: [], timeAttack: { bronze: 19.7, silver: 19.3, gold: 19.1 },
     payout: pay([170, 170, 170, 170], [18, 18, 18, 18], [0, 0, 0, 0]), firstClear: { cash: 0, crates: 0 },
     requires: { car: 'vireo' }, blurb: 'One run along the harbour against your own ghost. Two chicanes, one hairpin, three clean exits.',
   },
   {
-    id: 'ta-causeway', name: 'Causeway Time Trial', district: 'trials', track: T('causeway'), rivals: [], timeAttack: { bronze: 17.3, silver: 15.9, gold: 15.6 },
+    id: 'ta-causeway', name: 'Causeway Time Trial', district: 'trials', track: T('causeway'), rivals: [], timeAttack: { bronze: 17.9, silver: 15.9, gold: 15.6 },
     payout: pay([170, 170, 170, 170], [18, 18, 18, 18], [0, 0, 0, 0]), firstClear: { cash: 0, crates: 0 },
     requires: { car: 'vireo' }, blurb: 'Flat out over the lagoon against your own ghost. Top speed, clean shifts, two Perfect boosts.',
   },
   {
-    id: 'ta-airstrip', name: 'Airfield Time Trial', district: 'trials', track: T('airstrip'), rivals: [], timeAttack: { bronze: 15.2, silver: 14.4, gold: 14.1 },
+    id: 'ta-airstrip', name: 'Airfield Time Trial', district: 'trials', track: T('airstrip'), rivals: [], timeAttack: { bronze: 15.6, silver: 14.4, gold: 14.1 },
     payout: pay([170, 170, 170, 170], [18, 18, 18, 18], [0, 0, 0, 0]), firstClear: { cash: 0, crates: 0 },
     requires: { car: 'vireo' }, blurb: 'A runway sprint against your own ghost. Most of the time is won or lost in the first 250 m.',
   },
@@ -233,12 +233,13 @@ export const CIRCUIT_EVENTS: RaceEvent[] = [
  * above × this. Every Circuit rival races one event only, so the scale is applied here, once, at load. Tuned with
  * `PROBE=1 npx vitest run tests/circuit.test.ts -t tuner` against the input targets in that test.
  */
+// Skill-first (Racing workstream): re-measured with the circuit tuner after poor shifts were made to cost more.
 export const CIRCUIT_PACE: Record<string, number> = {
-  'kestrel-chicane': 1.090,
-  'corvo-airfield': 1.127,
+  'kestrel-chicane': 1.094,
+  'corvo-airfield': 1.129,
   'esplanade-gp': 0.990,
-  'causeway-run': 0.948,
-  'circuit-crown': 1.006,
+  'causeway-run': 0.914,
+  'circuit-crown': 0.999,
 };
 for (const e of CIRCUIT_EVENTS) {
   const k = CIRCUIT_PACE[e.id] ?? 1;
