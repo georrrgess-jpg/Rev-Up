@@ -28,6 +28,8 @@ const STAGES: Record<string, { wall: [string, string, string, string]; light: st
   vireo: { wall: ['#0d0606', '#3c1612', '#1e0b09', '#080303'], light: '#ffe2d650', floor: 'rgba(226,60,46,0.18)' },
   mako: { wall: ['#040806', '#17271f', '#0c1510', '#030504'], light: '#e8ffc04a', floor: 'rgba(199,242,58,0.16)' },
   sovereign: { wall: ['#0a0805', '#2e2416', '#17120b', '#060503'], light: '#ffeccb58', floor: 'rgba(201,162,74,0.2)' },
+  // 1.10 Redline: a pit-lane night with a red redline glow under the Kestrel 1600 R
+  kestrelr: { wall: ['#0d0707', '#3a1214', '#1c090a', '#070303'], light: '#ffd6d650', floor: 'rgba(224,32,46,0.2)' },
 };
 /** Factory look; the new cars use their art palette until the tables give them their own. */
 /** 1.10: how each rival / series paint is earned (shown on its locked swatch; tap previews it on the car). */

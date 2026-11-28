@@ -28,6 +28,7 @@ import type { App } from './app';
 import { bayFloorY, drawServiceBay } from '../render/bay';
 import { fmt, h } from './dom';
 import { fabBench } from './fabrication';
+import { openTestDrive, type TestDriveOpts } from './testDrive'; // 1.10 Test & Compare
 import { openBuilds } from './projects';
 
 export type MechArea = 'engine' | 'wheels' | 'body' | 'tuning';
@@ -558,7 +559,8 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
         const where = 'at' in src
           ? (cur ? `Free · your ${partName(cur)} goes to ${I.describeCell(s, src.at)}` : `Free · frees ${I.describeCell(s, src.at)}`)
           : (cur ? `Free · the ${carById(src.car).model} gets your ${partName(cur)}` : `Free · leaves the ${carById(src.car).model}'s slot empty`);
-        return bar(primary(`Install ${partName(src.part)}`, where, true, () => act(() => game.transact((d) => I.fitFrom(d, car, src)), () => gsfx.fit(src.part.t))));
+        return bar(primary(`Install ${partName(src.part)}`, where, true, () => act(() => game.transact((d) => I.fitFrom(d, car, src)), () => gsfx.fit(src.part.t))),
+          null, 'at' in src ? testBtn({ family: src.part.f, partId: src.part.id }) : testBtn({ family: src.part.f, tier: src.part.t }));
       }
       if (p?.k === 'order') {
         const price = PART_ORDER_PRICE[p.t];
@@ -579,7 +581,7 @@ export function openMechanic(app: App, opts: MechanicOpts = {}): () => void {
           class: `btn alt${full || sShort > 0 ? ' off' : ''}`, 'aria-disabled': String(full || sShort > 0),
           'aria-label': `Buy and install a T${t} ${FAMILIES[p.f].name} for ${scrap} scrap`, onclick: () => buy('scrap'),
         }, h('span', { class: 'stack' }, `${fmt(scrap)} scrap`, h('small', {}, sShort > 0 ? `${fmt(sShort)} more` : 'or pay scrap')));
-        return bar(primary(`Buy & install · $${fmt(price)}`, sub, !full && short <= 0, () => buy('cash'), `Buy and install a T${t} ${FAMILIES[p.f].name} for $${price}`), scrapBtn);
+        return bar(primary(`Buy & install · $${fmt(price)}`, sub, !full && short <= 0, () => buy('cash'), `Buy and install a T${t} ${FAMILIES[p.f].name} for $${price}`), scrapBtn, testBtn({ family: p.f, tier: t }));
       }
       if (p?.k === 'style') {
         const it = p.item;

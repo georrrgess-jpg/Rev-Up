@@ -160,7 +160,7 @@ export class RaceView implements View {
           h('tr', {}, h('th', {}, 'Live'), ...p.live.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `$${c}`))),
           quick ? h('tr', { class: 'q' }, h('th', {}, 'Quick'), ...p.quick.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `$${c}`))) : null,
           h('tr', { class: 'r' }, h('th', {}, 'Rep'), ...e.payout.rep.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `${c}`)))),
-        h('p', {}, `Live only: +$${p.perfect} per Perfect boost (up to 2)${p.firstClear ? `, +$${p.firstClear} for your first win` : ''}. Quick Race pays ${Math.round(p.quickShare * 100)}% of the live purse and no bonuses.`),
+        h('p', {}, `Live only: +$${p.perfect} per Perfect boost (up to 2)${p.clean ? `, +$${p.clean} when every shift is clean` /* 1.10 (Progression) */ : ''}${p.firstClear ? `, +$${p.firstClear} for your first win` : ''}. Quick Race pays ${Math.round(p.quickShare * 100)}% of the live purse and no bonuses.`),
         e.boss ? h('p', { class: 'event-bonus' }, `First win: ${e.boss.reward.blueprint} paint, “${e.boss.reward.badge}” badge, $${e.boss.reward.cash} and ${e.boss.reward.crates} crates.`) : null);
     };
     const quickPart = (e: RaceEvent, small: boolean) => {

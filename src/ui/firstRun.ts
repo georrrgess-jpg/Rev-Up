@@ -142,7 +142,8 @@ export class RaceCoach {
     if (s.tips['fr:practice']) app.game.transact((d) => { delete d.tips['fr:practice']; return []; });
     const r = s.lastResult;
     if (!r) return;
-    card.classList.add('fr-card');
+    // a car to reveal keeps the card exactly as it is (its one action is the reveal)
+    if (!s.pendingReveal) card.classList.add('fr-card');
     const lines: HTMLElement[] = [];
     // 1. measured: the same race with and without each fitted part
     let gains: ReturnType<typeof measureParts> = [];
@@ -176,9 +177,11 @@ export class RaceCoach {
       act = { label: goal.action.label.split(/\s*[:·—]\s/)[0], sub: '', run: () => this.toGarage(() => runGoalAction(app, goal.action)) };
     }
     const block = h('div', { class: 'fr-result' }, ...lines,
-      h('div', { class: 'fr-acts' },
-        act ? h('button', { class: 'btn primary', onclick: act.run }, h('span', { class: 'stack' }, act.label, act.sub ? h('small', {}, act.sub) : null)) : h('button', { class: 'btn primary', onclick: () => this.toGarage(() => {}) }, 'Back to Garage'),
-        h('button', { class: 'btn', onclick: () => this.retry() }, h('span', { class: 'stack' }, 'Practise again', h('small', {}, eventById(r.eventId).name)))));
+      // one primary action here; the card's own Back to Garage and Race again stay right under it (never a dead end)
+      act ? h('div', { class: 'fr-acts' }, h('button', { class: 'btn primary', onclick: act.run }, h('span', { class: 'stack' }, act.label, act.sub ? h('small', {}, act.sub) : null))) : null);
+    // "Race again" from this card is a coached practice run too
+    const again = this.cardBtn(/again/i);
+    if (again) { again.textContent = 'Practise again'; again.setAttribute('aria-label', `Practise ${eventById(r.eventId).name} again, coached`); again.addEventListener('click', () => this.markPractice(), { capture: true }); }
     const rewards = card.querySelector('.rewards');
     if (rewards) rewards.after(block); else card.prepend(block);
     requestAnimationFrame(() => (block.querySelector('.btn.primary') as HTMLElement | null)?.focus({ preventScroll: true }));
@@ -194,9 +197,8 @@ export class RaceCoach {
     else (this.screen.querySelector('.result .btn') as HTMLElement | null)?.click();
     setTimeout(then, 60);
   }
-  private retry() {
+  private markPractice() {
     this.app.game.transact((d) => { d.tips['fr:practice'] = true; return []; });
-    this.cardBtn(/again/i)?.click();
   }
   private craft(family: string) {
     const garage = this.app.views.garage as unknown as { showPair(family?: string, tier?: number): boolean };

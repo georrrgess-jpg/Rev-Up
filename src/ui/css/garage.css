@@ -346,6 +346,17 @@
 .garage .actions .selbar .sel-store { border-color: #4a6a8a; background: #1a2a3a; color: #cfe6ff; }
 .garage .actions .selbar .sel-store.hot { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(142,211,250,.3); }
 .garage .actions .selbar .sel-recycle { border-color: #7a5b44; background: #2a2220; color: #f0c8b4; }
+/* 1.10 four picked-up actions: Fit · Store · Recycle · Test share the three columns left of Race */
+.garage .actions .selbar { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.garage .actions .selbar .sel-test { border-color: #5a4a8a; background: #221d36; color: #ddd3ff; }
+@media (max-width: 360px) { .garage .actions .selbar .btn { font-size: var(--fs-xs); } }
+/* Workshop commit bar with Test: on narrow phones the main action takes its own row */
+.sheet .mech-commit .btn.test { flex: 0 1 auto; max-width: 24%; }
+@media (max-width: 420px) {
+  .sheet .mech-commit.has-test { flex-wrap: wrap; }
+  .sheet .mech-commit.has-test .btn.go { flex: 1 1 100%; }
+  .sheet .mech-commit.has-test .btn:not(.go) { flex: 1 1 0; max-width: none; }
+}
 @keyframes selIn { from { opacity: 0; transform: translateY(4px); } }
 .reduced .garage .actions.sel-on .selbar { animation: none; }
 /* short phones (320×568): the board needs every pixel and the body may scroll under the docked spare rack, so the

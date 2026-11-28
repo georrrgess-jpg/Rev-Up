@@ -204,6 +204,9 @@ export class GuideCoach {
     let cue: CoachStep | null = null;
     try { cue = this.cue(); } catch { cue = null; }
     const sheet = this.topSheet();
+    // tips yield to open sheets: over a sheet, only a cue on a control inside that sheet (Fit Parts, the Shop) shows,
+    // and never over Test & Compare
+    if (cue && sheet && (!cue.targets.every((t) => sheet.contains(t)) || sheet.querySelector('.td'))) cue = null;
     if (cue && !sheet) cue = { ...cue, keepClear: this.keepClear(cue) };
     this.coach.el.classList.toggle('over-sheet', !!sheet);
     const isNew = cue && cue.id !== this.coach.current?.id;
@@ -309,7 +312,7 @@ export class GuideCoach {
         const ch = fitChange(s, s.activeCar, part);
         const what = ch ? `${ch.label} ${ch.from} → ${ch.to}: ${ch.meaning}.` : 'It powers the car once fitted.';
         if (sheet) {
-          const c = one(this.find(SEL.fitRecommended) ?? this.find('.sheet button', /recommended fit|fit recommended|fit best/i), `Fit it: ${what}`);
+          const c = one(this.find(SEL.fitRecommended), `Fit it: ${what}`);
           return c && { ...c, skipLabel: SKIP_RUN };
         }
         if (route === 'race') { const c = one(this.find(SEL.raceFit), `Fit your T${part.t} ${FAMILIES[part.f].name} first: ${what}`); return c && { ...c, skipLabel: SKIP_RUN }; }

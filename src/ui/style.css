@@ -958,9 +958,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
 .fr-result .fr-skill, .fr-result .fr-econ { color: var(--dim); }
 .fr-result .fr-econ b { color: var(--text); }
 .fr-result .fr-next small { display: block; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; font-size: var(--fs-xs); }
-.fr-result .fr-acts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin-top: 4px; }
+.fr-result .fr-acts { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 4px; }
 .fr-result .fr-acts .btn { min-height: 52px; }
-.result .card.fr-card .next, .result .card.fr-card .next-act, .result .card.fr-card .btns,
+.result .card.fr-card .btns .btn.primary { background: var(--panel2); color: var(--text); border-color: var(--line); box-shadow: none; }
+.result .card.fr-card .next, .result .card.fr-card .next-act,
 .result .card.fr-card .why-list, .result .card.fr-card .reward-more, .result .card.fr-card .standing { display: none; }
 /* short phones: the one button stays above the fold (the Rep line in the block covers the progress bar) */
 @media (max-height: 700px) {

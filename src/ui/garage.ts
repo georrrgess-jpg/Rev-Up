@@ -19,6 +19,7 @@ import { openShop } from './shop';
 import { openSpares } from './spares';
 import { openFitParts } from './fit';
 import { openMechanic } from './mechanic';
+import { openTestDrive } from './testDrive'; // 1.10 Test & Compare
 import { GoalCard, findPair } from './goalCard';
 import { canStore, earliestCarFor, isOverCap, storePart } from './contracts';
 
@@ -699,9 +700,10 @@ export class GarageView implements View {
       for (const site of sites.values()) {
         const name = FAMILIES[site.f].name;
         // the merged part would make the car faster: say how much, in its own stat, right on the result
-        const made = B.getPart(this.s, site.at);
-        const ch = made && I.upgradesFor(this.s, made).includes(this.s.activeCar) ? fitChange(this.s, this.s.activeCar, made) : null;
         this.later(() => {
+          // (worked out here, after the merge has painted, never on the input path)
+          const made = B.getPart(this.s, site.at);
+          const ch = made && I.upgradesFor(this.s, made).includes(this.s.activeCar) ? fitChange(this.s, this.s.activeCar, made) : null;
           this.chainEl?.remove(); // the result line takes over from the cascade counter
           this.floater(site.at, `T${site.from} ${name} → T${site.to}${site.chain > 1 ? ` · ×${site.chain}` : ''}${ch?.up ? ` · fit: ${ch.short}` : ''}`, `mres${site.to >= 5 ? ' high' : ''}`, ch?.up ? 1800 : 1300, 22);
         }, reduced ? 0 : Math.min(delay + 120, 620));
@@ -1027,6 +1029,8 @@ export class GarageView implements View {
         ? btn(`sel-store${over ? ' hot' : ''}`, 'Store', later ? `for ${later.split(' ')[0]}` : 'Parts Shelf', `Store the T${p.t} ${fam.name} on the Parts Shelf${later ? ` for the ${later}` : ''}`, () => { this.setSel(null); this.flushFx(); storePart(this.app.game, ref); })
         : btn('sel-cancel', 'Done', 'put it down', 'Put the part down', () => this.setSel(null)),
       btn('sel-recycle', 'Recycle', `+${B.scrapValue(p)} scrap`, `Recycle the T${p.t} ${fam.name} for ${B.scrapValue(p)} scrap`, () => { this.setSel(null); this.requestScrap(ref); }),
+      // 1.10 Test & Compare: race this part against the current build before committing to it
+      btn('sel-test', 'Test', 'vs now', `Test the T${p.t} ${fam.name} on track against your ${car.model}'s current build`, () => { this.setSel(null); openTestDrive(this.app, { car: this.s.activeCar, partId: p.id }); }),
     );
   }
 
