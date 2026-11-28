@@ -3,6 +3,7 @@
 // Live races (you drive: full purse and bonuses) and Quick Races (your crew drives while you merge: a share
 // of the purse, no bonuses) are labelled and priced apart. Owned by the mobile UX workstream.
 import { carStyle } from '../core/style';
+import { rivalCarModel } from '../data/rivalCars';
 import type { GameState } from '../core/state';
 import type { GameEvent } from '../core/events';
 import { computeLoadout } from '../core/loadout';
@@ -153,7 +154,7 @@ export class RaceView implements View {
       return h('details', { class: 'event-detail', 'data-event': e.id, ...(expanded.has(e.id) ? { open: '' } : {}) },
         h('summary', {}, 'Rivals and payouts'),
         h('p', {}, e.blurb),
-        e.rivals.length ? h('div', { class: 'rivals' }, ...e.rivals.map((id) => RIVALS[id]).map((r) => h('div', {}, h('b', {}, r.name), ` · ${r.line}`))) : null,
+        e.rivals.length ? h('div', { class: 'rivals' }, ...e.rivals.map((id) => RIVALS[id]).map((r) => h('div', {}, h('b', {}, r.name), h('span', { class: 'rv-car' }, ` · ${rivalCarModel(r)}`), ` · ${r.line}`))) : null,
         e.timeAttack ? null : h('table', { class: 'paytable' },
           h('tr', {}, h('th', {}, ''), ...p.live.slice(0, e.rivals.length + 1).map((_, i) => h('th', {}, ordinal(i + 1)))),
           h('tr', {}, h('th', {}, 'Live'), ...p.live.slice(0, e.rivals.length + 1).map((c) => h('td', {}, `$${c}`))),

@@ -95,6 +95,26 @@ export const ENGINES: Record<string, EngineSpec> = {
   // rising motor whine over it and a high inverter whistle that comes in with load
   tempest: { layout: 'Four electric motors', cyl: 4, tilt: 1.4, odd: 0, sub: 0, subRatio: 0.5, lope: 0, lopeRatio: 0.25,
     cut: [1400, 6500], q: 0.7, formants: [[1200, 3, 1.2]], drive: 0.6, rasp: 0.06, raspHz: 5200, turbo: 0.35, turboHz: [6200, 9400], whine: 0.95, whineRatio: 6.2, gain: 1.15 },
+
+  // ---- voices for the opponent-only cars (src/data/rivalCars.ts RIVAL_LOOKS → voice); pitch follows the rival's class
+  // Pellet K-Van / Mote 660: a tiny buzzing kei triple
+  kei: { layout: 'I3 660 kei', cyl: 3, tilt: 0.6, odd: 0.4, sub: 0.15, subRatio: 1 / 3, lope: 0.12, lopeRatio: 1 / 3,
+    cut: [900, 3200], q: 1.4, formants: [[420, 4, 2], [1800, 4, 2]], drive: 2.2, rasp: 0.35, raspHz: 2400, gain: 1.05 },
+  // Haulmark 2500 / Dunerunner T8: a lazy, loose truck V8 with a deep exhaust drone
+  v8truck: { layout: 'V8 truck, long stroke', cyl: 8, tilt: 1.1, odd: 0.15, sub: 0.6, subRatio: 0.5, lope: 0.4, lopeRatio: 0.125,
+    cut: [380, 1700], q: 2.4, formants: [[120, 6, 1.2], [380, 4, 1.4]], drive: 2.0, rasp: 0.1, raspHz: 600, crackle: 0.2, gain: 0.74 },
+  // Dray Courier: a rattly work-van four with a hollow drone
+  van: { layout: 'I4 work van', cyl: 4, tilt: 0.95, odd: 0.3, sub: 0.2, subRatio: 0.5, lope: 0.08, lopeRatio: 0.25,
+    cut: [560, 1900], q: 1.2, formants: [[240, 5, 1.6], [800, 3, 1.5]], drive: 1.9, rasp: 0.28, raspHz: 1100, gain: 0.98 },
+  // Cordell Six: a turbo straight six, smooth until the boost comes in
+  turbo6: { layout: 'I6 turbo, sleeper', cyl: 6, tilt: 0.75, odd: 0.1, sub: 0.08, subRatio: 0.5, lope: 0.04, lopeRatio: 0.25,
+    cut: [700, 3000], q: 1.0, formants: [[280, 4, 1.2], [1500, 4, 1.6]], drive: 1.8, rasp: 0.15, raspHz: 1900, turbo: 0.7, turboHz: [2400, 5600], flutter: true, gain: 1.0 },
+  // Tessera DR: a buzzing twin-rotor, all rasp and pops
+  rotary: { layout: 'Twin rotor', cyl: 4, tilt: 0.5, odd: 0.6, sub: 0.05, subRatio: 0.5, lope: 0.1, lopeRatio: 0.5,
+    cut: [1000, 4200], q: 2.0, formants: [[700, 6, 2.2], [2600, 5, 2.5]], drive: 3.2, rasp: 0.5, raspHz: 3000, crackle: 0.8, gain: 1.08 },
+  // Sandpiper Buggy: an air-cooled flat four, a clattering offbeat thrum
+  boxer: { layout: 'Flat-4 air-cooled', cyl: 4, tilt: 0.8, odd: 0.25, sub: 0.4, subRatio: 0.5, lope: 0.3, lopeRatio: 0.25,
+    cut: [600, 2400], q: 1.6, formants: [[320, 5, 1.6], [1200, 4, 2]], drive: 2.4, rasp: 0.32, raspHz: 1500, crackle: 0.3, gain: 0.96 },
 };
 
 export const engineFor = (car: string): EngineSpec => ENGINES[car] ?? ENGINES.beater;

@@ -1,6 +1,7 @@
 // Rival Runs in the Race menu: a compact section of short challenges against recurring rivals, and a brief sheet
 // before each run (eligible cars, objective, rule, guaranteed prize, best results). Owned by the Pit Setup &
 // Rival Runs workstream.
+import { rivalCarModel } from '../data/rivalCars';
 import './css/pit.css';
 import * as RR from '../core/rivalRuns';
 import type { RivalRun } from '../data/rivalRuns';
@@ -71,6 +72,7 @@ export function openRivalBrief(app: App, runId: string, start: StartRun, pick?: 
         h('p', { class: 'rr-taunt' }, run.taunt),
         h('div', { class: 'rr-facts' },
           fact('Objective', run.goal),
+          rv ? fact(`${rv.name.split(' ')[0]}’s car`, rivalCarModel(rv)) : null,
           fact('Course', `${TRACKS[ev.track].name} · ${TRACKS[ev.track].course}`),
           fact('Rules', run.rule),
           fact('Prize', rec.claimed ? `${RR.prizeText(run.prize)} — already yours` : `${RR.prizeText(run.prize)}, guaranteed the first time you meet the objective. ${RR.prizeDetail(run.prize)}`),

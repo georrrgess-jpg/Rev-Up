@@ -9,6 +9,7 @@ import { mph } from '../core/units';
 import type { RaceSim, Racer } from '../core/race';
 import type { Look } from './scene';
 import { signText } from './scene';
+import { rivalLook } from '../data/rivalCars';
 
 type Kind = 'smoke' | 'chip' | 'spark' | 'pop';
 interface Part { x: number; y: number; vx: number; vy: number; life: number; max: number; s: number; grow: number; c: string; kind: Kind; lane: number }
@@ -41,8 +42,10 @@ export const LAUNCH_FX: Record<string, LaunchFx> = {
   ardent: { smoke: '#ece8e0', amount: 0.6, sig: 'pops', accent: '#ff8a2a' }, // screaming four: crackle and flame
   meridian: { smoke: '#d8dde6', amount: 1.1, sig: 'none' }, // big-torque V8: a long, lazy burnout
   tempest: { smoke: '#cfe6ee', amount: 0.25, sig: 'arcs', accent: '#5ef2ff' }, // four motors: no smoke, cyan arcs
+  kade: { smoke: '#e6d8ee', amount: 0.3, sig: 'arcs', accent: '#ff3df2' }, // Vesna's four-motor launch car: magenta arcs
 };
-const fxOf = (car: string) => LAUNCH_FX[car] ?? LAUNCH_FX.beater;
+/** A racer's launch effect: its look's (a rival's body), else its class's. */
+const fxOf = (r: Racer) => LAUNCH_FX[rivalLook(r.look)?.fx ?? ''] ?? LAUNCH_FX[r.car] ?? LAUNCH_FX.beater;
 
 export interface Lane { lane: number; depth: number; ground: number }
 
@@ -75,7 +78,7 @@ export class RaceFx {
     for (const r of sim.racers) {
       const L = lenOf(r);
       const { lane, depth } = laneOf(r);
-      const fx = fxOf(r.car);
+      const fx = fxOf(r);
       const rx = RaceFx.rearX(r, L, depth);
       // rubber: the launch's wheelspin leaves a mark from the line (static: drawn even with reduced motion)
       const spin = staging > 0 && r.isPlayer ? 1 : r.slip;
@@ -170,7 +173,7 @@ export class RaceFx {
 
   /** Light trails behind the light-bar cars off the line and while boosting (Lumen, Halcyon, Sovereign). */
   drawTrail(ctx: CanvasRenderingContext2D, r: Racer, sx: number, gy: number, len: number, dpr: number, launching: boolean) {
-    const fx = fxOf(r.car);
+    const fx = fxOf(r);
     if (this.reduced || !(fx.sig === 'trail' || fx.sig === 'arcs') || r.v < 4 || !(launching || r.nitroLeft > 0)) return;
     const tl = Math.min(len * 2.2, r.v * 0.06 * len);
     const y0 = gy - len * 0.13;

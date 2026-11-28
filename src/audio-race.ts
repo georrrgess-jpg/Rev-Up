@@ -14,6 +14,7 @@ import { EngineVoice as Voice, resolveEngine, runScript } from './audio-engine';
 import { drivetrainFor } from './data/drivetrain';
 import { RACE, trackLength, type CarId } from './data/tables';
 import { segmentAt, type RaceSim, type Racer } from './core/race';
+import { rivalLook } from './data/rivalCars';
 
 const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 
@@ -163,7 +164,7 @@ export class RivalAudio {
           const g = c.createGain(); g.gain.value = 0;
           const pan = c.createStereoPanner();
           g.connect(pan).connect(L.mix.engine);
-          const v = new Voice(c, g, L.noise, resolveEngine(r.car));
+          const v = new Voice(c, g, L.noise, resolveEngine(r.car, null, null, rivalLook(r.look)?.voice)); // a rival's look has its own voice
           v.start(t);
           e = { v, g, pan, quiet: 0 };
           this.voices.set(r.id, e);

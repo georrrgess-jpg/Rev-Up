@@ -11,15 +11,16 @@
 </style>
 </head>
 <body>
-<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?sheet=concours">Concours</a><a href="?sheet=parts">Parts T7–T10</a><a href="?sheet=bay">Bay</a><a href="?sheet=hero">Hero</a><a href="?sheet=reveal">Reveal FX</a><a href="?lit">Lit</a></nav>
+<nav><a href="?">Cars</a><a href="?sheet=liveries">Liveries</a><a href="?sheet=styles">Wheels and paint</a><a href="?sheet=scenes">Scenes</a><a href="?sheet=service">Service bay</a><a href="?sheet=race">Race sizes</a><a href="?sheet=concours">Concours</a><a href="?sheet=parts">Parts T7–T10</a><a href="?sheet=bay">Bay</a><a href="?sheet=hero">Hero</a><a href="?sheet=reveal">Reveal FX</a><a href="?sheet=rivals">Rivals</a><a href="?sheet=grids">Rival grids</a><a href="?lit">Lit</a></nav>
 <canvas id="c"></canvas>
 <script type="module">
   // Dev-only art sheet: every car at hero / card / race / thumbnail sizes, plus liveries, wheel sets, materials and race scenery.
-  import { drawCar, drawHeroCar, ART_CARS, FACTORY_LOOKS, LIVERIES, serviceZones, tailLampPoint } from '/src/render/car.ts';
+  import { drawCar, drawHeroCar, ART_CARS, FACTORY_LOOKS, LIVERIES, RIVAL_ART_IDS, carLengthM, serviceZones, tailLampPoint } from '/src/render/car.ts';
+  import { RIVAL_LOOKS, artOf, rivalCarModel } from '/src/data/rivalCars.ts';
   import { drawServiceBay, bayFloorY } from '/src/render/bay.ts';
   import { drawRevealSignature, REVEAL_SIGNATURE_CARS } from '/src/render/revealFx.ts';
   import { partSvg } from '/src/render/parts.ts';
-  import { CARS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
+  import { CARS, EVENTS, RIVALS, SIGNATURE_FINISHES } from '/src/data/tables.ts';
   import { drawBackdrop, drawRoadDressing, drawForeground, roadColors, THEMES } from '/src/render/scene.ts';
   const q = new URLSearchParams(location.search);
   const sheet = q.get('sheet') ?? 'cars';
@@ -168,6 +169,46 @@
     const times = []; let i = 1;
     const step = () => { const a = performance.now(); frame(i++); times.push(performance.now() - a); if (times.length < 240) requestAnimationFrame(step); else { const s = [...times].sort((x, y) => x - y); window.__bench = { coldMs: +coldMs.toFixed(1), avgMs: +(times.reduce((x, y) => x + y, 0) / times.length).toFixed(2), p95Ms: +s[Math.floor(s.length * 0.95)].toFixed(2) }; } };
     requestAnimationFrame(step);
+  } else if (sheet === 'rivals') {
+    // opponent-only cars: the close-up, the race sprite (lit, boosting, braking), race sizes, the silhouette, and the
+    // roster car of the same class at the same race scale for comparison; &builds adds the roster-body builds
+    const list = Object.values(RIVAL_LOOKS).filter((l) => (q.has('builds') ? true : RIVAL_ART_IDS.includes(l.id)) && (!only || l.id === only));
+    const RH = 250, ppm = 21;
+    const ctx = size(list.length * RH);
+    const drivers = (id) => Object.values(RIVALS).filter((r) => r.look === id && !r.id.includes('@')).map((r) => r.name.split(' ')[0]);
+    list.forEach((lk, i) => {
+      const y0 = i * RH; bg(ctx, y0, RH);
+      ctx.fillStyle = '#dfe6ec'; ctx.font = '700 13px system-ui';
+      ctx.fillText(`${lk.model} (${lk.id}) · class ${lk.car} · ${lk.L} m · voice ${lk.voice} · ${drivers(lk.id).join(', ')}`, 10, y0 + 16);
+      ctx.font = '12px system-ui'; ctx.fillStyle = '#9fb0bf'; ctx.fillText(lk.blurb, 10, y0 + 32);
+      const hero = Math.min(W * 0.45, 520);
+      drawCar(ctx, lk.art, 20, y0 + RH - 25, hero * lk.L / 5.4, { paint: lk.paint, trim: lk.trim, style: lk.style, wheelAngle: 0.3, detail: true, light: Number(q.get('light') ?? 0) });
+      const x = hero + 60;
+      drawCar(ctx, lk.art, x, y0 + 120, lk.L * ppm * 1.6, { paint: lk.paint, trim: lk.trim, style: lk.style, cache: true, detail: false, wheelAngle: 1, nitro: 1.4, headlights: 0.6, brake: true, blur: 0.7 });
+      drawCar(ctx, lk.art, x + 200, y0 + 120, lk.L * ppm, { paint: lk.paint, trim: lk.trim, style: lk.style, cache: true, detail: false });
+      drawCar(ctx, lk.art, x + 330, y0 + 120, lk.L * ppm * 0.6, { paint: lk.paint, trim: lk.trim, style: lk.style, cache: true, detail: false });
+      drawCar(ctx, lk.art, x, y0 + 220, lk.L * ppm, { paint: lk.paint, trim: lk.trim, silhouette: true });
+      const ros = look(lk.car);
+      drawCar(ctx, lk.car, x + 200, y0 + 220, carLengthM(lk.car) * ppm, { paint: ros.paint, trim: ros.trim, cache: true, detail: false });
+      ctx.fillStyle = '#7f8d99'; ctx.fillText(`roster ${ros.model}`, x + 200, y0 + 236);
+    });
+  } else if (sheet === 'grids') {
+    // every race's rivals at race size, one lane each, as they line up (look id under each car)
+    const evs = EVENTS.filter((e) => e.rivals.length && !e.knockout);
+    const RH = 150, ppm = 19;
+    const ctx = size(evs.length * RH);
+    evs.forEach((e, i) => {
+      const y0 = i * RH; bg(ctx, y0, RH);
+      ctx.fillStyle = '#dfe6ec'; ctx.font = '700 13px system-ui'; ctx.fillText(`${e.name} (${e.id})`, 10, y0 + 16);
+      e.rivals.forEach((rid, k) => {
+        const r = RIVALS[rid]; const lk = RIVAL_LOOKS[r.look];
+        const art = artOf(r), Lm = carLengthM(art);
+        const trim = lk?.trim ?? look(r.car).trim;
+        const x = 20 + k * (W / 3.2), y = y0 + 110;
+        drawCar(ctx, art, x, y, Lm * ppm, { paint: r.paint, trim, style: lk?.style, cache: true, detail: false, wheelAngle: k });
+        ctx.fillStyle = '#dfe6ec'; ctx.font = '12px system-ui'; ctx.fillText(`${r.name} · ${rivalCarModel(r)}`, x, y + 22);
+      });
+    });
   } else if (sheet === 'scenes') {
     // phone-size race frames for every theme (390x420 css each)
     const sw = 390, sh = 420, per = Math.max(1, Math.floor(W / sw));

@@ -14,7 +14,9 @@ import { mph } from '../core/units';
 import { Gauge, ShiftCue } from './raceGauge';
 import type { LastResult } from '../core/state';
 import { CarId, Family, RACE, RIVALS, carById, eventById, finishStripe, trackLength } from '../data/tables';
-import { carLengthM, drawCar, fitCanvas } from '../render/car';
+import { CarStyle, carLengthM, drawCar, fitCanvas } from '../render/car';
+import { artOf, rivalLook } from '../data/rivalCars';
+import type { Racer } from '../core/race';
 import type { App } from './app';
 import { h, ordinal } from './dom';
 
@@ -483,7 +485,7 @@ export class RaceScreen {
       // render the GO zoom's car sprites now, one per frame, so the launch never waits for them
       if (this.countdown > 0 && this.warmQueue?.length) this.warmQueue.shift()!();
       this.stepParticles(dt);
-      this.fx.update(dt, this.sim, Math.max(0, this.countdown), this.quality, (r) => carLengthM(r.car), (r) => this.laneOf(r));
+      this.fx.update(dt, this.sim, Math.max(0, this.countdown), this.quality, (r) => carLengthM(artOf(r)), (r) => this.laneOf(r));
     }
     this.draw();
     this.shiftHud(t);
@@ -656,18 +658,13 @@ export class RaceScreen {
     const cv = document.createElement('canvas');
     cv.width = 4; cv.height = 4;
     this.warmCtx = cv.getContext('2d');
-    const s = this.app.game.state;
     const q: (() => void)[] = [];
     for (const mul of [1, 1.11]) {
       this.sim.racers.forEach((r, i) => {
         const lane = LANE_OF[i];
-        const len = carLengthM(r.car) * ppmBase * mul * (0.86 + lane * 0.06);
-        const cls = carById(r.car);
-        const livery = r.isPlayer ? s.paints[r.car] : null;
-        q.push(() => drawCar(this.warmCtx!, r.car, -len * 3, 0, len, {
-          paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, style: r.isPlayer ? carStyle(s, r.car) : undefined,
-          livery: finishStripe(r.car, livery ?? undefined), detail: false, cache: true,
-        }));
+        const b = this.bodyOf(r);
+        const len = carLengthM(b.art) * ppmBase * mul * (0.86 + lane * 0.06);
+        q.push(() => drawCar(this.warmCtx!, b.art, -len * 3, 0, len, { paint: b.paint, trim: b.trim, style: b.style, livery: b.livery, detail: false, cache: true }));
       });
     }
     this.warmQueue = q;
@@ -683,6 +680,17 @@ export class RaceScreen {
   private stepParticles(dt: number) {
     for (const p of this.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
     this.particles = this.particles.filter((p) => p.life > 0);
+  }
+
+  /** What a racer looks like: the player's own car and finish, or a rival's look (its body, trim and build). */
+  private bodyOf(r: Racer): { art: string; paint: string; trim: string; style?: CarStyle; livery?: string } {
+    const cls = carById(r.car);
+    if (r.isPlayer) {
+      const s = this.app.game.state, livery = s.paints[r.car];
+      return { art: r.car, paint: livery ?? cls.paint, trim: cls.trim, style: carStyle(s, r.car), livery: finishStripe(r.car, livery ?? undefined) };
+    }
+    const lk = rivalLook(r.look);
+    return { art: artOf(r), paint: r.paint, trim: lk?.trim ?? cls.trim, style: lk?.style as CarStyle | undefined };
   }
 
   /** A racer's lane and depth (back lanes are smaller and further up the road). */
@@ -852,10 +860,10 @@ export class RaceScreen {
     }
     for (const { r, lane } of draws) {
       const depth = 0.86 + lane * 0.06;
-      const len = carLengthM(r.car) * ppm * depth;
+      const b = this.bodyOf(r);
+      const len = carLengthM(b.art) * ppm * depth;
       const gy = roadTop + (lane + 0.85) * laneH;
       const sx = (r.x - camX) * ppm - len;
-      const cls = carById(r.car);
       if (sx > W + 10 || sx + len < -10) {
         // off-screen marker
         const ahead = sx > W;
@@ -876,14 +884,13 @@ export class RaceScreen {
       // smoke, gravel and pops of this lane sit behind its car; light trails stream from the tail
       this.fx.drawParticles(ctx, camX, ppm, laneGeo, lane);
       this.fx.drawTrail(ctx, r, sx, gy, len, this.dpr, this.countdown <= 0 && r.x < (sim.track.segments[0]?.length ?? 0));
-      const livery = r.isPlayer ? this.app.game.state.paints[r.car] : null;
       const idx = sim.racers.indexOf(r);
       const braking = this.prevV[idx] !== undefined && r.v < this.prevV[idx] - 0.03 && r.finishTime === null;
       this.prevV[idx] = r.v;
-      drawCar(ctx, r.car, sx, gy, len, {
-        paint: r.isPlayer ? (livery ?? cls.paint) : r.paint, trim: cls.trim, style: r.isPlayer ? carStyle(this.app.game.state, r.car) : undefined, wheelAngle: r.x / 0.31,
+      drawCar(ctx, b.art, sx, gy, len, {
+        paint: b.paint, trim: b.trim, style: b.style, wheelAngle: r.x / 0.31,
         blur: this.reduced ? 0 : Math.max(0, Math.min(1, (r.v - 7) / 10)), brake: braking,
-        livery: finishStripe(r.car, livery ?? undefined), detail: false, cache: true,
+        livery: b.livery, detail: false, cache: true,
         nitro: r.nitroLeft > 0 ? r.nitroMul : 0, headlights: sceneLights(theme),
       });
       if (r.isPlayer) {

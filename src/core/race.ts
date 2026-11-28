@@ -41,6 +41,8 @@ export interface Racer {
   id: string;
   name: string;
   car: CarId;
+  /** A rival's look (src/data/rivalCars.ts): the body drawn, named and voiced. Cosmetic; `car` drives the physics. */
+  look?: string;
   paint: string;
   isPlayer: boolean;
   stats: RacerStats;
@@ -303,6 +305,7 @@ export class RaceSim {
       const r = RIVALS[rid];
       const vary = () => 1 + (rng() * 2 - 1) * RACE.rivalVariance;
       this.racers.push(mk(r.id, r.name, r.car, r.paint, { top: r.stats.top * vary(), accel: r.stats.accel * vary(), grip: r.stats.grip * vary() }, false, setup.rivalShift ?? 'ordinary'));
+      if (r.look) this.racers[this.racers.length - 1].look = r.look;
       // rivals in a launch-control car are pros: they always hit it
       if (LAUNCH_CONTROL.cars.includes(r.car)) this.racers[this.racers.length - 1].lc = true;
     }

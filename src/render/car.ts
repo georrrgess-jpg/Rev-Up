@@ -1,4 +1,5 @@
 import type { CarId } from '../data/tables';
+import { RIVAL_ART } from './rivalArt';
 
 // Rev Up vehicle renderer.
 //
@@ -9,16 +10,16 @@ import type { CarId } from '../data/tables';
 // The same geometry is used in the Garage, Showroom, reveal and race; races use cached body layers with
 // live wheels, lights and nitro.
 
-type P = { x: number; y: number };
+export type P = { x: number; y: number };
 /** Profile vertex: x, y (metres, y up), corner radius, tag for the edge that starts here ('g' = glass). */
-type V = [number, number, number?, string?];
+export type V = [number, number, number?, string?];
 
 interface WheelStyle { kind: 'steel' | 'cover' | 'sport' | 'dish' | 'center' | 'aero' | 'gravel' | 'race' | 'forged' | 'split' | 'blade' | 'mag' | 'fan' | 'disc'; rim: number; tire: string; side?: string; caliper?: string; rimCol?: string }
 
 /** What can be seen through the side glass: seat colour, an optional roll cage, the dash. */
 interface Cabin { seat: string; cage?: boolean; single?: boolean }
 
-interface CarDef {
+export interface CarDef {
   L: number; // length, metres
   width: number;
   rx: number; fx: number; r: number; // wheel centres and radius
@@ -241,6 +242,10 @@ const ENGINES: Record<string, EngineDef> = {
   meridian: { x0: 0.75, x1: 2.05, mid: true, kind: 'v12', col: '#2f6fe0', lid: 'glass' },
   tempest: { x0: 0.6, x1: 1.75, mid: true, kind: 'e4', col: '#5ef2ff', hybrid: true },
 };
+// opponent-only bodies (src/render/rivalArt.ts) join the same table, so geometry, sprites and lamps work as for any car
+for (const [id, a] of Object.entries(RIVAL_ART)) DEFS[id] = a.def;
+/** Opponent-only bodies: drawn like any car (drawCar with this id), never owned by the player. */
+export const RIVAL_ART_IDS: readonly string[] = Object.keys(RIVAL_ART);
 const engineFor = (id: string): EngineDef => ENGINES[id] ?? ENGINES.muscle;
 const defFor = (id: string): CarDef => DEFS[id] ?? DEFS.muscle;
 
@@ -275,7 +280,7 @@ const TAILS: Record<string, { x: number; y: number; len: number }> = {
   sovereign: { x: 0.27, y: 0.72, len: 0.55 },
   ardent: { x: 0.06, y: 0.62, len: 0.1 }, meridian: { x: 0.36, y: 0.655, len: 0.7 }, tempest: { x: 0.16, y: 0.74, len: 0.3 },
 };
-const tailOf = (id: string) => TAILS[id] ?? TAILS.muscle;
+const tailOf = (id: string) => TAILS[id] ?? RIVAL_ART[id]?.tail ?? TAILS.muscle;
 /** Canvas position of the near-side tail lamp for a car drawn with drawCar(ctx, id, x, y, w, …), plus its length in px. */
 export function tailLampPoint(id: CarId | string, x: number, y: number, w: number): { x: number; y: number; len: number } {
   const t = tailOf(id), k = w / defFor(id).L;
@@ -283,7 +288,7 @@ export function tailLampPoint(id: CarId | string, x: number, y: number, w: numbe
 }
 
 /** Height of the headlamp centres on the front plane. */
-const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63, tuner: 0.62, super: 0.5, rally: 0.66, gt: 0.6, proto: 0.5, vireo: 0.44, mako: 0.53, sovereign: 0.42, ardent: 0.55, meridian: 0.53, tempest: 0.5 } as Record<string, number>)[id] ?? 0.65;
+const lampY = (id: string) => ({ hothatch: 0.54, junker: 0.59, beater: 0.65, muscle: 0.7, tourer: 0.63, tuner: 0.62, super: 0.5, rally: 0.66, gt: 0.6, proto: 0.5, vireo: 0.44, mako: 0.53, sovereign: 0.42, ardent: 0.55, meridian: 0.53, tempest: 0.5 } as Record<string, number>)[id] ?? RIVAL_ART[id]?.lampY ?? 0.65;
 
 // ---------------------------------------------------------------- colour helpers
 
@@ -1126,6 +1131,7 @@ function nearPanel(c: Ctx) {
       ctx.fillStyle = dg; ctx.beginPath(); ctx.ellipse(x, y, rx, rx * 0.6, 0.2, 0, Math.PI * 2); ctx.fill();
     }
   }
+  RIVAL_ART[id]?.body?.(rivalKit(c));
   // shoulder crease highlight following the body
   ctx.strokeStyle = lit(paint, 0.45);
   ctx.globalAlpha = 0.55;
@@ -1345,6 +1351,8 @@ function mirror(ctx: CanvasRenderingContext2D, x: number, y: number, col: string
 function panelDetails(c: Ctx) {
   const { ctx, id, d, paint, trim, detail } = c;
   const lo = d.sill + 0.05;
+  const ra = RIVAL_ART[id];
+  if (ra) { ra.side?.(rivalKit(c)); return; }
   if (id === 'junker' && c.restore >= 2) {
     // restored body: straight panels in one colour, true door seams; brightwork adds a chrome waist strip
     seam(ctx, [[1.24, 0.98], [1.24, 0.5], [1.3, lo]], 0.014);
@@ -1703,7 +1711,7 @@ function tape(ctx: CanvasRenderingContext2D, x: number, y: number, len: number, 
 function sideGlass(c: Ctx) {
   const { ctx, id, g, d } = c;
   const cab = d.cabin ?? { seat: '#2a2c30' };
-  const chrome = id === 'muscle' || id === 'beater' || id === 'tourer';
+  const chrome = id === 'muscle' || id === 'beater' || id === 'tourer' || !!RIVAL_ART[id]?.chromeGlass;
   g.glass.forEach((w, wi) => {
     let ymin = Infinity, ymax = -Infinity, xmin = Infinity, xmax = -Infinity;
     for (const p of w) { ymin = Math.min(ymin, p.y); ymax = Math.max(ymax, p.y); xmin = Math.min(xmin, p.x); xmax = Math.max(xmax, p.x); }
@@ -1753,6 +1761,7 @@ function sideGlass(c: Ctx) {
 function signatureStripe(c: Ctx) {
   // earned signature finishes add a contrasting accent line under the beltline (hot hatch uses its own stripe)
   const { ctx, d, id } = c;
+  if (RIVAL_ART[id]) return;
   if (id === 'hothatch' || id === 'muscle' || id === 'tourer' || id === 'tuner' || id === 'super' || id === 'vireo' || id === 'mako' || id === 'sovereign' || id === 'ardent' || id === 'meridian' || id === 'tempest') return;
   ctx.fillStyle = c.stripe!;
   ctx.beginPath(); ctx.moveTo(0.06, d.belt - 0.13); ctx.lineTo(d.L - 0.15, d.belt - 0.18); ctx.lineTo(d.L - 0.15, d.belt - 0.22); ctx.lineTo(0.06, d.belt - 0.17); ctx.closePath(); ctx.fill();
@@ -1780,6 +1789,97 @@ function sunStrip(c: Ctx) {
   fillPts(ctx, [p0, pt(p0.x + D.x, p0.y + D.y), pt(p1.x + D.x, p1.y + D.y), p1], '#14161a');
   const m0 = q(0.08), m1 = q(0.14);
   fillPts(ctx, [pt(m0.x + D.x * 0.2, m0.y + D.y * 0.2), pt(m0.x + D.x * 0.8, m0.y + D.y * 0.8), pt(m1.x + D.x * 0.8, m1.y + D.y * 0.8), pt(m1.x + D.x * 0.2, m1.y + D.y * 0.2)], 'rgba(245,245,240,0.85)');
+}
+
+/** The drawing kit handed to the opponent-only bodies (src/render/rivalArt.ts): car metres, y up, on the car's ctx. */
+export interface RivalKit {
+  ctx: CanvasRenderingContext2D; d: CarDef; D: P; paint: string; trim: string;
+  /** Close-up (handles, badges, lettering) vs race sprite; `fine` is off while race sprites are built. */
+  detail: boolean; fine: boolean; glow: number;
+  lit(c: string, t: number): string; mix(a: string, b: string, t: number, alpha?: number): string;
+  pt(x: number, y: number): P;
+  /** A point x along the car, u across it (0 near side → 1 far side), at height y. */
+  P3(x: number, u: number, y: number): P;
+  fill(pts: P[], f: string | CanvasGradient): void;
+  path(pts: P[]): void;
+  rect(x: number, y: number, w: number, h: number, f: string, r?: number): void;
+  /** A plain ellipse at (x, y) in car metres. */
+  ellipse0(x: number, y: number, rx: number, ry: number): P[];
+  seam(pts: [number, number][], w?: number): void;
+  handle(x: number, y: number, chrome?: boolean): void;
+  mirror(x: number, y: number, col: string): void;
+  label(text: string, x: number, y: number, size: number, col: string, weight?: string): void;
+  extrude(pts: P[], colour: (n: P) => string | CanvasGradient | null): void;
+  carbon(pts: P[]): void;
+  /** Front fascia: a point, a quad and an ellipse on the front plane (u across, y height). */
+  fp(u: number, y: number): P; quad(u0: number, u1: number, y0: number, y1: number): P[]; ellipse(uc: number, yc: number, ru: number, ry: number, n?: number): P[];
+  /** Height of the top planes at x; a patch on them; a line across them. */
+  ty(x: number): number; topPatch(x0: number, x1: number, u0: number, u1: number, lift?: number, n?: number): P[]; across(x: number, u0: number, u1: number, lift?: number): void;
+  stripes(bands: [number, number][], col: string): void;
+  bumper(end: 'front' | 'rear', y0: number, y1: number, wrap: number, face: string | CanvasGradient, top: string, frontFace: string, sag?: number): void;
+  lens(warm: boolean): string;
+}
+
+function rivalKit(c: Ctx, glow = 0): RivalKit {
+  const { ctx, d, g } = c;
+  const D = g.D;
+  const ty = (x: number) => topAt(g, x);
+  const P3 = (x: number, u: number, y: number) => pt(x + D.x * u, y + D.y * u);
+  const lampOn = glow > 0;
+  return {
+    ctx, d, D, paint: c.paint, trim: c.trim, detail: c.detail, fine: FINE, glow,
+    lit, mix, pt, P3,
+    fill: (pts, f) => fillPts(ctx, pts, f),
+    path: (pts) => path(ctx, pts),
+    rect: (x, y, w, h, f, r = 0) => { ctx.fillStyle = f; ctx.beginPath(); if (r) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); ctx.fill(); },
+    ellipse0: (x, y, rx, ry) => { const pts: P[] = []; for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; pts.push(pt(x + Math.cos(a) * rx, y + Math.sin(a) * ry)); } return pts; },
+    seam: (pts, w) => seam(ctx, pts, w),
+    handle: (x, y, chrome) => handle(ctx, x, y, chrome),
+    mirror: (x, y, col) => mirror(ctx, x, y, col),
+    label: (text, x, y, size, col, weight = '900') => {
+      ctx.save(); ctx.translate(x, y); ctx.scale(size / 10, -size / 10);
+      ctx.fillStyle = col; ctx.font = `${weight} 13px sans-serif`; ctx.textBaseline = 'alphabetic'; ctx.fillText(text, 0, 0);
+      ctx.restore();
+    },
+    extrude: (pts, colour) => extrude(ctx, pts, null, D, (n) => colour(n)),
+    carbon: (pts) => carbon(ctx, pts),
+    fp: (u, y) => fp(g, u, y), quad: (u0, u1, y0, y1) => quadFP(g, u0, u1, y0, y1), ellipse: (uc, yc, ru, ry, n) => ellipseFP(g, uc, yc, ru, ry, n),
+    ty,
+    topPatch: (x0, x1, u0, u1, lift = 0, n = 8) => {
+      const near: P[] = [], far: P[] = [];
+      let last = 0;
+      for (let k = 0; k <= n; k++) {
+        // a step in the outline (a cockpit edge, a pillar facing away) has no top plane: hold the last height there
+        const x = x0 + ((x1 - x0) * k) / n, t = ty(x) || last || ty(x1), y = t + lift;
+        last = t; near.push(P3(x, u0, y)); far.push(P3(x, u1, y));
+      }
+      return [...near, ...far.reverse()];
+    },
+    across: (x, u0, u1, lift = 0) => { const y = ty(x) + lift; const a = P3(x, u0, y), b = P3(x, u1, y); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); },
+    stripes: (bands, col) => {
+      ctx.fillStyle = col;
+      for (const { a, b } of g.top) for (const [f0, f1] of bands) {
+        ctx.beginPath();
+        ctx.moveTo(a.x + D.x * f0, a.y + D.y * f0); ctx.lineTo(b.x + D.x * f0, b.y + D.y * f0);
+        ctx.lineTo(b.x + D.x * f1, b.y + D.y * f1); ctx.lineTo(a.x + D.x * f1, a.y + D.y * f1);
+        ctx.closePath(); ctx.fill();
+      }
+    },
+    bumper: (end, y0, y1, wrap, face, top, frontFace, sag = 0) => {
+      const e = end === 'front' ? d.L : 0;
+      const out = end === 'front' ? 0.07 : -0.06;
+      const lip = end === 'front'
+        ? [pt(e - 0.02, y0), pt(e + out, y0 + 0.01), pt(e + out, y1 - 0.01), pt(e - 0.02, y1)]
+        : [pt(e + 0.02, y0 + sag), pt(e + out, y0 + 0.01 + sag), pt(e + out, y1 - 0.01), pt(e + 0.02, y1)];
+      extrude(ctx, lip, null, D, (n) => (n.y > 0.5 ? top : n.x > 0.5 ? frontFace : null));
+      const side = end === 'front'
+        ? [pt(e - wrap, y0 + 0.02), pt(e + out, y0 + 0.01), pt(e + out, y1 - 0.01), pt(e - wrap, y1 - 0.01)]
+        : [pt(e + out, y0 + 0.01 + sag), pt(e + wrap, y0 + 0.02 + sag * 0.3), pt(e + wrap, y1 - 0.01), pt(e + out, y1 - 0.01)];
+      fillPts(ctx, side, face);
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.01; path(ctx, side); ctx.stroke();
+    },
+    lens: (warm) => (lampOn ? (warm ? '#fff3c9' : '#f2fbff') : warm ? '#e8dcb8' : '#d9e6ea'),
+  };
 }
 
 /** Details on the extruded planes and in front of the near wheels: stripes, scoop, spoiler, bumpers, fascia, flares. */
@@ -2051,6 +2151,8 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     ctx.strokeStyle = c.stripe ?? trim; ctx.lineWidth = 0.012; ctx.beginPath(); ctx.moveTo(0.01, 0.888); ctx.lineTo(0.34, 0.898); ctx.stroke();
     diffuser(ctx, 0.6);
   }
+  const ra = RIVAL_ART[id];
+  if (ra?.top) ra.top(rivalKit(c, glow));
   // ---- bumpers: a short extruded lip beyond each end, plus the wrap on the near side
   const bumper = (end: 'front' | 'rear', y0: number, y1: number, wrap: number, face: string | CanvasGradient, top: string, frontFace: string, sag = 0) => {
     const e = end === 'front' ? d.L : 0;
@@ -2268,6 +2370,8 @@ function frontLayer(c: Ctx, glow: number, brake: boolean) {
     fillPts(ctx, quadFP(g, 0.0, 1.0, 0.16, 0.168), glowC);
     carbon(ctx, [pt(4.5, 0.135), pt(4.93, 0.13), pt(4.92, 0.165), pt(4.5, 0.17)]);
     void D;
+  } else if (ra) {
+    ra.face(rivalKit(c, glow));
   } else {
     // full-width dark grille with quad round headlights inset in chrome bezels and amber parking lamps
     fillPts(ctx, quadFP(g, 0.0, 1.0, 0.5, 0.86), '#d3d8dc');
@@ -2428,7 +2532,7 @@ const TRAILS: Record<string, { ys: number[]; len: number; cols: [string, string,
 
 function flame(c: Ctx, k: number, phase: number) {
   const { ctx } = c;
-  const tr = TRAILS[c.id];
+  const tr = TRAILS[c.id] ?? RIVAL_ART[c.id]?.trail;
   const len = (0.9 + 0.5 * k + 0.08 * Math.sin(phase * 5)) * (tr?.len ?? 1);
   const x0 = (tr?.x0 ?? 0) + 0.02;
   const gr = ctx.createLinearGradient(x0, 0, x0 - len, 0);

@@ -2,6 +2,7 @@
 // the Heritage Cup class series, skill milestones that pay once, the Race menu's competition summary, and the
 // evidence-based explanation of a finish. Pure rules over GameState / RaceOutcome (no DOM); every function that
 // changes state is meant to run inside Game.transact.
+import { rivalCarModel } from '../data/rivalCars';
 import {
   BLUEPRINT_FINISHES, CarId, EVENTS, FAMILIES, Family, RIVALS, RaceEvent, TRACKS, carById, eventById, roundCash,
 } from '../data/tables';
@@ -260,7 +261,7 @@ export function competitionSummary(s: GameState): CompetitionSummary {
     const req = e.requires;
     const why = open ? '' : req.car && !s.owned.includes(req.car) ? `Unlock the ${carById(req.car).model}` : req.afterWin ? `Win ${eventById(req.afterWin).name} first` : req.beatBoss ? `Beat ${RIVALS[req.beatBoss]?.name}` : '';
     return {
-      rival: r.rival, name: rv.name, car: rv.car, carModel: carById(rv.car).model, paint: rv.paint, line: rv.line,
+      rival: r.rival, name: rv.name, car: rv.car, carModel: rivalCarModel(rv), paint: rv.paint, line: rv.line,
       strength: prof?.strength ?? '', home: prof?.home ?? TRACKS[e.track].name,
       event: e.id, eventName: e.name, beaten: rungBeaten(s, r), open, why, prize: rungPrizeText(r),
     };

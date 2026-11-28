@@ -53,16 +53,17 @@ export function upgradeLevel(car: string, part?: PartLike | null): number {
   return Math.min(1.2, base + bonus);
 }
 
-/** The voice of this car with this engine (and turbo) fitted. Upgrades add harmonics, cam lope, crackle and whistle. */
-export function resolveEngine(car: string, engine?: PartLike | null, turbo?: PartLike | null): ResolvedEngine {
-  const base = engineFor(car);
+/** The voice of this car with this engine (and turbo) fitted. Upgrades add harmonics, cam lope, crackle and whistle.
+ *  `voice` (a rival's look) swaps the timbre for another ENGINES entry; pitch still follows this car's tach. */
+export function resolveEngine(car: string, engine?: PartLike | null, turbo?: PartLike | null, voice?: string): ResolvedEngine {
+  const base = engineFor(voice ?? car);
   const d = drivetrainFor(car as CarId);
   const u = upgradeLevel(car, engine);
   const ut = upgradeLevel(car, turbo);
   const turboLevel = (base.turbo ?? 0) * (1 + 0.4 * u) + 0.45 * ut * (base.turbo ? 0.5 : 1);
   return {
     ...base,
-    car, idle: d.idle, redline: d.redline, u, ut,
+    car: voice ?? car, idle: d.idle, redline: d.redline, u, ut,
     tilt: base.tilt - 0.4 * u,
     drive: base.drive * (1 + 1.1 * u),
     lope: Math.min(0.75, base.lope + 0.22 * u * (base.cyl >= 6 ? 1 : 0.6)),

@@ -63,23 +63,23 @@ export interface RivalProfile { strength: string; home: string }
 export const CIRCUIT_RIVALS: Record<string, Rival> = {
   // ---- Esplanade Grand Prix (Ardent Spyder rung)
   mika: { id: 'mika', name: 'Mika Sorel', car: 'ardent', paint: '#ff5a1f', line: 'Has driven the Esplanade’s chicanes a thousand times in her head. Never touches a kerb.', stats: { top: 71.0, accel: 14.6, grip: 2.68 } },
-  pia: { id: 'pia', name: 'Pia Lund', car: 'ardent', paint: '#f4f1e6', line: 'Club racer with a carbon tub and a notebook of braking points.', stats: { top: 70.0, accel: 14.2, grip: 2.6 } },
+  pia: { id: 'pia', name: 'Pia Lund', car: 'ardent', look: 'rv-wisp', paint: '#f4f1e6', line: 'Club racer with a carbon tub and a notebook of braking points.', stats: { top: 70.0, accel: 14.2, grip: 2.6 } },
   anouk2: { id: 'anouk2', name: 'Anouk Vidal', car: 'vireo', paint: '#f2f0e6', line: 'Brought her Vireo down from the Corniche. Brakes where everyone else lifts.', stats: { top: 78.0, accel: 15.0, grip: 2.55 } },
   // ---- Causeway Run (Meridian LT rung)
   lorne: { id: 'lorne', name: 'Lorne Halvard', car: 'meridian', paint: '#1f4fc4', line: 'Runs the causeway at dawn to beat the fishing boats out. Hasn’t lifted since the bridge opened.', stats: { top: 91.0, accel: 15.6, grip: 2.5 } },
-  teo2: { id: 'teo2', name: 'Teo Marchand', car: 'mako', paint: '#3a3f47', line: 'Twin turbos, a longer top gear, the same one speed: all of it.', stats: { top: 84.0, accel: 16.2, grip: 2.5 } },
+  teo2: { id: 'teo2', name: 'Teo Marchand', car: 'mako', look: 'rv-varga', paint: '#3a3f47', line: 'Twin turbos, a longer top gear, the same one speed: all of it.', stats: { top: 84.0, accel: 16.2, grip: 2.5 } },
   aurelia2: { id: 'aurelia2', name: 'Aurelia Stern', car: 'sovereign', paint: '#0d0d12', line: 'Lost the Grand Riviera to you. Wants it back over open water.', stats: { top: 86.0, accel: 16.0, grip: 2.65 } },
   // ---- Circuit Crown (Tempest E4 rung, the final)
   zara: { id: 'zara', name: 'Zara Quell', car: 'tempest', paint: '#e8f6ff', line: 'Wrote the Tempest’s launch map herself. Has never been beaten to the first marker.', stats: { top: 93.0, accel: 19.6, grip: 3.0 }, boss: true },
   lorne2: { id: 'lorne2', name: 'Lorne Halvard', car: 'meridian', paint: '#1f4fc4', line: 'Followed you inland. On a runway the Meridian’s tall gears still pull.', stats: { top: 89.0, accel: 15.6, grip: 2.6 } },
   mika2: { id: 'mika2', name: 'Mika Sorel', car: 'ardent', paint: '#ff5a1f', line: 'Light enough to launch hard, brave enough to take the taxiway flat.', stats: { top: 74.0, accel: 16.2, grip: 2.85 } },
   // ---- Heritage Cup rounds for the Kestrel and the Corvo
-  kai2: { id: 'kai2', name: 'Kai Mercer', car: 'tuner', paint: '#20c4c4', line: 'Moved his Kestrel to the coast. The chicanes feel like home.', stats: { top: 50.0, accel: 9.3, grip: 1.8 } },
-  ozzy2: { id: 'ozzy2', name: 'Ozzy Lin', car: 'tuner', paint: '#8cff3a', line: 'Lime-green Kestrel, louder laugh, softer tyres.', stats: { top: 50.5, accel: 9.6, grip: 1.76 } },
-  odin2: { id: 'odin2', name: 'Odin Pike', car: 'tuner', paint: '#ff7a1a', line: 'Took the Kestrel back out of the desert. It still has sand in the vents.', stats: { top: 51.0, accel: 9.4, grip: 1.72 } },
-  tomas2: { id: 'tomas2', name: 'Tomás Reyes', car: 'rally', paint: '#c23b22', line: 'Gravel champion on tarmac for once. Launches like the ground is loose anyway.', stats: { top: 55.0, accel: 12.4, grip: 2.25 } },
+  kai2: { id: 'kai2', name: 'Kai Mercer', car: 'tuner', look: 'ks-kai', paint: '#20c4c4', line: 'Moved his Kestrel to the coast. The chicanes feel like home.', stats: { top: 50.0, accel: 9.3, grip: 1.8 } },
+  ozzy2: { id: 'ozzy2', name: 'Ozzy Lin', car: 'tuner', look: 'ks-ozzy', paint: '#8cff3a', line: 'Lime-green Kestrel, louder laugh, softer tyres.', stats: { top: 50.5, accel: 9.6, grip: 1.76 } },
+  odin2: { id: 'odin2', name: 'Odin Pike', car: 'tuner', look: 'ks-odin', paint: '#ff7a1a', line: 'Took the Kestrel back out of the desert. It still has sand in the vents.', stats: { top: 51.0, accel: 9.4, grip: 1.72 } },
+  tomas2: { id: 'tomas2', name: 'Tomás Reyes', car: 'rally', look: 'cv-tomas', paint: '#c23b22', line: 'Gravel champion on tarmac for once. Launches like the ground is loose anyway.', stats: { top: 55.0, accel: 12.4, grip: 2.25 } },
   yara2: { id: 'yara2', name: 'Yara Bell', car: 'rally', paint: '#e0d4b8', line: 'Counts the runway lights out loud. Shifts on the seventh.', stats: { top: 55.5, accel: 12.0, grip: 2.3 } },
-  wren2: { id: 'wren2', name: 'Wren Calloway', car: 'rally', paint: '#3c7d4f', line: 'Never lifts on a crest; the taxiway turn is just a flat crest.', stats: { top: 56.0, accel: 12.6, grip: 2.2 } },
+  wren2: { id: 'wren2', name: 'Wren Calloway', car: 'rally', look: 'cv-wren', paint: '#3c7d4f', line: 'Never lifts on a crest; the taxiway turn is just a flat crest.', stats: { top: 56.0, accel: 12.6, grip: 2.2 } },
 };
 
 /** Where each ladder rival is fast, and why (shown on the ladder; read against the course demands). */
