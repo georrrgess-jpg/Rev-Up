@@ -94,7 +94,7 @@ export const roadColors = (theme: string) => { const p = palOf(theme); return { 
 // ---------------------------------------------------------------- tiles
 
 export interface Layer { cv: HTMLCanvasElement; par: number; top: number; w: number; emit: Emit[] }
-interface Built { key: string; pal: Pal; sky: HTMLCanvasElement; layers: Layer[]; fore: Layer | null; recipe: Recipe; live: { after: number; draw: (L: LiveCtx) => void }[] }
+interface Built { key: string; pal: Pal; sky: HTMLCanvasElement; cloud: HTMLCanvasElement; layers: Layer[]; fore: Layer | null; recipe: Recipe; live: { after: number; draw: (L: LiveCtx) => void }[] }
 let built: Built | null = null;
 
 function canvas(w: number, h: number) {
@@ -111,6 +111,22 @@ function blitLayer(ctx: C2, L: Layer, scroll: number) {
   if (L.w - off < ctx.canvas.width) ctx.drawImage(L.cv, L.w - off, top);
 }
 
+/** The race HUD's standings and progress bar sit over the top ~170 CSS px. On short screens the landmarks reach up
+ *  there, so a soft darkening is baked into the sky and into every tile that reaches that high (only over what the
+ *  tile painted), which keeps the HUD text readable at no per-frame cost. `c` draws in screen rows. */
+function hudScrim(c: C2, v: SceneView, w: number, onlyPainted: boolean) {
+  const h = Math.min(v.horizon, 170 * v.dpr);
+  if (h < 8) return;
+  // stronger when the horizon itself is high on the screen (little sky between the HUD and the scenery)
+  const a = v.horizon < 220 * v.dpr ? 0.42 : 0.3;
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, `rgba(0,0,16,${a})`); g.addColorStop(0.6, `rgba(0,0,16,${a * 0.55})`); g.addColorStop(1, 'rgba(0,0,16,0)');
+  c.save();
+  if (onlyPainted) c.globalCompositeOperation = 'source-atop';
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.restore();
+}
+
 function buildSky(v: SceneView, pal: Pal): HTMLCanvasElement {
   const { W, horizon, dpr } = v;
   const cv = canvas(W, horizon + 2);
@@ -118,10 +134,6 @@ function buildSky(v: SceneView, pal: Pal): HTMLCanvasElement {
   const g = c.createLinearGradient(0, 0, 0, horizon);
   g.addColorStop(0, pal.sky[0]); g.addColorStop(0.55, pal.sky[1]); g.addColorStop(1, pal.sky[2]);
   c.fillStyle = g; c.fillRect(0, 0, W, horizon + 2);
-  // a gentle darkening at the very top keeps the race HUD text readable on bright skies
-  const hud = c.createLinearGradient(0, 0, 0, horizon * 0.4);
-  hud.addColorStop(0, 'rgba(0,0,20,0.34)'); hud.addColorStop(1, 'rgba(0,0,20,0)');
-  c.fillStyle = hud; c.fillRect(0, 0, W, horizon * 0.4);
   if (pal.stars) {
     for (let k = 0; k < 90; k++) {
       const x = hash(k + 3) * W, y = hash(k * 3.1 + 9) * horizon * 0.75;
@@ -145,6 +157,7 @@ function buildSky(v: SceneView, pal: Pal): HTMLCanvasElement {
   const band = c.createLinearGradient(0, horizon - 40 * dpr, 0, horizon + 2);
   band.addColorStop(0, 'rgba(255,255,255,0)'); band.addColorStop(1, 'rgba(255,255,255,0.16)');
   c.fillStyle = band; c.fillRect(0, horizon - 40 * dpr, W, 42 * dpr);
+  hudScrim(c, v, W, false);
   return cv;
 }
 const disc = (c: C2, x: number, y: number, r: number, fill: string) => { c.fillStyle = fill; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
@@ -178,6 +191,7 @@ function buildLayers(v: SceneView, pal: Pal, recipe: Recipe) {
       emit: (e) => { if (e.x >= 0 && e.x < w) emit.push(e); },
       text: (t, x, y, bw, bh, col, maxPx, weight = 900) => signText(c, t, x, y, bw, bh, Math.min(3 * u, bh * 0.18), col, maxPx, weight, 'Barlow, system-ui, sans-serif'),
     });
+    if (top < 170 * u) hudScrim(c, v, w, true);
     return { cv, par, top, w, emit };
   };
   const B: RecipeBuilder = {
@@ -200,7 +214,7 @@ function ensure(v: SceneView): Built {
   const pal: Pal = { ...palOf(v.theme), ...(recipe.pal ?? {}) };
   const sky = buildSky(v, pal);
   const { layers, fore, live } = buildLayers(v, pal, recipe);
-  built = { key, pal, sky, layers, fore, recipe, live };
+  built = { key, pal, sky, cloud: cloudSprite(pal, v.dpr), layers, fore, recipe, live };
   return built;
 }
 
@@ -215,19 +229,31 @@ function sceneScroll(v: SceneView) {
   return v.camX * ref;
 }
 
+/** One cloud, painted once per build at its largest scale (three overlapping translucent puffs), then blitted. */
+const CLOUD_S = 1.4;
+function cloudSprite(pal: Pal, u: number) {
+  const s = CLOUD_S * u;
+  const cv = canvas(94 * s, 30 * s);
+  const c = cv.getContext('2d')!;
+  c.translate(47 * s, 20 * s);
+  c.fillStyle = pal.cloud;
+  c.beginPath(); c.ellipse(0, 0, 46 * s, 9 * s, 0, 0, 7); c.fill();
+  c.beginPath(); c.ellipse(16 * s, -8 * s, 24 * s, 11 * s, 0, 0, 7); c.fill();
+  c.beginPath(); c.ellipse(-14 * s, -5 * s, 18 * s, 8 * s, 0, 0, 7); c.fill();
+  return cv;
+}
+
 function clouds(v: SceneView, b: Built, scroll: number) {
   const { ctx, W, horizon: hz, dpr: u, t } = v;
   const n = b.recipe.clouds ?? 4;
   if (!n) return;
-  ctx.fillStyle = b.pal.cloud;
+  const sp = b.cloud;
   for (let k = 0; k < n; k++) {
     const span = W * 1.6;
     const x = drift(k * span / n - scroll * 0.02 - t * 8 * u, span) - W * 0.3;
     const y = hz * (0.2 + 0.13 * (k % 3));
-    const s = (0.8 + hash(k) * 0.6) * u;
-    ctx.beginPath(); ctx.ellipse(x, y, 46 * s, 9 * s, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x + 16 * s, y - 8 * s, 24 * s, 11 * s, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x - 14 * s, y - 5 * s, 18 * s, 8 * s, 0, 0, 7); ctx.fill();
+    const f = (0.8 + hash(k) * 0.6) / CLOUD_S;
+    ctx.drawImage(sp, x - sp.width * f / 2, y - sp.height * f * (20 / 30), sp.width * f, sp.height * f);
   }
 }
 

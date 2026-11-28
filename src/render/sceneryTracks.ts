@@ -116,12 +116,14 @@ function skyline(P: Paint, base: number, n: number, minH: number, maxH: number, 
 function gulls(L: LiveCtx, n: number, y0: number, col = 'rgba(20,24,40,0.55)') {
   const { ctx, W, u, t, scroll } = L;
   ctx.strokeStyle = col; ctx.lineWidth = 1.5 * u;
-  for (let k = 0; k < n; k++) {
+  ctx.beginPath();
+  for (let k = 0; k < (L.light ? Math.min(n, 2) : n); k++) {
     const x = drift(W * 0.2 + k * 53 * u + t * (18 + k * 3) * u - scroll * 0.05, W * 1.4) - W * 0.2;
     const y = y0 + k * 7 * u + Math.sin(t * 1.3 + k) * 6 * u;
     const f = Math.sin(t * 7 + k * 2) * 3 * u;
-    ctx.beginPath(); ctx.moveTo(x - 6 * u, y - f); ctx.lineTo(x, y); ctx.lineTo(x + 6 * u, y - f); ctx.stroke();
+    ctx.moveTo(x - 6 * u, y - f); ctx.lineTo(x, y); ctx.lineTo(x + 6 * u, y - f);
   }
+  ctx.stroke(); // one stroke for the flock
 }
 
 /** A boat crossing the water band at its own speed, moving with the layer `par`. */
@@ -343,7 +345,7 @@ const BOX_COLS = ['#d9472b', '#1f7fbf', '#f2a91c', '#2f9a6a', '#7a4ab0', '#e2702
 // ---- Scrapyard Strip: Ray's Yard at sunset — magnet crane, crusher, excavator, forklift, car stacks and tyre walls
 const scrapyard: Build = (B) => {
   const { u, hz, rt, span, pal } = B;
-  B.layer(FAR, hz - 110 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 66 * u, hz + 2, (P) => {
     const { c, w, k } = P;
     ridge(c, w, hz + 2, 56 * u, 90 * u, 1, '#6a2f55');
     // a line of pylons striding across the hills
@@ -353,7 +355,7 @@ const scrapyard: Build = (B) => {
     haze(P, hz - 110 * u, hz + 2, pal.sky[2], 0.12, 0.35);
   });
   const g = hz + span * 0.42; // the yard floor line for the landmark layer
-  B.layer(MID, hz - 150 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 88 * u, hz + span * 0.55, (P) => {
     const { c, w, k, emit } = P;
     // heaps of crushed cars behind the yard: pyramids of cubes, faded by distance
     P.place(9, (x, r, i) => {
@@ -396,7 +398,7 @@ const scrapyard: Build = (B) => {
     });
     haze(P, hz - 150 * u, hz + span * 0.55, pal.sky[2], 0.06, 0.14);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 70 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     rect(c, 0, hz + span * 0.35, w, rt - hz, pal.ground);
     // gravel texture streaks
@@ -429,20 +431,12 @@ const scrapyard: Build = (B) => {
     P.place(3, (x) => { for (let i = 0; i < 2; i++) tyre(c, x + i * 16 * u, rb + 20 * u, 7 * u, '#120c0a', '#2a201c'); }, 4);
     void k;
   });
-  // a second forklift shuttles pallets along the yard
-  B.live((L) => {
-    if (L.light) return;
-    const k: Kit = { c: L.ctx, u: L.u, rim: 'rgba(255,220,170,0.5)', shadow: 'rgba(0,0,0,0.2)' };
-    const span2 = L.W * 1.7;
-    const x = drift(L.W * 0.9 - L.scroll * 0.18 + Math.sin(L.t * 0.35) * 60 * L.u, span2) - L.W * 0.3;
-    if (x > -40 * L.u && x < L.W + 40 * L.u) forklift(k, x, L.hz + L.span * 0.8, 0.85 * L.u, '#f2b21c', 0.5 + 0.5 * Math.sin(L.t * 0.9));
-  });
 };
 
 // ---- Maple Highway: a bright autumn afternoon — the water tower, a red barn and silo, the church, maples
 const maple: Build = (B) => {
   const { u, hz, rt, span, pal } = B;
-  B.layer(FAR, hz - 60 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 40 * u, hz + 2, (P) => {
     const { c, w } = P;
     ridge(c, w, hz + 2, 44 * u, 130 * u, 2, '#7fb48e');
     // patchwork fields on the far hills
@@ -450,7 +444,7 @@ const maple: Build = (B) => {
     haze(P, hz - 60 * u, hz + 2, pal.sky[2], 0.15, 0.35);
   });
   const g = hz + span * 0.4;
-  B.layer(MID, hz - 110 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 64 * u, hz + span * 0.55, (P) => {
     const { c, w, k } = P;
     ridge(c, w, g, 28 * u, 80 * u, 5, '#55984f');
     rect(c, 0, g - 1, w, hz + span * 0.55 - g + 1, '#55984f');
@@ -465,7 +459,7 @@ const maple: Build = (B) => {
     P.place(9, (x, r, i) => roundTree(k, x, g + 2 * u, (0.6 + r * 0.3) * u, ['#e2572a', '#f2a12c', '#c93a2a', '#f5c33a', '#7aa63a'][i % 5]), 12);
     haze(P, hz - 110 * u, hz + span * 0.55, pal.sky[2], 0.04, 0.12);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     rect(c, 0, hz + span * 0.45, w, rt - hz, pal.ground);
     c.fillStyle = 'rgba(255,255,255,0.06)'; for (let x = 0; x < w; x += 26 * u) c.fillRect(x, hz + span * 0.45, 13 * u, rt - hz);
@@ -515,7 +509,7 @@ const maple: Build = (B) => {
 // ---- Foundry Circuit: steel-blue dusk lit by the furnaces — cooling towers, a blast furnace, ladle crane, coils
 const foundry: Build = (B) => {
   const { u, hz, rt, span, pal } = B;
-  B.layer(FAR, hz - 110 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 74 * u, hz + 2, (P) => {
     const { c, w, k, emit } = P;
     ridge(c, w, hz + 2, 36 * u, 70 * u, 3, '#3c3a63', true);
     P.place(2, (x, r) => {
@@ -525,7 +519,7 @@ const foundry: Build = (B) => {
     haze(P, hz - 110 * u, hz + 2, '#ff8a3d', 0.05, 0.3);
   });
   const g = hz + span * 0.4;
-  B.layer(MID, hz - 150 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 104 * u, hz + span * 0.55, (P) => {
     const { c, w, k, emit } = P;
     rect(c, 0, hz - 10 * u, w, span * 0.55 + 10 * u, '#1e2240');
     // a run of mill sheds along the horizon
@@ -556,7 +550,7 @@ const foundry: Build = (B) => {
     });
     haze(P, hz - 150 * u, hz + span * 0.55, '#ff8a3d', 0.02, 0.12);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 50 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     rect(c, 0, hz + span * 0.42, w, rt - hz, pal.ground);
     const y = hz + span * 0.84;
@@ -600,7 +594,7 @@ const foundry: Build = (B) => {
 // ---- Harbor Launch: the container port — ship-to-shore cranes, a container ship, straddle carriers, bollards
 const harbor: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 60 * u, rt, (P) => {
+  B.layer(FAR, hz - 45 * u, rt, (P) => {
     const { c, w } = P;
     water(P, hz - 2 * u, rt, '#1c7fb0', '#2aa3bf', 'rgba(255,255,255,0.35)', 50, 2);
     // the city across the bay, pale with distance
@@ -608,7 +602,7 @@ const harbor: Build = (B) => {
     rect(c, 0, hz - 1 * u, w, 2 * u, '#7fa6bf');
   });
   const q = hz + span * 0.3; // the quay edge
-  B.layer(MID, hz - 150 * u, hz + span * 0.6, (P) => {
+  B.layer(MID, hz - 125 * u, hz + span * 0.6, (P) => {
     const { c, w, k, emit } = P;
     rect(c, 0, q, w, hz + span * 0.6 - q, '#b9b2a2'); rect(c, 0, q, w, 2 * u, '#f2c230');
     // a container ship at the berth
@@ -681,12 +675,12 @@ const harbor: Build = (B) => {
 // ---- Cliffside Esses: white chalk cliffs, the striped lighthouse, sea stacks, gorse and sheep on the clifftop
 const cliffs: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 40 * u, rt, (P) => {
+  B.layer(FAR, hz - 26 * u, rt, (P) => {
     const { c } = P;
     water(P, hz - 2 * u, rt, '#1d78b2', '#24a9c4', 'rgba(255,255,255,0.4)', 60, 7);
     P.place(2, (x, r) => { c.fillStyle = '#7fa3b8'; c.beginPath(); c.ellipse(x, hz, (60 + r * 40) * u, (12 + r * 6) * u, 0, Math.PI, 0); c.fill(); }, 2);
   });
-  B.layer(MID, hz - 130 * u, rt, (P) => {
+  B.layer(MID, hz - 150 * u, rt, (P) => {
     const { c, k, emit } = P;
     // headlands of chalk dropping into the sea, a lighthouse on the tallest, sea stacks off the point
     P.place(2, (x, r, i) => {
@@ -766,12 +760,12 @@ const cliffs: Build = (B) => {
 // ---- Coast Road: a clear noon on the beach highway — beach huts, the pier, lifeguard tower, umbrellas and palms
 const coast: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 40 * u, rt, (P) => {
+  B.layer(FAR, hz - 30 * u, rt, (P) => {
     const { c } = P;
     water(P, hz - 2 * u, rt, '#1690c8', '#27c2c9', 'rgba(255,255,255,0.45)', 70, 3);
     P.at(0.524, (x) => { c.fillStyle = '#4f8a7a'; c.beginPath(); c.ellipse(x, hz, 70 * u, 14 * u, 0, Math.PI, 0); c.fill(); rect(c, x - 4 * u, hz - 20 * u, 8 * u, 10 * u, '#f6f3ea'); poly(c, [x - 5 * u, hz - 20 * u, x + 5 * u, hz - 20 * u, x, hz - 26 * u], '#2f6fb5'); });
   });
-  B.layer(MID, hz - 110 * u, rt, (P) => {
+  B.layer(MID, hz - 52 * u, rt, (P) => {
     const { c, k, emit } = P;
     // the pier on stilts with a café at its end
     P.at(0.468, (x) => {
@@ -784,7 +778,7 @@ const coast: Build = (B) => {
     });
     P.place(2, (x, r) => sailboat(k, x, hz + span * (0.08 + r * 0.1), (0.7 + r * 0.3) * u, r > 0.5 ? '#c8432f' : '#2b4d7a'), 8);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 70 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w } = P;
     // the beach: sand, a wet strip with surf, huts, umbrellas, towels, surfboards and the lifeguard tower
     rect(c, 0, hz + span * 0.42, w, rt - hz, '#f0d9a0');
@@ -846,7 +840,7 @@ const coast: Build = (B) => {
 // ---- Neon Mile: the downtown street circuit at night — the Spire, the theatre marquee, neon signs, searchlights
 const downtown: Build = (B) => {
   const { u, hz, rt, span, pal } = B;
-  B.layer(FAR, hz - 170 * u, hz + 4, (P) => {
+  B.layer(FAR, hz - 118 * u, hz + 4, (P) => {
     skyline(P, hz + 4, 16, 40 * u, 110 * u, '#1a1438', ['rgba(255,226,170,0.5)', 'rgba(80,230,255,0.6)', 'rgba(255,80,170,0.7)'], 0.4, 21, true);
     haze(P, hz - 170 * u, hz + 4, '#6a1f6e', 0.05, 0.3);
   });
@@ -880,7 +874,7 @@ const downtown: Build = (B) => {
       rect(c, x + 52 * u, hz - 74 * u, 6 * u, 20 * u, '#ff3fa4');
     });
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 70 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k, emit } = P;
     rect(c, 0, hz + span * 0.3, w, rt - hz, pal.ground);
     const neon = ['#ff3fa4', '#38e1ff', '#ffd23f', '#9b7bff'];
@@ -954,7 +948,7 @@ const bridge: Build = (B) => {
     rect(c, 0, y - 2 * u, w, span * 0.6, '#0e1a40');
     c.fillStyle = 'rgba(255,214,140,0.25)'; for (let x = 0; x < w; x += 18 * u) c.fillRect(x, y + 2 * u, 1.6 * u, (6 + hash(x) * 10) * u);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 30 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     // dark water far below the deck, with a moored ferry and a harbour light
     rect(c, 0, hz + span * 0.5, w, rt - hz, '#0a1430');
@@ -1018,7 +1012,7 @@ const skylineRun: Build = (B) => {
     haze(P, hz - 190 * u, hz + 4, '#a0237a', 0.04, 0.3);
     void k;
   });
-  B.layer(MID, hz - 160 * u, hz + span * 0.6, (P) => {
+  B.layer(MID, hz - 150 * u, hz + span * 0.6, (P) => {
     const { c, w, k, emit } = P;
     P.at(0.540, (x) => {
       poly(c, [x - 16 * u, hz + 4 * u, x + 16 * u, hz + 4 * u, x + 6 * u, hz - 140 * u, x - 6 * u, hz - 140 * u], '#151a3a');
@@ -1053,7 +1047,7 @@ const skylineRun: Build = (B) => {
     ctx.fillStyle = '#20304a'; for (let i = 0; i < 12; i++) ctx.fillRect(x + 8 * uu + i * 11.5 * uu, h - 42 * uu, 7 * uu, 4 * uu);
     ctx.fillStyle = '#2ff3ff'; ctx.fillRect(x, h - 35 * uu, len, 1.4 * uu);
   });
-  B.layer(NEAR, hz - 70 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, emit } = P;
     rect(c, 0, hz + span * 0.3, w, rt - hz, pal.ground);
     c.strokeStyle = 'rgba(255,47,180,0.22)'; c.lineWidth = 1 * u;
@@ -1098,14 +1092,14 @@ function desertVerge(B: RecipeBuilder, P: Paint, post: string, tape: string) {
 // ---- Dune Wash: golden dunes and a rally camp — service tents, the start arch, spectators on the crests
 const dunes: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 70 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 42 * u, hz + 2, (P) => {
     const { c, w } = P;
     ridge(c, w, hz + 2, 50 * u, 150 * u, 6, '#e3a868');
     ridge(c, w, hz + 2, 30 * u, 110 * u, 2, '#d0905a');
     haze(P, hz - 70 * u, hz + 2, '#ffe2a8', 0.15, 0.4);
   });
   const g = hz + span * 0.4;
-  B.layer(MID, hz - 120 * u, hz + span * 0.6, (P) => {
+  B.layer(MID, hz - 52 * u, hz + span * 0.6, (P) => {
     const { c, w, k, emit } = P;
     // big dunes with a sharp crest: lit windward side, shaded lee
     P.place(4, (x, r) => {
@@ -1128,7 +1122,7 @@ const dunes: Build = (B) => {
     // the stage start arch
     P.at(0.790, (x) => bannerArch(k, x, g + 2 * u, 120 * u, 56 * u, '#d6202a', 'DUNE WASH RALLY', '#ffffff', (t, tx, ty, tw, th, col) => P.text(t, tx, ty, tw, th, col, 11 * u)));
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 50 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     // sand with ripples, spectators on a crest, hay bales and tufts
     c.fillStyle = '#f0bd78'; c.beginPath(); c.moveTo(0, rt);
@@ -1169,13 +1163,13 @@ const dunes: Build = (B) => {
 // ---- Red Canyon Stage: towering striped canyon walls, the rock arch, hoodoos and juniper scrub
 const canyon: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 100 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 82 * u, hz + 2, (P) => {
     const { c, w } = P;
     ridge(c, w, hz + 2, 80 * u, 120 * u, 9, '#b56a6a', true);
     c.fillStyle = 'rgba(80,30,40,0.18)'; for (let i = 1; i < 5; i++) c.fillRect(0, hz - i * 16 * u, w, 3 * u);
     haze(P, hz - 100 * u, hz + 2, '#ffc98f', 0.2, 0.4);
   });
-  B.layer(MID, hz - 140 * u, hz + span * 0.5, (P) => {
+  B.layer(MID, hz - 108 * u, hz + span * 0.5, (P) => {
     const { c, w, k } = P;
     rect(c, 0, hz - 2 * u, w, span * 0.5 + 2 * u, '#b04a28');
     // canyon walls: stepped red cliffs with bright strata, cut by a deep shadowed gorge
@@ -1195,7 +1189,7 @@ const canyon: Build = (B) => {
     });
     P.place(5, (x, r) => hoodoo(k, x, hz + span * 0.3, (1 + r * 0.6) * u, '#c9582e'), 16);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     rect(c, 0, hz + span * 0.4, w, rt - hz, '#c4602f');
     c.fillStyle = 'rgba(255,220,170,0.22)'; for (let i = 0; i < 30; i++) c.fillRect(hash(i * 2.1) * w, hz + span * (0.45 + hash(i) * 0.5), 20 * u, 1.5 * u);
@@ -1229,7 +1223,7 @@ const canyon: Build = (B) => {
 // ---- Mesa Speed Trap: a white salt flat at noon — the timing tower, distant mesas in the mirage, a freight train
 const mesaFlats: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 70 * u, hz + 6 * u, (P) => {
+  B.layer(FAR, hz - 55 * u, hz + 6 * u, (P) => {
     const { c, w, k } = P;
     P.place(5, (x, r) => mesa(k, x, hz + 2 * u, (70 + r * 80) * u, (24 + r * 30) * u, '#a77a8a', '#c99aa0'), 3);
     // the mirage: a pale band that swallows the mesas' feet
@@ -1238,7 +1232,7 @@ const mesaFlats: Build = (B) => {
     c.fillStyle = g; c.fillRect(0, hz - 10 * u, w, 16 * u);
     haze(P, hz - 70 * u, hz + 6 * u, '#f4ead8', 0.3, 0.5);
   });
-  B.layer(MID, hz - 120 * u, hz + span * 0.5, (P) => {
+  B.layer(MID, hz - 130 * u, hz + span * 0.5, (P) => {
     const { c, w, emit } = P;
     rect(c, 0, hz, w, span * 0.5, '#efe6d6');
     // a railway embankment along the far side of the flat
@@ -1298,11 +1292,11 @@ const mesaFlats: Build = (B) => {
 // ---- Airfield Sprint: hangars, the control tower, parked aircraft, runway lights, and a plane taking off
 const airstrip: Build = (B) => {
   const { u, hz, rt, span } = B;
-  B.layer(FAR, hz - 60 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 34 * u, hz + 2, (P) => {
     ridge(P.c, P.w, hz + 2, 40 * u, 160 * u, 6, '#c9a08a');
     haze(P, hz - 60 * u, hz + 2, '#f3e2c0', 0.2, 0.4);
   });
-  B.layer(MID, hz - 130 * u, hz + span * 0.5, (P) => {
+  B.layer(MID, hz - 124 * u, hz + span * 0.5, (P) => {
     const { c, w, emit } = P;
     rect(c, 0, hz - 2 * u, w, span * 0.5 + 2 * u, '#b9a886');
     P.at(0.290, (x) => {
@@ -1339,7 +1333,7 @@ const airstrip: Build = (B) => {
     ctx.fillStyle = '#d6202a'; ctx.beginPath(); ctx.moveTo(-14 * uu, -1 * uu); ctx.lineTo(-18 * uu, -8 * uu); ctx.lineTo(-11 * uu, -1 * uu); ctx.fill();
     ctx.restore();
   });
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k, emit } = P;
     // the apron: concrete with taxi lines, parked prop planes, a fuel truck and edge lights
     rect(c, 0, hz + span * 0.4, w, rt - hz, '#a59f92');
@@ -1380,7 +1374,7 @@ const airstrip: Build = (B) => {
 // ---- Summit: shared alpine pieces
 function alpsFar(B: RecipeBuilder, back: string, front: string, snow: string, seed: number, hazeCol: string) {
   const { u, hz } = B;
-  B.layer(FAR, hz - 150 * u, hz + 2, (P) => {
+  B.layer(FAR, hz - 144 * u, hz + 2, (P) => {
     const { k } = P;
     // two rows of peaks: a pale back range and a bolder front range, each with lit faces and snow caps
     P.place(5, (x, r) => peak(k, x, hz + 2, (150 + r * 90) * u, (100 + r * 40) * u, back, snow, 0.42), seed);
@@ -1394,7 +1388,7 @@ const pass: Build = (B) => {
   const { u, hz, rt, span } = B;
   alpsFar(B, '#8fa8d0', '#6f8cbc', '#f4f8ff', 3, '#e8f7ff');
   const g = hz + span * 0.45;
-  B.layer(MID, hz - 120 * u, hz + span * 0.6, (P) => {
+  B.layer(MID, hz - 92 * u, hz + span * 0.6, (P) => {
     const { c, w, k, emit } = P;
     // a nearer range of dark rock peaks
     P.place(5, (x, r) => peak(k, x, g, (110 + r * 60) * u, (60 + r * 30) * u, '#4f6a98', '#eef5ff', 0.34), 13);
@@ -1421,7 +1415,7 @@ const pass: Build = (B) => {
     haze(P, hz - 120 * u, hz + span * 0.6, '#e8f7ff', 0.05, 0.15);
     void k;
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     rect(c, 0, hz + span * 0.5, w, rt - hz, '#e4eff8');
     c.fillStyle = 'rgba(120,160,200,0.18)'; for (let i = 0; i < 30; i++) c.fillRect(hash(i * 2.3) * w, hz + span * (0.55 + hash(i) * 0.4), (14 + hash(i * 3) * 30) * u, 1.6 * u);
@@ -1458,7 +1452,7 @@ const pass: Build = (B) => {
 const summit: Build = (B) => {
   const { u, hz, rt, span } = B;
   alpsFar(B, '#8aa3cc', '#6a88ba', '#f6faff', 8, '#dff0ff');
-  B.layer(MID, hz - 100 * u, hz + span * 0.5, (P) => {
+  B.layer(MID, hz - 78 * u, hz + span * 0.5, (P) => {
     const { c, w, k, emit } = P;
     P.place(6, (x, r) => peak(k, x, hz + span * 0.5, (100 + r * 70) * u, (50 + r * 34) * u, '#4f6f9e', '#eef5ff', 0.34), 11);
     rect(c, 0, hz + span * 0.2, w, span * 0.3, '#dfe9f3');
@@ -1484,7 +1478,7 @@ const summit: Build = (B) => {
     ctx.fillStyle = '#bfe3ff'; ctx.fillRect(x - 5 * uu, y + 8 * uu, 10 * uu, 4 * uu);
     ctx.fillStyle = '#2a3346'; ctx.fillRect(x - 0.5 * uu, y, 1 * uu, 6 * uu);
   });
-  B.layer(NEAR, hz - 110 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k, emit } = P;
     rect(c, 0, hz + span * 0.3, w, rt - hz, '#e8f1f8');
     // chalets with dark timber, snowy roofs and lit windows
@@ -1532,7 +1526,7 @@ const summit: Build = (B) => {
 // ---- Azure Riviera: shared sea and hillside
 function rivieraSea(B: RecipeBuilder, colA: string, colB: string, glint: string, islands: string) {
   const { u, hz, rt, span } = B;
-  B.layer(0.02, hz - 40 * u, rt, (P) => {
+  B.layer(0.02, hz - 24 * u, rt, (P) => {
     const { c } = P;
     water(P, hz - 2 * u, rt, colA, colB, glint, 70, 4);
     P.place(2, (x, r) => { c.fillStyle = islands; c.beginPath(); c.ellipse(x, hz, (50 + r * 50) * u, (10 + r * 10) * u, 0, Math.PI, 0); c.fill(); }, 41);
@@ -1554,7 +1548,7 @@ function rivieraHill(P: Paint, B: RecipeBuilder, hill: string, villas: number, s
 const corniche: Build = (B) => {
   const { u, hz, rt, span } = B;
   rivieraSea(B, '#1d4fa0', '#1f7fb8', 'rgba(255,226,170,0.5)', '#6a7fb4');
-  B.layer(MID, hz - 140 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 88 * u, hz + span * 0.55, (P) => {
     const { c, k } = P;
     rivieraHill(P, B, '#5d8a4e', 26, 0);
     // landmark: the stone viaduct and the tunnel mouth cut into the headland
@@ -1567,7 +1561,7 @@ const corniche: Build = (B) => {
     });
     void k;
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     // the cliff below the road: warm limestone with agaves, prickly pears and stone pines
     c.fillStyle = '#c9a878'; c.beginPath(); c.moveTo(0, rt);
@@ -1608,7 +1602,7 @@ const corniche: Build = (B) => {
 const port: Build = (B) => {
   const { u, hz, rt, span } = B;
   rivieraSea(B, '#1a5fb0', '#1f8cc0', 'rgba(255,255,255,0.45)', '#7a8fc0');
-  B.layer(MID, hz - 140 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 86 * u, hz + span * 0.55, (P) => {
     const { c, w, k, emit } = P;
     // the harbour front: a row of tall pastel houses with green shutters along the quay
     rect(c, 0, hz - 4 * u, w, span * 0.55 + 4 * u, '#e8e2d4');
@@ -1626,7 +1620,7 @@ const port: Build = (B) => {
       yacht(k, x - 80 * u, hz + 6 * u, 1.05 * u);
     });
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k } = P;
     // the marina: a forest of masts over moored yachts, pontoons and the water
     rect(c, 0, hz + span * 0.35, w, rt - hz, '#1f6fa8');
@@ -1663,7 +1657,7 @@ const port: Build = (B) => {
 const grand: Build = (B) => {
   const { u, hz, rt, span } = B;
   rivieraSea(B, '#3a4fa0', '#6a6fb8', 'rgba(255,190,150,0.5)', '#8a7fb4');
-  B.layer(MID, hz - 140 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 116 * u, hz + span * 0.55, (P) => {
     const { c, emit } = P;
     rivieraHill(P, B, '#5a7f4e', 20, 2);
     // landmark: the Grand Casino — a cream palace with a green copper dome, flags and lit arcades
@@ -1683,7 +1677,7 @@ const grand: Build = (B) => {
       rect(c, x + 88 * u, hz - 74 * u, 64 * u, 5 * u, '#c8603a');
     });
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 70 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k, emit } = P;
     // the boulevard gardens: a fountain, date palms, flower beds and ornate lamps
     rect(c, 0, hz + span * 0.42, w, rt - hz, '#c9b48a');
@@ -1720,7 +1714,7 @@ const grand: Build = (B) => {
 const esplanade: Build = (B) => {
   const { u, hz, rt, span } = B;
   rivieraSea(B, '#1d55a8', '#2a8ac0', 'rgba(255,236,190,0.5)', '#7084b8');
-  B.layer(MID, hz - 140 * u, hz + span * 0.55, (P) => {
+  B.layer(MID, hz - 124 * u, hz + span * 0.55, (P) => {
     const { c, k, emit } = P;
     rivieraHill(P, B, '#609050', 22, 4);
     // landmark: the harbour wheel (turning live) and the clock tower on the quay
@@ -1738,7 +1732,7 @@ const esplanade: Build = (B) => {
     });
     void k;
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 60 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c, w, k, emit } = P;
     // the promenade: cafés with striped awnings, bunting between lamp posts, flower boxes
     rect(c, 0, hz + span * 0.35, w, rt - hz, '#e0d4b8');
@@ -1778,7 +1772,7 @@ const esplanade: Build = (B) => {
 const causeway: Build = (B) => {
   const { u, hz, rt, span } = B;
   rivieraSea(B, '#4a6aa8', '#7fa6c8', 'rgba(255,214,200,0.55)', '#8a8fb8');
-  B.layer(MID, hz - 110 * u, hz + span * 0.5, (P) => {
+  B.layer(MID, hz - 84 * u, hz + span * 0.5, (P) => {
     const { c, k, emit } = P;
     // a far viaduct of arches running out across the lagoon, and the lighthouse on its islet
     P.at(0.484, (x) => {
@@ -1796,7 +1790,7 @@ const causeway: Build = (B) => {
       c.strokeStyle = 'rgba(60,50,40,0.45)'; c.lineWidth = 0.6 * u; c.beginPath(); for (let i = 0; i < 6; i++) { c.moveTo(x + 44 * u + i * 3 * u, hz - 16 * u - i * 2 * u); c.lineTo(x + 40 * u + i * 4 * u, hz + 4 * u); } c.stroke();
     }, 58);
   }, MID_W, MID_W / 2.4);
-  B.layer(NEAR, hz - 50 * u, rt, (P) => {
+  B.layer(NEAR, hz - 40 * u, rt, (P) => {
     const { c } = P;
     // open lagoon water up to the parapet: fishing boats, channel buoys and wading flamingos on a sandbar
     water(P, hz + span * 0.3, rt, '#5f8ec0', '#3f78b0', 'rgba(255,220,210,0.45)', 40, 6);
