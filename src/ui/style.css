@@ -926,3 +926,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber2
   .comp-strip .cs-item > span, .comp-strip .cs-pips { display: none; }
   .comp-strip .cs-item b { font-size: var(--fs-sm); }
 }
+
+/* Showroom: vertical scrolling only. The full-bleed car stage (negative side margins) made the scroller 12 px wider
+   than the screen, so a sideways drag moved the whole screen. */
+.showroom-view .scroll, .showroom-view.scroll { overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; touch-action: pan-y; }
+.showroom-view { overflow-x: hidden; }

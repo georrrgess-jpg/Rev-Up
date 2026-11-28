@@ -94,8 +94,8 @@ export const rivalCarModel = (r: Pick<Rival, 'car'> & { look?: string }): string
 
 /*
  * Who drives what is set on each rival (`look` in src/data/tables.ts RIVALS and src/data/circuit.ts CIRCUIT_RIVALS).
- * Rivals without a look keep their roster car as it comes, because the car is the point: Nova's Lumen (“the only
- * other Lumen”), Vale's and Rhea's Altamars, Mina's Ironhorse, Ozzy's and Odin's Kestrels, Yara's and Sable's Corvos,
- * Bex's Strata, the Halcyon twins (Iver, Ilse, Sorin), Anouk's Vireo, Dario's Mako, Mika's Ardent, Lorne's Meridian,
- * Aurelia's Sovereign, Zara's Tempest, and the Stock Cup (three different stock roster cars).
+ * Rivals without a look keep their roster car as it comes, because the car is the point: Victor's Lumen (“the only
+ * other Lumen”), Etienne's and Carmen's Altamars, Minh's Ironhorse, Reggie's and Gareth's Kestrels, Yara's and Lorraine's Corvos,
+ * Bex's Strata, the Halcyon twins (Anders, Ilse, Sorin), Anouk's Vireo, Dario's Mako, Mika's Ardent, Lorne's Meridian,
+ * Caroline's Sovereign, Imani's Tempest, and the Stock Cup (three different stock roster cars).
  */

@@ -354,7 +354,7 @@ describe('progress summary and the next milestone', () => {
     const m = M.nextMilestone(s)!;
     expect(m.car).toBe('vireo');
     const ev = m.needs.find((n) => n.kind === 'event')!;
-    expect(ev).toMatchObject({ kind: 'event', event: 'summit-gala', done: false, open: true, boss: 'Iver Kaas' });
+    expect(ev).toMatchObject({ kind: 'event', event: 'summit-gala', done: false, open: true, boss: 'Anders Kvale' });
     expect(m.needs.find((n) => n.kind === 'rep')).toMatchObject({ have: 14000, need: 15000, done: false });
     expect(m.needs.find((n) => n.kind === 'keystone')).toMatchObject({ family: 'tires', tier: 9, done: true });
     expect(m.unlocks.join(' ')).toMatch(/Corniche Hairpins/);

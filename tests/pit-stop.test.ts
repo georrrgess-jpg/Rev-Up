@@ -158,7 +158,7 @@ describe('Rival Runs', () => {
     expect(g.startRivalRun('rr-sol-shift', 'muscle', T0 + 7)).toBeNull();
   });
 
-  it('judges the objective on the sim: a clean, boosted Tapeback beats Pip off the line and pays a T3 Turbo once', () => {
+  it('judges the objective on the sim: a clean, boosted Tapeback beats Tilly off the line and pays a T3 Turbo once', () => {
     const s = owning(['junker', 'beater']);
     for (const f of ['engine', 'tires', 'turbo'] as Family[]) fit(s, 'junker', f, 2);
     const { g, kv } = gameFrom(s);

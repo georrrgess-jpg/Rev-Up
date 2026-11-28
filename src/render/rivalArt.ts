@@ -1018,7 +1018,7 @@ export const RIVAL_ART: Record<string, RivalArt> = {
     },
   },
 
-  // Kade Q4 — Vesna Kade's four-motor launch car, built in a shed: a cab set far back on a high square tail, a long
+  // Kade Q4 — Marta Kade's four-motor launch car, built in a shed: a cab set far back on a high square tail, a long
   // low hood, fat rear tyres, a wheelie bar behind, a tall wing and magenta light lines (no grille, no exhaust).
   'rv-kade': {
     def: {

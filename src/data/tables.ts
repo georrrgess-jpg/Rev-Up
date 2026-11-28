@@ -401,7 +401,7 @@ export const CARS: CarClass[] = [
     paint: '#f1ece2', trim: '#c9a24a', blurb: 'The flagship: a long, low V12 hybrid with a blade of light front and rear. The car the whole garage builds toward.',
     offlineRate: 18, rev: { base: 80, peak: 320 }, handling: 'The only car that runs T10 parts: the fastest in the game and calm at any speed; its long wheelbase gives up a little in the tightest hairpins.',
   },
-  // ---- 1.9 Circuit: the Tempest E4, the last car (after the Sovereign beats Aurelia Stern)
+  // ---- 1.9 Circuit: the Tempest E4, the last car (after the Sovereign beats Caroline Stern)
   {
     id: 'tempest', name: 'Electric flagship', model: 'Tempest E4', district: 'riviera', cap: 10,
     base: { top: 59, accel: 9.0, grip: 1.42 }, unlock: { rep: 27000, family: 'turbo', tier: 10, event: 'grand-riviera', after: 'sovereign' }, enabled: true,
@@ -441,17 +441,17 @@ export const SIGNATURE_FINISHES: Partial<Record<CarId, { name: string; paint: st
 };
 
 export const RAY_FINISH = { name: 'Ray’s Rust-Red', paint: '#a8432a' };
-/** Won from Vale Moreau in the Coastal Crown; usable on any car. */
+/** Won from Etienne Moreau in the Coastal Crown; usable on any car. */
 export const CROWN_FINISH = { name: 'Crown Teal', paint: '#127c8a' };
-/** Won from Nova Sato in The Main Event; usable on any car. */
+/** Won from Victor Sandoval in The Main Event; usable on any car. */
 export const MAIN_EVENT_FINISH = { name: 'Main Event Neon', paint: '#e2337a' };
-/** Won from Sable Dunn in the Canyon Rally final; usable on any car. */
+/** Won from Lorraine Dunn in the Canyon Rally final; usable on any car. */
 export const RALLY_FINISH = { name: 'Canyon Ochre', paint: '#c2652a' };
-/** Won from Iver Kaas in the Summit Gala, the grand finale; usable on any car. */
+/** Won from Anders Kvale in the Summit Gala, the grand finale; usable on any car. */
 export const SUMMIT_FINISH = { name: 'Summit Ice', paint: '#bfe6f2' };
-/** Won from Aurelia Stern in the Grand Riviera, the flagship final; usable on any car. */
+/** Won from Caroline Stern in the Grand Riviera, the flagship final; usable on any car. */
 export const RIVIERA_FINISH = { name: 'Riviera Gold', paint: '#c9a24a' };
-/** Won from Vesna Kade in Launch Control, the Tempest final; usable on any car. */
+/** Won from Marta Kade in Launch Control, the Tempest final; usable on any car. */
 export const LAUNCH_FINISH = { name: 'Storm Cyan', paint: '#38d6e8' };
 /** Blueprint finishes that any owned car can wear, by blueprint name. */
 export const BLUEPRINT_FINISHES = [RAY_FINISH, CROWN_FINISH, MAIN_EVENT_FINISH, RALLY_FINISH, SUMMIT_FINISH, RIVIERA_FINISH, LAUNCH_FINISH];
@@ -705,70 +705,70 @@ export interface Rival {
 }
 
 export const RIVALS: Record<string, Rival> = {
-  nell: { id: 'nell', name: 'Nell Rivet', car: 'junker', look: 'tb-nell', paint: '#5e7d4a', line: 'Built her Tapeback from three others. Knows every bolt.', stats: { top: 32.0, accel: 4.45, grip: 0.8 } },
+  nell: { id: 'nell', name: 'Nell Pruitt', car: 'junker', look: 'tb-nell', paint: '#5e7d4a', line: 'Built her Tapeback from three others. Knows every bolt.', stats: { top: 32.0, accel: 4.45, grip: 0.8 } },
   oz: { id: 'oz', name: 'Oz Kowalski', car: 'junker', look: 'tb-oz', paint: '#8c5a7a', line: 'Runs a tow truck by day and this by night.', stats: { top: 31.6, accel: 4.3, grip: 0.82 } },
-  pip: { id: 'pip', name: 'Pip Marlowe', car: 'junker', look: 'tb-pip', paint: '#c48a3a', line: 'Seventeen, fearless, and still on her learner plates.', stats: { top: 31.3, accel: 4.5, grip: 0.77 } },
-  gus: { id: 'gus', name: 'Gus Grimm', car: 'junker', look: 'rv-kvan', paint: '#7d8c8f', line: 'Learned to drive in a forklift. Still brakes like one.', stats: { top: 29.6, accel: 3.75, grip: 0.7 } },
+  pip: { id: 'pip', name: 'Tilly Brennan', car: 'junker', look: 'tb-pip', paint: '#c48a3a', line: 'Seventeen, fearless, and still on her learner plates.', stats: { top: 31.3, accel: 4.5, grip: 0.77 } },
+  gus: { id: 'gus', name: 'Gus Halloran', car: 'junker', look: 'rv-kvan', paint: '#7d8c8f', line: 'Learned to drive in a forklift. Still brakes like one.', stats: { top: 29.6, accel: 3.75, grip: 0.7 } },
   dex: { id: 'dex', name: 'Dex', car: 'junker', look: 'rv-mote', paint: '#6f7f5a', line: 'Drives everything like it’s stolen. It usually is.', stats: { top: 30.5, accel: 3.9, grip: 0.72 } },
-  mo: { id: 'mo', name: 'Mo Patch', car: 'junker', look: 'rv-brava', paint: '#8a6d9e', line: 'Fixes cars with chewing gum and optimism.', stats: { top: 31.2, accel: 4.0, grip: 0.73 } },
-  lina: { id: 'lina', name: 'Lina Sparks', car: 'beater', look: 'rv-dray', paint: '#3f7f8c', line: 'Welder by day. Faster by night.', stats: { top: 32.4, accel: 4.4, grip: 0.76 } },
+  mo: { id: 'mo', name: 'Mo Haddad', car: 'junker', look: 'rv-brava', paint: '#8a6d9e', line: 'Fixes cars with chewing gum and optimism.', stats: { top: 31.2, accel: 4.0, grip: 0.73 } },
+  lina: { id: 'lina', name: 'Lina Szabo', car: 'beater', look: 'rv-dray', paint: '#3f7f8c', line: 'Welder by day. Faster by night.', stats: { top: 32.4, accel: 4.4, grip: 0.76 } },
   tug: { id: 'tug', name: 'Tug', car: 'beater', look: 'rv-haulmark', paint: '#7a5c3a', line: 'Tows cars for a living. Doesn’t like being towed.', stats: { top: 33.6, accel: 4.6, grip: 0.8 } },
-  bolt: { id: 'bolt', name: 'Bolt Okafor', car: 'beater', look: 'cr-bolt', paint: '#4a6b3a', line: 'Never loses a launch. Sometimes loses the bend.', stats: { top: 33.2, accel: 5.2, grip: 0.78 } },
+  bolt: { id: 'bolt', name: 'Chidi Okafor', car: 'beater', look: 'cr-bolt', paint: '#4a6b3a', line: 'Never loses a launch. Sometimes loses the bend.', stats: { top: 33.2, accel: 5.2, grip: 0.78 } },
   ray: { id: 'ray', name: 'Rusty Ray', car: 'beater', look: 'rv-ostler', paint: '#a0522d', line: 'Runs the Scrapyard. His car is mostly rust and grudges.', stats: { top: 35.0, accel: 5.3, grip: 0.86 }, boss: true },
   june: { id: 'june', name: 'June Hale', car: 'hothatch', look: 'rv-lark', paint: '#2d6a4f', line: 'Commutes at race pace. Waves as she passes.', stats: { top: 37.2, accel: 5.4, grip: 0.9 } },
-  priya: { id: 'priya', name: 'Priya Vance', car: 'hothatch', look: 'rv-vanta', paint: '#c9a227', line: 'Spreadsheet tuner. Knows your gear ratios.', stats: { top: 39.0, accel: 5.9, grip: 0.95 } },
+  priya: { id: 'priya', name: 'Priya Nair', car: 'hothatch', look: 'rv-vanta', paint: '#c9a227', line: 'Spreadsheet tuner. Knows your gear ratios.', stats: { top: 39.0, accel: 5.9, grip: 0.95 } },
   hank: { id: 'hank', name: 'Hank “Two-Tone”', car: 'muscle', look: 'ih-hank', paint: '#6b2737', line: 'His coupe has two colors and zero patience.', stats: { top: 42.0, accel: 6.2, grip: 0.96 } },
   ines: { id: 'ines', name: 'Inês Faro', car: 'beater', look: 'cr-ines', paint: '#4f6d8c', line: 'Keeps a logbook of every fuel stop since 1998.', stats: { top: 38.4, accel: 5.5, grip: 0.95 } },
-  bram: { id: 'bram', name: 'Bram Hollis', car: 'beater', look: 'cr-bram', paint: '#8b7d5a', line: 'Taxi driver. Takes the racing line out of habit.', stats: { top: 38.0, accel: 5.8, grip: 0.93 } },
+  bram: { id: 'bram', name: 'Bram Verhoeven', car: 'beater', look: 'cr-bram', paint: '#8b7d5a', line: 'Taxi driver. Takes the racing line out of habit.', stats: { top: 38.0, accel: 5.8, grip: 0.93 } },
   otto: { id: 'otto', name: 'Otto Brandt', car: 'beater', look: 'cr-otto', paint: '#5d2f3a', line: 'Restores sedans nobody else wants. Then races them.', stats: { top: 38.8, accel: 5.4, grip: 0.92 } },
-  zoe: { id: 'zoe', name: 'Zoe Arkwright', car: 'hothatch', look: 'vx-zoe', paint: '#d1d63f', line: 'Hatch purist. Calls every other car "a bit much".', stats: { top: 42.2, accel: 6.9, grip: 1.2 } },
+  zoe: { id: 'zoe', name: 'Zoe Parkhurst', car: 'hothatch', look: 'vx-zoe', paint: '#d1d63f', line: 'Hatch purist. Calls every other car "a bit much".', stats: { top: 42.2, accel: 6.9, grip: 1.2 } },
   rafa: { id: 'rafa', name: 'Rafa Soler', car: 'hothatch', look: 'vx-rafa', paint: '#2b8a5a', line: 'Left-foot braker. Never seems to lift.', stats: { top: 41.8, accel: 7.2, grip: 1.16 } },
   kit: { id: 'kit', name: 'Kit Navarro', car: 'hothatch', look: 'vx-kit', paint: '#c2462e', line: 'Grew up on these roads. Knows every apex.', stats: { top: 42.5, accel: 6.8, grip: 1.24 } },
-  mara: { id: 'mara', name: 'Mara Quint', car: 'muscle', look: 'rv-prism', paint: '#3d3a6b', line: 'Drag-strip veteran. Wins most races in the first 100 m.', stats: { top: 50.0, accel: 8.75, grip: 1.22 } },
+  mara: { id: 'mara', name: 'Mags Dunleavy', car: 'muscle', look: 'rv-prism', paint: '#3d3a6b', line: 'Drag-strip veteran. Wins most races in the first 100 m.', stats: { top: 50.0, accel: 8.75, grip: 1.22 } },
   dane: { id: 'dane', name: 'Dane Okoro', car: 'muscle', look: 'rv-cordell', paint: '#7c2d2d', line: 'Hill-climb champion. Brakes later than anyone.', stats: { top: 50.6, accel: 8.2, grip: 1.42 } },
-  lux: { id: 'lux', name: 'Lux Ferrin', car: 'tourer', look: 'rv-regent', paint: '#9a9fa8', line: 'Collects grand tourers. Races them on weekends.', stats: { top: 52.0, accel: 8.1, grip: 1.3 } },
-  kai: { id: 'kai', name: 'Kai Mercer', car: 'tuner', look: 'rv-tessera', paint: '#20c4c4', line: 'Lives on the Neon Mile. Brakes later than anyone.', stats: { top: 50.5, accel: 9.6, grip: 1.75 } },
-  rhea: { id: 'rhea', name: 'Rhea Volk', car: 'tourer', paint: '#c0185b', line: 'Drives a black-cherry Altamar like it owes her money.', stats: { top: 55.0, accel: 9.0, grip: 1.55 } },
-  jules: { id: 'jules', name: 'Jules Ortega', car: 'hothatch', look: 'rv-vanta', paint: '#ffb000', line: 'Night courier. Knows every shortcut and takes none of them.', stats: { top: 49.5, accel: 9.8, grip: 1.6 } },
-  mina: { id: 'mina', name: 'Mina Hart', car: 'muscle', paint: '#3b5bff', line: 'Electric-blue Ironhorse, rebuilt twice.', stats: { top: 56.5, accel: 9.2, grip: 1.5 } },
-  ozzy: { id: 'ozzy', name: 'Ozzy Lin', car: 'tuner', paint: '#8cff3a', line: 'Lime-green Kestrel and a laugh you hear over the engine.', stats: { top: 52.0, accel: 10.2, grip: 1.82 } },
+  lux: { id: 'lux', name: 'Gordon Ashby', car: 'tourer', look: 'rv-regent', paint: '#9a9fa8', line: 'Collects grand tourers. Races them on weekends.', stats: { top: 52.0, accel: 8.1, grip: 1.3 } },
+  kai: { id: 'kai', name: 'Hiro Matsuda', car: 'tuner', look: 'rv-tessera', paint: '#20c4c4', line: 'Lives on the Neon Mile. Brakes later than anyone.', stats: { top: 50.5, accel: 9.6, grip: 1.75 } },
+  rhea: { id: 'rhea', name: 'Carmen Baptiste', car: 'tourer', paint: '#c0185b', line: 'Drives a black-cherry Altamar like it owes her money.', stats: { top: 55.0, accel: 9.0, grip: 1.55 } },
+  jules: { id: 'jules', name: 'Jules Ferreira', car: 'hothatch', look: 'rv-vanta', paint: '#ffb000', line: 'Night courier. Knows every shortcut and takes none of them.', stats: { top: 49.5, accel: 9.8, grip: 1.6 } },
+  mina: { id: 'mina', name: 'Minh Tran', car: 'muscle', paint: '#3b5bff', line: 'Electric-blue Ironhorse, rebuilt twice.', stats: { top: 56.5, accel: 9.2, grip: 1.5 } },
+  ozzy: { id: 'ozzy', name: 'Reggie Ballard', car: 'tuner', paint: '#8cff3a', line: 'Lime-green Kestrel and a laugh you hear over the engine.', stats: { top: 52.0, accel: 10.2, grip: 1.82 } },
   stock1: { id: 'stock1', name: 'Dex', car: 'beater', paint: '#5b6f8c', line: 'Back from the Scrapyard for the Stock Cup.', stats: { top: 47.0, accel: 8.6, grip: 1.5 } },
   stock2: { id: 'stock2', name: 'June', car: 'hothatch', paint: '#3e8e5a', line: 'Her Vexa on stock parts is still a Vexa.', stats: { top: 47.5, accel: 8.9, grip: 1.56 } },
-  stock3: { id: 'stock3', name: 'Mara', car: 'muscle', paint: '#8c2f2f', line: 'Stock Ironhorse; all torque, no manners.', stats: { top: 49.0, accel: 8.4, grip: 1.45 } },
-  nova: { id: 'nova', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Runs The Main Event. Drives the only other Lumen in the city.', stats: { top: 61.8, accel: 11.0, grip: 1.78 }, boss: true },
-  nova2: { id: 'nova2', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Back for a rematch on the bridge, Lumen against Lumen.', stats: { top: 68.0, accel: 11.4, grip: 1.75 } },
-  vale: { id: 'vale', name: 'Vale Moreau', car: 'tourer', paint: '#16233a', line: 'Owns the coast road. Drives the only Altamar anyone has seen.', stats: { top: 53.6, accel: 8.6, grip: 1.38 }, boss: true },
+  stock3: { id: 'stock3', name: 'Mags', car: 'muscle', paint: '#8c2f2f', line: 'Stock Ironhorse; all torque, no manners.', stats: { top: 49.0, accel: 8.4, grip: 1.45 } },
+  nova: { id: 'nova', name: 'Victor Sandoval', car: 'super', paint: '#e2337a', line: 'Runs The Main Event. Drives the only other Lumen in the city.', stats: { top: 61.8, accel: 11.0, grip: 1.78 }, boss: true },
+  nova2: { id: 'nova2', name: 'Victor Sandoval', car: 'super', paint: '#e2337a', line: 'Back for a rematch on the bridge, Lumen against Lumen.', stats: { top: 68.0, accel: 11.4, grip: 1.75 } },
+  vale: { id: 'vale', name: 'Etienne Moreau', car: 'tourer', paint: '#16233a', line: 'Owns the coast road. Drives the only Altamar anyone has seen.', stats: { top: 53.6, accel: 8.6, grip: 1.38 }, boss: true },
   sol: { id: 'sol', name: 'Sol Ortega', car: 'muscle', look: 'rv-cordell', paint: '#264653', line: 'Quiet, precise, already in fifth gear.', stats: { top: 44.0, accel: 6.6, grip: 1.0 } },
   // ---- Desert Proving Ground
   tomas: { id: 'tomas', name: 'Tomás Reyes', car: 'rally', look: 'rv-dunerunner', paint: '#c23b22', line: 'Three-time desert champion. Reads gravel like a newspaper.', stats: { top: 56.0, accel: 12.0, grip: 2.2 } },
-  yara: { id: 'yara', name: 'Yara Bell', car: 'rally', paint: '#e0d4b8', line: 'Co-drove for ten years, then bought the car.', stats: { top: 55.0, accel: 12.4, grip: 2.25 } },
-  odin: { id: 'odin', name: 'Odin Pike', car: 'tuner', paint: '#ff7a1a', line: 'Brought a city Kestrel to the desert. It mostly works.', stats: { top: 54.0, accel: 11.4, grip: 1.95 } },
-  wren: { id: 'wren', name: 'Wren Calloway', car: 'rally', look: 'rv-sandpiper', paint: '#3c7d4f', line: 'Never lifts on a crest. Has the dents to prove it.', stats: { top: 58.0, accel: 12.8, grip: 2.35 } },
-  sable: { id: 'sable', name: 'Sable Dunn', car: 'rally', paint: '#2b2b2b', line: 'Runs the Canyon Rally. Her Corvo is older than you and faster than anything.', stats: { top: 60.0, accel: 13.6, grip: 2.45 }, boss: true },
+  yara: { id: 'yara', name: 'Yara Nasser', car: 'rally', paint: '#e0d4b8', line: 'Co-drove for ten years, then bought the car.', stats: { top: 55.0, accel: 12.4, grip: 2.25 } },
+  odin: { id: 'odin', name: 'Gareth Pike', car: 'tuner', paint: '#ff7a1a', line: 'Brought a city Kestrel to the desert. It mostly works.', stats: { top: 54.0, accel: 11.4, grip: 1.95 } },
+  wren: { id: 'wren', name: 'Dub Calloway', car: 'rally', look: 'rv-sandpiper', paint: '#3c7d4f', line: 'Never lifts on a crest. Has the dents to prove it.', stats: { top: 58.0, accel: 12.8, grip: 2.35 } },
+  sable: { id: 'sable', name: 'Lorraine Dunn', car: 'rally', paint: '#2b2b2b', line: 'Runs the Canyon Rally. Her Corvo is older than you and faster than anything.', stats: { top: 60.0, accel: 13.6, grip: 2.45 }, boss: true },
   // class meets for older cars
   hank2: { id: 'hank2', name: 'Hank “Two-Tone”', car: 'muscle', look: 'ih-hank', paint: '#6b2737', line: 'Rebuilt his Ironhorse for the salt flats. Still no patience.', stats: { top: 56.0, accel: 10.6, grip: 1.5 } },
-  mara2: { id: 'mara2', name: 'Mara Quint', car: 'muscle', look: 'ih-mara', paint: '#3d3a6b', line: 'Brought the drag-strip Ironhorse out of retirement.', stats: { top: 55.0, accel: 11.0, grip: 1.45 } },
+  mara2: { id: 'mara2', name: 'Mags Dunleavy', car: 'muscle', look: 'ih-mara', paint: '#3d3a6b', line: 'Brought the drag-strip Ironhorse out of retirement.', stats: { top: 55.0, accel: 11.0, grip: 1.45 } },
   sol2: { id: 'sol2', name: 'Sol Ortega', car: 'muscle', look: 'ih-sol', paint: '#264653', line: 'Already in fifth gear. Always.', stats: { top: 56.5, accel: 10.4, grip: 1.5 } },
-  lux2: { id: 'lux2', name: 'Lux Ferrin', car: 'tourer', look: 'al-lux', paint: '#9a9fa8', line: 'Drove his Altamar up the mountain for the view. And the trophy.', stats: { top: 60.0, accel: 10.8, grip: 1.75 } },
-  vale2: { id: 'vale2', name: 'Vale Moreau', car: 'tourer', paint: '#16233a', line: 'Wants her coast road back. Settles for the pass.', stats: { top: 61.0, accel: 10.6, grip: 1.8 } },
-  rhea2: { id: 'rhea2', name: 'Rhea Volk', car: 'tourer', look: 'al-rhea', paint: '#c0185b', line: 'Black-cherry Altamar, new tyres, same grudge.', stats: { top: 60.5, accel: 11.0, grip: 1.72 } },
+  lux2: { id: 'lux2', name: 'Gordon Ashby', car: 'tourer', look: 'al-lux', paint: '#9a9fa8', line: 'Drove his Altamar up the mountain for the view. And the trophy.', stats: { top: 60.0, accel: 10.8, grip: 1.75 } },
+  vale2: { id: 'vale2', name: 'Etienne Moreau', car: 'tourer', paint: '#16233a', line: 'Wants her coast road back. Settles for the pass.', stats: { top: 61.0, accel: 10.6, grip: 1.8 } },
+  rhea2: { id: 'rhea2', name: 'Carmen Baptiste', car: 'tourer', look: 'al-rhea', paint: '#c0185b', line: 'Black-cherry Altamar, new tyres, same grudge.', stats: { top: 60.5, accel: 11.0, grip: 1.72 } },
   // ---- The Summit
-  mirelle: { id: 'mirelle', name: 'Mirelle Aubert', car: 'gt', look: 'rv-aster', paint: '#1c4fa0', line: 'Endurance pro. Does her fastest lap in the last hour.', stats: { top: 68.0, accel: 12.2, grip: 2.2 } },
+  mirelle: { id: 'mirelle', name: 'Claudine Aubert', car: 'gt', look: 'rv-aster', paint: '#1c4fa0', line: 'Endurance pro. Does her fastest lap in the last hour.', stats: { top: 68.0, accel: 12.2, grip: 2.2 } },
   kenji: { id: 'kenji', name: 'Kenji Mori', car: 'gt', look: 'rv-halden', paint: '#f2f2f2', line: 'Aero engineer. Talks about downforce at dinner.', stats: { top: 69.0, accel: 11.8, grip: 2.25 } },
-  nova3: { id: 'nova3', name: 'Nova Sato', car: 'super', paint: '#e2337a', line: 'Came up the mountain for one more race against you.', stats: { top: 70.0, accel: 12.4, grip: 1.85 } },
-  bex: { id: 'bex', name: 'Bex Ardent', car: 'gt', paint: '#ff9e1b', line: 'Team orange. Never pits, never smiles.', stats: { top: 70.5, accel: 12.6, grip: 2.3 } },
+  nova3: { id: 'nova3', name: 'Victor Sandoval', car: 'super', paint: '#e2337a', line: 'Came up the mountain for one more race against you.', stats: { top: 70.0, accel: 12.4, grip: 1.85 } },
+  bex: { id: 'bex', name: 'Bex Hargreaves', car: 'gt', paint: '#ff9e1b', line: 'Team orange. Never pits, never smiles.', stats: { top: 70.5, accel: 12.6, grip: 2.3 } },
   // 1.9 Circuit rivals
-  sorin: { id: 'sorin', name: 'Sorin Vale', car: 'proto', paint: '#20304a', line: 'Drives the autoroute at night with the lights off. Says it helps him think.', stats: { top: 84.0, accel: 15.2, grip: 2.5 } },
-  vesna: { id: 'vesna', name: 'Vesna Kade', car: 'sovereign', look: 'rv-kade', paint: '#e6f6f8', line: 'Builds four-motor launch cars in a harbour shed. Has never lost a start.', stats: { top: 92.0, accel: 18.5, grip: 2.9 }, boss: true },
-  iver: { id: 'iver', name: 'Iver Kaas', car: 'proto', paint: '#f4f4f4', line: 'Built the Halcyon’s twin. Hosts the Summit Gala and has never lost it.', stats: { top: 78.0, accel: 14.6, grip: 2.5 }, boss: true },
+  sorin: { id: 'sorin', name: 'Sorin Dragomir', car: 'proto', paint: '#20304a', line: 'Drives the autoroute at night with the lights off. Says it helps him think.', stats: { top: 84.0, accel: 15.2, grip: 2.5 } },
+  vesna: { id: 'vesna', name: 'Marta Kade', car: 'sovereign', look: 'rv-kade', paint: '#e6f6f8', line: 'Builds four-motor launch cars in a harbour shed. Has never lost a start.', stats: { top: 92.0, accel: 18.5, grip: 2.9 }, boss: true },
+  iver: { id: 'iver', name: 'Anders Kvale', car: 'proto', paint: '#f4f4f4', line: 'Built the Halcyon’s twin. Hosts the Summit Gala and has never lost it.', stats: { top: 78.0, accel: 14.6, grip: 2.5 }, boss: true },
   // ---- Azure Riviera
-  ilse: { id: 'ilse', name: 'Ilse Brandvold', car: 'proto', paint: '#2f8fd6', line: 'Brought her Halcyon down from the Summit. Hates hairpins, wins them anyway.', stats: { top: 80.0, accel: 15.0, grip: 2.55 } },
+  ilse: { id: 'ilse', name: 'Ilse Verbeek', car: 'proto', paint: '#2f8fd6', line: 'Brought her Halcyon down from the Summit. Hates hairpins, wins them anyway.', stats: { top: 80.0, accel: 15.0, grip: 2.55 } },
   anouk: { id: 'anouk', name: 'Anouk Vidal', car: 'vireo', paint: '#f2f0e6', line: 'Grew up above the Corniche. Brakes where everyone else lifts.', stats: { top: 79.0, accel: 15.5, grip: 2.65 } },
-  ravi: { id: 'ravi', name: 'Ravi Castellane', car: 'vireo', look: 'rv-corsair', paint: '#1d6b4a', line: 'A test driver who never got the memo that testing is over.', stats: { top: 78.5, accel: 15.2, grip: 2.6 } },
-  dario: { id: 'dario', name: 'Dario Belmonte', car: 'mako', paint: '#e8c547', line: 'Runs the port at night. His Mako launches like a dropped anchor in reverse.', stats: { top: 82.0, accel: 15.8, grip: 2.5 } },
-  teo: { id: 'teo', name: 'Teo Marchand', car: 'mako', look: 'rv-varga', paint: '#3a3f47', line: 'Twin turbos, twin exhausts, one speed: all of it.', stats: { top: 82.5, accel: 16.0, grip: 2.55 } },
-  iver2: { id: 'iver2', name: 'Iver Kaas', car: 'proto', paint: '#f4f4f4', line: 'Lost the Gala to you. Followed you down to the sea for a rematch.', stats: { top: 82.0, accel: 15.3, grip: 2.6 } },
-  aurelia: { id: 'aurelia', name: 'Aurelia Stern', car: 'sovereign', paint: '#0d0d12', line: 'Hosts the Grand Riviera from the only other Sovereign. Has never seen anyone’s tail lights.', stats: { top: 90.0, accel: 17.0, grip: 2.85 }, boss: true },
+  ravi: { id: 'ravi', name: 'Ravi Menon', car: 'vireo', look: 'rv-corsair', paint: '#1d6b4a', line: 'A test driver who never got the memo that testing is over.', stats: { top: 78.5, accel: 15.2, grip: 2.6 } },
+  dario: { id: 'dario', name: 'Dario Esposito', car: 'mako', paint: '#e8c547', line: 'Runs the port at night. His Mako launches like a dropped anchor in reverse.', stats: { top: 82.0, accel: 15.8, grip: 2.5 } },
+  teo: { id: 'teo', name: 'Mateo Ibarra', car: 'mako', look: 'rv-varga', paint: '#3a3f47', line: 'Twin turbos, twin exhausts, one speed: all of it.', stats: { top: 82.5, accel: 16.0, grip: 2.55 } },
+  iver2: { id: 'iver2', name: 'Anders Kvale', car: 'proto', paint: '#f4f4f4', line: 'Lost the Gala to you. Followed you down to the sea for a rematch.', stats: { top: 82.0, accel: 15.3, grip: 2.6 } },
+  aurelia: { id: 'aurelia', name: 'Caroline Stern', car: 'sovereign', paint: '#0d0d12', line: 'Hosts the Grand Riviera from the only other Sovereign. Has never seen anyone’s tail lights.', stats: { top: 90.0, accel: 17.0, grip: 2.85 }, boss: true },
   ...CIRCUIT_RIVALS, // 1.9 Circuit rivals (src/data/circuit.ts)
 };
 
@@ -864,7 +864,7 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [360, 250, 180, 140], rep: [52, 36, 28, 22], crates: [3, 2, 1, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { afterWin: 'cliff-esses' },
     boss: { rival: 'vale', reward: { cash: 600, crates: 5, blueprint: 'Crown Teal', badge: 'Coastal Crown' } },
-    blurb: 'Final round on the open Coast Road. Beat Vale Moreau to earn the right to an Altamar GT.',
+    blurb: 'Final round on the open Coast Road. Beat Etienne Moreau to earn the right to an Altamar GT.',
   },
   // ---- Class meets: earlier cars come back off the shelf
   {
@@ -923,7 +923,7 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [900, 0, 0, 0], rep: [120, 0, 0, 0], crates: [4, 0, 0, 0] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'tuner', stars: 4 }, knockout: { heats: ['main-event:1', 'main-event:2', 'main-event:3'] },
     boss: { rival: 'nova', reward: { cash: 1500, crates: 6, blueprint: 'Main Event Neon', badge: 'Main Event Champion' } },
-    blurb: 'Three heats, one night. Top 3 go through the street heat, top 2 through the bridge, then a final against Nova Sato. Change cars between heats.',
+    blurb: 'Three heats, one night. Top 3 go through the street heat, top 2 through the bridge, then a final against Victor Sandoval. Change cars between heats.',
   },
   {
     id: 'main-event:1', name: 'Heat 1 · Street', district: 'downtown', track: 'downtown', rivals: ['kai', 'ozzy', 'jules'], heatOf: 'main-event', advance: 3,
@@ -939,7 +939,7 @@ export const EVENTS: RaceEvent[] = [
     id: 'main-event:3', name: 'Final · Skyline', district: 'downtown', track: 'skyline', rivals: ['nova'], heatOf: 'main-event', advance: 1,
     payout: { cash: [900, 300, 0, 0], rep: [120, 30, 0, 0], crates: [4, 1, 0, 0] }, firstClear: { cash: 0, crates: 0 }, requires: {},
     boss: { rival: 'nova', reward: { cash: 1500, crates: 6, blueprint: 'Main Event Neon', badge: 'Main Event Champion' } },
-    blurb: 'Skyline Run, one on one with Nova Sato.',
+    blurb: 'Skyline Run, one on one with Victor Sandoval.',
   },
   {
     id: 'midnight-run', name: 'Midnight Run', district: 'downtown', track: 'bridge', rivals: ['nova2', 'rhea', 'mina'],
@@ -978,7 +978,7 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [820, 580, 430, 320], rep: [92, 64, 46, 34], crates: [4, 2, 1, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { afterWin: 'canyon-stage' },
     boss: { rival: 'sable', reward: { cash: 2500, crates: 6, blueprint: 'Canyon Ochre', badge: 'Canyon Rally Champion' } },
-    blurb: 'The final stage against Sable Dunn. Win it to be offered a seat in a Strata GTR.',
+    blurb: 'The final stage against Lorraine Dunn. Win it to be offered a seat in a Strata GTR.',
   },
   {
     id: 'ironhorse-revival', name: 'Ironhorse Revival', district: 'meets', track: 'mesa', rivals: ['hank2', 'mara2', 'sol2'], carOnly: 'muscle', trophy: 'Salt Flat Legend',
@@ -1018,7 +1018,7 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [1500, 1000, 750, 550], rep: [150, 100, 70, 50], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'proto' }, goals: { par: 32.0 },
     boss: { rival: 'iver', reward: { cash: 6000, crates: 8, blueprint: 'Summit Ice', badge: 'Summit Champion' } },
-    blurb: 'The grand finale. Every champion you have beaten, and Iver Kaas in the other Halcyon. Clean shifts or nothing. Win it for an invitation to the Riviera — and a Vireo 9R.',
+    blurb: 'The grand finale. Every champion you have beaten, and Anders Kvale in the other Halcyon. Clean shifts or nothing. Win it for an invitation to the Riviera — and a Vireo 9R.',
   },
   // ---------------- Azure Riviera (after the Summit Gala): the supercars, one course for each ----------------
   {
@@ -1048,14 +1048,14 @@ export const EVENTS: RaceEvent[] = [
     payout: { cash: [1800, 1250, 900, 680], rep: [170, 115, 80, 60], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'sovereign' }, goals: { par: 20.5 },
     boss: { rival: 'aurelia', reward: { cash: 8000, crates: 8, blueprint: 'Riviera Gold', badge: 'Riviera Champion' } },
-    blurb: 'The flagship final: three long straights and two fast sweepers along the sea, against Aurelia Stern in the other Sovereign. Bring the T10 engine and clean shifts.',
+    blurb: 'The flagship final: three long straights and two fast sweepers along the sea, against Caroline Stern in the other Sovereign. Bring the T10 engine and clean shifts.',
   },
   {
     id: 'launch-final', name: 'Launch Control', district: 'riviera', track: 'harbor', rivals: ['dario', 'sorin', 'vesna'],
     payout: { cash: [2000, 1400, 1000, 760], rep: [180, 120, 86, 64], crates: [5, 3, 2, 1] }, firstClear: { cash: 0, crates: 0 },
     requires: { car: 'tempest' },
     boss: { rival: 'vesna', reward: { cash: 10000, crates: 8, blueprint: 'Storm Cyan', badge: 'Launch Control Champion' } },
-    blurb: 'The last race: a long launch off the quay, one bend, one sprint, against Vesna Kade. Four electric motors and a perfect start beat everything else here.',
+    blurb: 'The last race: a long launch off the quay, one bend, one sprint, against Marta Kade. Four electric motors and a perfect start beat everything else here.',
   },
   ...CIRCUIT_EVENTS, // 1.9 Circuit events (src/data/circuit.ts)
 ];

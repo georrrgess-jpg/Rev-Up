@@ -42,7 +42,7 @@ export const LAUNCH_FX: Record<string, LaunchFx> = {
   ardent: { smoke: '#ece8e0', amount: 0.6, sig: 'pops', accent: '#ff8a2a' }, // screaming four: crackle and flame
   meridian: { smoke: '#d8dde6', amount: 1.1, sig: 'none' }, // big-torque V8: a long, lazy burnout
   tempest: { smoke: '#cfe6ee', amount: 0.25, sig: 'arcs', accent: '#5ef2ff' }, // four motors: no smoke, cyan arcs
-  kade: { smoke: '#e6d8ee', amount: 0.3, sig: 'arcs', accent: '#ff3df2' }, // Vesna's four-motor launch car: magenta arcs
+  kade: { smoke: '#e6d8ee', amount: 0.3, sig: 'arcs', accent: '#ff3df2' }, // Marta's four-motor launch car: magenta arcs
 };
 /** A racer's launch effect: its look's (a rival's body), else its class's. */
 const fxOf = (r: Racer) => LAUNCH_FX[rivalLook(r.look)?.fx ?? ''] ?? LAUNCH_FX[r.car] ?? LAUNCH_FX.beater;

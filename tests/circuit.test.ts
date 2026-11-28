@@ -277,9 +277,9 @@ describe('competition summary and finish explanations', () => {
     const c = race('causeway-run', B('meridian', [9, 9, 9]), { shift: 'clean', nitro: 'perfect' });
     const parts0 = s.board.filter(Boolean).length + s.crates.length;
     const r3 = commitCircuit(s, 9, 'meridian', c, [])!;
-    expect(r3.earned.map((x) => x.name)).toContain('Beat Lorne Halvard');
+    expect(r3.earned.map((x) => x.name)).toContain('Beat Lorne Gillespie');
     expect(s.board.filter(Boolean).length + s.crates.length).toBeGreaterThan(parts0);
-    expect(commitCircuit(s, 10, 'meridian', c, [])!.earned.map((x) => x.name)).not.toContain('Beat Lorne Halvard');
+    expect(commitCircuit(s, 10, 'meridian', c, [])!.earned.map((x) => x.name)).not.toContain('Beat Lorne Gillespie');
   });
 
   it('explainFinish names the zone, the stat and a useful change', () => {

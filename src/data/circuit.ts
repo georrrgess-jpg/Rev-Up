@@ -62,24 +62,24 @@ export interface RivalProfile { strength: string; home: string }
 /** New rivals (and returning characters with new cars or builds). Stats are the event's final pace. */
 export const CIRCUIT_RIVALS: Record<string, Rival> = {
   // ---- Esplanade Grand Prix (Ardent Spyder rung)
-  mika: { id: 'mika', name: 'Mika Sorel', car: 'ardent', paint: '#ff5a1f', line: 'Has driven the Esplanade’s chicanes a thousand times in her head. Never touches a kerb.', stats: { top: 71.0, accel: 14.6, grip: 2.68 } },
+  mika: { id: 'mika', name: 'Mika Lehtonen', car: 'ardent', paint: '#ff5a1f', line: 'Has driven the Esplanade’s chicanes a thousand times in her head. Never touches a kerb.', stats: { top: 71.0, accel: 14.6, grip: 2.68 } },
   pia: { id: 'pia', name: 'Pia Lund', car: 'ardent', look: 'rv-wisp', paint: '#f4f1e6', line: 'Club racer with a carbon tub and a notebook of braking points.', stats: { top: 70.0, accel: 14.2, grip: 2.6 } },
   anouk2: { id: 'anouk2', name: 'Anouk Vidal', car: 'vireo', paint: '#f2f0e6', line: 'Brought her Vireo down from the Corniche. Brakes where everyone else lifts.', stats: { top: 78.0, accel: 15.0, grip: 2.55 } },
   // ---- Causeway Run (Meridian LT rung)
-  lorne: { id: 'lorne', name: 'Lorne Halvard', car: 'meridian', paint: '#1f4fc4', line: 'Runs the causeway at dawn to beat the fishing boats out. Hasn’t lifted since the bridge opened.', stats: { top: 91.0, accel: 15.6, grip: 2.5 } },
-  teo2: { id: 'teo2', name: 'Teo Marchand', car: 'mako', look: 'rv-varga', paint: '#3a3f47', line: 'Twin turbos, a longer top gear, the same one speed: all of it.', stats: { top: 84.0, accel: 16.2, grip: 2.5 } },
-  aurelia2: { id: 'aurelia2', name: 'Aurelia Stern', car: 'sovereign', paint: '#0d0d12', line: 'Lost the Grand Riviera to you. Wants it back over open water.', stats: { top: 86.0, accel: 16.0, grip: 2.65 } },
+  lorne: { id: 'lorne', name: 'Lorne Gillespie', car: 'meridian', paint: '#1f4fc4', line: 'Runs the causeway at dawn to beat the fishing boats out. Hasn’t lifted since the bridge opened.', stats: { top: 91.0, accel: 15.6, grip: 2.5 } },
+  teo2: { id: 'teo2', name: 'Mateo Ibarra', car: 'mako', look: 'rv-varga', paint: '#3a3f47', line: 'Twin turbos, a longer top gear, the same one speed: all of it.', stats: { top: 84.0, accel: 16.2, grip: 2.5 } },
+  aurelia2: { id: 'aurelia2', name: 'Caroline Stern', car: 'sovereign', paint: '#0d0d12', line: 'Lost the Grand Riviera to you. Wants it back over open water.', stats: { top: 86.0, accel: 16.0, grip: 2.65 } },
   // ---- Circuit Crown (Tempest E4 rung, the final)
-  zara: { id: 'zara', name: 'Zara Quell', car: 'tempest', paint: '#e8f6ff', line: 'Wrote the Tempest’s launch map herself. Has never been beaten to the first marker.', stats: { top: 93.0, accel: 19.6, grip: 3.0 }, boss: true },
-  lorne2: { id: 'lorne2', name: 'Lorne Halvard', car: 'meridian', paint: '#1f4fc4', line: 'Followed you inland. On a runway the Meridian’s tall gears still pull.', stats: { top: 89.0, accel: 15.6, grip: 2.6 } },
-  mika2: { id: 'mika2', name: 'Mika Sorel', car: 'ardent', paint: '#ff5a1f', line: 'Light enough to launch hard, brave enough to take the taxiway flat.', stats: { top: 74.0, accel: 16.2, grip: 2.85 } },
+  zara: { id: 'zara', name: 'Imani Whitfield', car: 'tempest', paint: '#e8f6ff', line: 'Wrote the Tempest’s launch map herself. Has never been beaten to the first marker.', stats: { top: 93.0, accel: 19.6, grip: 3.0 }, boss: true },
+  lorne2: { id: 'lorne2', name: 'Lorne Gillespie', car: 'meridian', paint: '#1f4fc4', line: 'Followed you inland. On a runway the Meridian’s tall gears still pull.', stats: { top: 89.0, accel: 15.6, grip: 2.6 } },
+  mika2: { id: 'mika2', name: 'Mika Lehtonen', car: 'ardent', paint: '#ff5a1f', line: 'Light enough to launch hard, brave enough to take the taxiway flat.', stats: { top: 74.0, accel: 16.2, grip: 2.85 } },
   // ---- Heritage Cup rounds for the Kestrel and the Corvo
-  kai2: { id: 'kai2', name: 'Kai Mercer', car: 'tuner', look: 'ks-kai', paint: '#20c4c4', line: 'Moved his Kestrel to the coast. The chicanes feel like home.', stats: { top: 50.0, accel: 9.3, grip: 1.8 } },
-  ozzy2: { id: 'ozzy2', name: 'Ozzy Lin', car: 'tuner', look: 'ks-ozzy', paint: '#8cff3a', line: 'Lime-green Kestrel, louder laugh, softer tyres.', stats: { top: 50.5, accel: 9.6, grip: 1.76 } },
-  odin2: { id: 'odin2', name: 'Odin Pike', car: 'tuner', look: 'ks-odin', paint: '#ff7a1a', line: 'Took the Kestrel back out of the desert. It still has sand in the vents.', stats: { top: 51.0, accel: 9.4, grip: 1.72 } },
+  kai2: { id: 'kai2', name: 'Hiro Matsuda', car: 'tuner', look: 'ks-kai', paint: '#20c4c4', line: 'Moved his Kestrel to the coast. The chicanes feel like home.', stats: { top: 50.0, accel: 9.3, grip: 1.8 } },
+  ozzy2: { id: 'ozzy2', name: 'Reggie Ballard', car: 'tuner', look: 'ks-ozzy', paint: '#8cff3a', line: 'Lime-green Kestrel, louder laugh, softer tyres.', stats: { top: 50.5, accel: 9.6, grip: 1.76 } },
+  odin2: { id: 'odin2', name: 'Gareth Pike', car: 'tuner', look: 'ks-odin', paint: '#ff7a1a', line: 'Took the Kestrel back out of the desert. It still has sand in the vents.', stats: { top: 51.0, accel: 9.4, grip: 1.72 } },
   tomas2: { id: 'tomas2', name: 'Tomás Reyes', car: 'rally', look: 'cv-tomas', paint: '#c23b22', line: 'Gravel champion on tarmac for once. Launches like the ground is loose anyway.', stats: { top: 55.0, accel: 12.4, grip: 2.25 } },
-  yara2: { id: 'yara2', name: 'Yara Bell', car: 'rally', paint: '#e0d4b8', line: 'Counts the runway lights out loud. Shifts on the seventh.', stats: { top: 55.5, accel: 12.0, grip: 2.3 } },
-  wren2: { id: 'wren2', name: 'Wren Calloway', car: 'rally', look: 'cv-wren', paint: '#3c7d4f', line: 'Never lifts on a crest; the taxiway turn is just a flat crest.', stats: { top: 56.0, accel: 12.6, grip: 2.2 } },
+  yara2: { id: 'yara2', name: 'Yara Nasser', car: 'rally', paint: '#e0d4b8', line: 'Counts the runway lights out loud. Shifts on the seventh.', stats: { top: 55.5, accel: 12.0, grip: 2.3 } },
+  wren2: { id: 'wren2', name: 'Dub Calloway', car: 'rally', look: 'cv-wren', paint: '#3c7d4f', line: 'Never lifts on a crest; the taxiway turn is just a flat crest.', stats: { top: 56.0, accel: 12.6, grip: 2.2 } },
 };
 
 /** Where each ladder rival is fast, and why (shown on the ladder; read against the course demands). */
@@ -124,7 +124,7 @@ export interface LadderRung {
 
 /**
  * Ten rungs: the champions of the main route (approachable at the bottom, every one a boss with its own reward), the
- * two Circuit rivals on the new courses, the campaign's last boss, and Zara Quell at the top. Branches mean some rungs
+ * two Circuit rivals on the new courses, the campaign's last boss, and Imani Whitfield at the top. Branches mean some rungs
  * open side by side; the position is how many rungs are beaten, and the next rung is the first open one not yet beaten.
  */
 export const LADDER: LadderRung[] = [
@@ -184,20 +184,20 @@ export const CIRCUIT_EVENTS: RaceEvent[] = [
     id: 'esplanade-gp', name: 'Esplanade Grand Prix', district: 'riviera', track: T('esplanade'), rivals: ['anouk2', 'pia', 'mika'],
     payout: pay([1600, 1100, 820, 620], [140, 98, 70, 52], [4, 3, 2, 1]), firstClear: { cash: 2000, crates: 5 },
     requires: { car: 'ardent' }, goals: { par: 20.0 },
-    blurb: 'Two chicanes and a hairpin along the harbour wall. Mika Sorel’s Ardent is the lightest thing here; out-brake her or out-boost her.',
+    blurb: 'Two chicanes and a hairpin along the harbour wall. Mika Lehtonen’s Ardent is the lightest thing here; out-brake her or out-boost her.',
   },
   {
     id: 'causeway-run', name: 'Causeway Run', district: 'riviera', track: T('causeway'), rivals: ['teo2', 'aurelia2', 'lorne'],
     payout: pay([1800, 1250, 900, 680], [150, 105, 75, 56], [5, 3, 2, 1]), firstClear: { cash: 2200, crates: 5 },
     requires: { car: 'meridian' }, goals: { par: 14.3 },
-    blurb: 'A kilometre of causeway over the lagoon and one fast kink. Lorne Halvard’s Meridian has the tallest gears in the field: shift clean and save a Perfect boost for the second straight.',
+    blurb: 'A kilometre of causeway over the lagoon and one fast kink. Lorne Gillespie’s Meridian has the tallest gears in the field: shift clean and save a Perfect boost for the second straight.',
   },
   {
     id: 'circuit-crown', name: 'Circuit Crown', district: 'riviera', track: T('airstrip'), rivals: ['lorne2', 'mika2', 'zara'],
     payout: pay([2200, 1500, 1100, 820], [180, 125, 88, 66], [5, 3, 2, 1]), firstClear: { cash: 0, crates: 0 },
     requires: { car: 'tempest', afterWin: 'launch-final' }, goals: { par: 12.7 },
     boss: { rival: 'zara', reward: { cash: 6000, crates: 6, blueprint: CIRCUIT_FINISHES.volt.name, badge: 'Circuit Champion' } },
-    blurb: 'The top of the rival ladder: a runway drag against Zara Quell’s Tempest. A 250 m launch decides most of it — hit launch control on GO, then shift on every green.',
+    blurb: 'The top of the rival ladder: a runway drag against Imani Whitfield’s Tempest. A 250 m launch decides most of it — hit launch control on GO, then shift on every green.',
   },
   // ---- Heritage Cup rounds for cars with no class meet yet
   {

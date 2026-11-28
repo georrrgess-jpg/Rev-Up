@@ -8,6 +8,9 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 
 ## Update 1.9 · Circuit
 
+- **Opponent names.** The roster of rival names was reworked to read like real people: ordinary, varied first names and surnames from many backgrounds instead of invented-sounding ones (e.g. Victor Sandoval, Lorraine Dunn, Etienne Moreau, Anders Kvale, Caroline Stern, Imani Whitfield, Marta Kade, Chidi Okafor, Tilly Brennan). Names that already read as real people or nicknames were kept (Rusty Ray, Tug, Dex, Hank “Two-Tone”, Oz Kowalski, Kit Navarro, Kenji Mori). Rivals are saved by id, so existing saves are unaffected.
+- **Showroom scrolls vertically only.** The full-width car stage made the scroller 12 px wider than the screen, so a sideways drag moved the page; it is now clipped (a touch swipe sideways moves nothing).
+
 - **Opponents drive their own cars.** 20 original opponent-only designs across the ladder (e.g. Pellet K-Van, Mote 660, Brava 850, Haulmark 2500 pickup, Dray Courier van, Ostler Estate, Lark Roadster, Cordell Six sleeper, Prism 88 wedge, Aldermoor Regent, Tessera DR drift coupé, Dunerunner T8 trophy truck, Sandpiper Buggy, Aster GT1, Halden Aero LM, Corsair Targa, Varga Twin-T, Wisp Clubman, Kade Q4), each with its own lamps, wheels and engine timbre. A rival's `car` stays its performance class; the new `look` only changes what is drawn, named and voiced, so race results are unchanged (tune-ladder probe identical). No race has two look-alike rivals; one-make class meets keep their model but each driver has a visibly different build. Art sheet: `art.html?sheet=rivals` and `?sheet=grids`.
 - **Goal button:** its second line stays inside the button and shows only the destination (the requirement is already on the card).
 
@@ -48,7 +51,7 @@ An original, portrait-first, installable mobile web game. Merge parts on a workb
 - **Signs fit their boxes.** Track signs (Ray's Yard, Maple, Summit Gala, Bend) are sized from the measured text; the race gauge and clock no longer clip.
 - **Steady downshifts.** The shift light and the tap judgment now read one shift-attempt state with a fixed window; braking shows no cue (a tap says "Braking — wait"), and the needle no longer lags the revs.
 - **Pit Setup** on every race card: the car, the track's demands, fitted parts and the best parts you own with what each swap changes; keep the build, swap, or apply the recommended setup and start. Missing a useful part? It points at the exact merge or Workshop order and brings you back to the same race.
-- **Rival Runs:** short replayable challenges with a one-time prize — **Launch Duel** (Tapeback only vs Pip Marlowe; a T3 Turbo), **Fifth Gear** (Vexa GTi, no nitro, clean shifts vs Sol Ortega; the Checker fade livery), **Apex Duel** (Ironhorse with every part at T3 vs Kit Navarro; Kit's Apex Red paint). Each shows eligible cars, objective and prize first, keeps your best result, and suggests a specific part or technique after a run.
+- **Rival Runs:** short replayable challenges with a one-time prize — **Launch Duel** (Tapeback only vs Tilly Brennan; a T3 Turbo), **Fifth Gear** (Vexa GTi, no nitro, clean shifts vs Sol Ortega; the Checker fade livery), **Apex Duel** (Ironhorse with every part at T3 vs Kit Navarro; Kit's Apex Red paint). Each shows eligible cars, objective and prize first, keeps your best result, and suggests a specific part or technique after a run.
 
 ## Update 1.5 · Garage and Racing Overhaul
 
@@ -69,7 +72,7 @@ Made for a player who liked the core loop but found the first ten minutes confus
 - **Real mph** everywhere (m/s × 2.23694), with full-build speeds from ~85 mph (Tapeback) to ~225 mph (Halcyon X on a long straight).
 
 ### Ladder, economy, cars and scenery
-- **New endgame:** the Desert (Corvo Rally, boss Sable Dunn) and the Summit (Strata GTR, Halcyon X, boss Iver Kaas), tiers up to T9, engine upgrades that change look, sound and stats, per-car milestones and class events that bring older cars back.
+- **New endgame:** the Desert (Corvo Rally, boss Lorraine Dunn) and the Summit (Strata GTR, Halcyon X, boss Anders Kvale), tiers up to T9, engine upgrades that change look, sound and stats, per-car milestones and class events that bring older cars back.
 - **Cash on sensible steps** everywhere a price or payout appears: $5 up to $100, $10 up to $1,000, $50 above.
 - **Customization:** paint, wheels (now gravel and race sets) and liveries, previewed live and shown in races, the Showroom and the unveil. **Tracks** got brighter palettes and landmarks. **The unveil** is a round platform with a spotlight and a slow turn (Skip and reduced motion kept; ownership is saved first).
 
@@ -85,7 +88,7 @@ Built from an audit of a fresh, a mid-game and a last-event save on the producti
   - **Stock Cup** — every part runs as T4 on any car, so the light car wins the corners; a trophy.
   - **Skyline Run** — sweepers, then a tight exit.
   - **Intermediate unlock: Kestrel 1600** (lightweight, cap T6): best off the line and through corners, short of top speed on highways. 3 stars + a crafted T6 Tires.
-  - **Final: The Main Event** — a knockout: street heat (top 3 through), bridge heat (top 2), final one-on-one with **Nova Sato**. Change cars between heats; losing a heat starts again from heat 1. Needs the Kestrel and 4 stars. Winning pays $1,500 + the **Main Event Neon** paint + a badge.
+  - **Final: The Main Event** — a knockout: street heat (top 3 through), bridge heat (top 2), final one-on-one with **Victor Sandoval**. Change cars between heats; losing a heat starts again from heat 1. Needs the Kestrel and 4 stars. Winning pays $1,500 + the **Main Event Neon** paint + a badge.
   - **Marquee: Lumen RS** (hypercar, cap T7, the Main Event win + a crafted T7 Turbo): cab-forward body, light-bar face, active wing, aero wheels, violet underglow, its own V12-and-whine voice, a violet **Surge** trail — and Perfect boosts at 1.7× instead of 1.5×. Fastest car on any highway, heavier than the Kestrel in tight corners. **Midnight Run** is where it belongs (a Lumen-against-Lumen rematch only it can win).
 - **The Altamar GT now follows the Coastal Crown** (its Rep sits just past the Crown): 25 min instead of 40, with no coastal grind.
 - **Reward ladder.** Early: parts you can order, garage upgrades, colours, steelies, Tapeback rust repair. Middle: sport wheel sets, Pit crew, metallic paint, Stock Cup. Late: pearl and candy paint, wire and aero wheels, Tapeback brightwork, signature finishes, Main Event Neon. Marquee: the Lumen RS.
@@ -112,7 +115,7 @@ One tuning table in `src/data/tables.ts` (Economy block) holds prices, payout sh
 | Recommended | Up next (plus an "Or try" list) |
 | Inspect / Next unlock | View / Next car |
 | Junker class · parts up to T2 | Junker · T2 parts |
-| "Beat Rusty Ray for his Crown Teal paint and to open the Suburbs" (Coastal Crown) | "Beat Vale Moreau for the Crown Teal paint" |
+| "Beat Rusty Ray for his Crown Teal paint and to open the Suburbs" (Coastal Crown) | "Beat Etienne Moreau for the Crown Teal paint" |
 | Event requirements: "Beat Rusty Ray to open the Suburbs" (any boss) | "Beat <that rival>" |
 | ⚙ Scrap (same glyph as Settings) | ♻ Scrap |
 | Nitro window cue | Boost zone cue |
@@ -130,7 +133,7 @@ One tuning table in `src/data/tables.ts` (Economy block) holds prices, payout sh
 
 Built from a fresh-save and returning-save replay of 1.2 and three independent reviews (first-time usability, race feel, mobile visual QA); 35 findings, all addressed below or listed under Known limitations.
 
-- **Open Road chapter (after the Ironhorse).** The **Coastal Highway** opens with three new tracks that race differently — **Harbor Launch** (a long launch and two straights: Turbo), **Cliffside Esses** (three tight bends: Tires), **Coastal Crown** (two long highway runs and a fast sweeper: Engine). The three rounds are a staged rival series that ends with **Vale Moreau** in the Coastal Crown (Crown Teal blueprint, “Coastal Crown” badge, $600, 5 crates). The marquee reward is a new class and silhouette: the **Altamar GT** grand tourer (cap **T6**; 5,600 Rep + a crafted T6 Engine + the Coastal Crown).
+- **Open Road chapter (after the Ironhorse).** The **Coastal Highway** opens with three new tracks that race differently — **Harbor Launch** (a long launch and two straights: Turbo), **Cliffside Esses** (three tight bends: Tires), **Coastal Crown** (two long highway runs and a fast sweeper: Engine). The three rounds are a staged rival series that ends with **Etienne Moreau** in the Coastal Crown (Crown Teal blueprint, “Coastal Crown” badge, $600, 5 crates). The marquee reward is a new class and silhouette: the **Altamar GT** grand tourer (cap **T6**; 5,600 Rep + a crafted T6 Engine + the Coastal Crown).
 - **Earlier cars come back.** **Class meets** race one earlier car only: the **Corsa Club Run** (Corsa Rojo) and **Hatch Attack** (Vexa GTi), each awarding a Showroom trophy. Parts above a car’s cap now **run at the cap tier** instead of being unusable, so an older car still benefits from your current bench.
 - **Time attacks.** Three solo runs (Strip, Highway and Esses Time Attacks) with Bronze/Silver/Gold targets; each medal pays once ($120 / $240 / $450 plus crates aimed at your current craft) and the result names the next target and the gap.
 - **Collection.** The Showroom leads with a collection card (cars, finishes, medals, trophies, badges), the next unlock stays on the Garage goal card with its requirement chips, and the Race tab groups events by district with round, class-meet, solo and trophy tags. No prices were inflated and there are no daily check-ins.
@@ -342,7 +345,7 @@ Expected runs to representative purchases (live runs at that stage): T1 part $45
 
 **Player paths** (simulation, 2–4 seeds each): perfect timing — Altamar 25–26 min, Kestrel 30–32 min, Lumen 31–34 min, every Downtown event run 2–5 times; mixed timing — same within a minute; **never uses nitro** — Altamar 29.7 min (1.3: never), Kestrel 51.8 min, Lumen 54.0 min, by buying Tune-ups (the 1.3 no-nitro bot was still stuck at the Coastal Crown after 2 hours). Same-seed race checks: the Stock Cup is won only by the Kestrel at T4 (the Altamar, Ironhorse and Lumen lose), Midnight Run only by the Lumen, the Main Event final by a T6 Kestrel 10/10 with Perfect boosts and 5/10 with late ones.
 
-**Real play in the browser** (production build, UI only): a returning Downtown save won The Main Event final against Nova Sato (champion card, $2,580 broken down as purse $900 + Perfect ×2 $180 + rival $1,500), revealed the Lumen RS ("T7 parts now fit · +51 km/h"), raced and won Midnight Run in it, reloaded — Lumen owned and active, title counted once. Also checked: Shop at every stage, Paint shop preview → buy → applied in Showroom, reveal and race, restoration stages, speed-trap result in km/h, knockout heat-out message.
+**Real play in the browser** (production build, UI only): a returning Downtown save won The Main Event final against Victor Sandoval (champion card, $2,580 broken down as purse $900 + Perfect ×2 $180 + rival $1,500), revealed the Lumen RS ("T7 parts now fit · +51 km/h"), raced and won Midnight Run in it, reloaded — Lumen owned and active, title counted once. Also checked: Shop at every stage, Paint shop preview → buy → applied in Showroom, reveal and race, restoration stages, speed-trap result in km/h, knockout heat-out message.
 
 **Layout** (320×568 … 1280×800, landscape, 125% text, fresh and late saves, Garage/Race/Showroom/guide/Settings/Shop/Paint shop): no sideways scroll, clipped text, overlapping controls or targets under 40 px. `npm run check:input`: 24/24.
 

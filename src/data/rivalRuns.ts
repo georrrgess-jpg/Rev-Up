@@ -53,8 +53,8 @@ export const RIVAL_RUNS: RivalRun[] = [
   {
     id: 'rr-pip-launch', name: 'Launch Duel', rival: 'pip', event: 'tapeback-trophy',
     cars: ['junker'], nitro: 1, rivalShift: 'clean', objective: { kind: 'launch', within: 0.05 },
-    goal: 'Match Pip off the line (level or ahead after the launch), then beat her to the line',
-    rule: 'Tapeback 1.1 only · 1 nitro · Pip shifts clean',
+    goal: 'Match Tilly off the line (level or ahead after the launch), then beat her to the line',
+    rule: 'Tapeback 1.1 only · 1 nitro · Tilly shifts clean',
     prize: { kind: 'part', family: 'turbo', tier: 3, why: 'two of them merge into the Vexa GTi’s T4 Turbo' },
     opens: 'beater',
     taunt: '“Still driving the taped one? Bet you can’t even beat me off the line.”',
