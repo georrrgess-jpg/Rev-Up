@@ -16,7 +16,7 @@ export function openGuide(app: App) {
         h('ol', {},
           h('li', {}, 'Merge two matching parts (same family and tier) into the next tier.'),
           h('li', {}, 'Fit parts to your car: Engine = top speed, Tires = grip, Turbo = acceleration.'),
-          h('li', {}, 'Race: tap SHIFT on green, then NITRO in the amber boost zone.'),
+          h('li', {}, 'Race: tap SHIFT on green, then NITRO in the amber boost zone. A live race with every shift clean (at least 3) pays +10% of the win purse; Quick Races never do.'),
           h('li', {}, 'Rep opens cars and is never spent. Cash buys parts. Scrap orders exact parts.'),
           h('li', {}, 'The goal card names the next car, what it still needs, and has the button to it.')),
         h('button', { class: 'btn wide', onclick: () => {
@@ -51,7 +51,7 @@ export function openGuide(app: App) {
         'Signature finish: a paint each car earns with a live top-3 finish.',
         'Class meet: a race for one earlier car only. Time attack: beat target times for medals.',
         'Downtown Nights: each event has three goals — win, beat the par time, land a Perfect boost — and each goal pays once and earns a star. Stars open the Kestrel 1600 and The Main Event.',
-        'Speed trap: scored on your speed through the gate. Stock Cup: every part runs as T4, so the lighter car wins. The Main Event: three heats in a row — top places go through, and you can change cars between heats.'),
+        'Speed trap: scored on your speed through the gate; each Bridge Speed Trap medal (bronze, silver, gold) also counts as a Downtown star. Stock Cup: every part runs as T4, so the lighter car wins. The Main Event: three heats in a row — top places go through, and you can change cars between heats.'),
       h('div', { class: 'fams' },
         h('button', { class: 'btn', onclick: () => { app.game.resetTips(); close(); app.toast('Tips are back on'); } }, 'Show tips again'),
         h('button', { class: 'btn primary', onclick: close }, 'Back to the game')),

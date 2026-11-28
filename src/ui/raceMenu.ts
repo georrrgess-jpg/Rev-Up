@@ -258,7 +258,8 @@ export class RaceView implements View {
       let summary: string;
       if (dist === 'trials') summary = `${evs.reduce((n, e) => n + (s.medals?.[e.id] ?? 0), 0)}/${evs.length * 3} medals`;
       else if (dist === 'meets') summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} trophies`;
-      else if (dist === 'downtown') summary = `★ ${P.starsIn(s)}/${evs.filter((e) => e.goals).length * 3} · ${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
+      // stars: three goals per event plus (1.10) one per speed-trap medal (bronze · silver · gold), as P.starsIn counts them
+      else if (dist === 'downtown') summary = `★ ${P.starsIn(s, dist)}/${evs.filter((e) => e.goals && e.district === dist).length * 3 + evs.filter((e) => e.speedTrap && e.district === dist).length * 3} · ${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
       else summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
       const locked = !open.length;
       if (locked) summary = `🔒 ${P.eventUnlocked(s, evs[0]).why}`;

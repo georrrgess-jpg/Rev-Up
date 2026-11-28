@@ -97,7 +97,7 @@ export class RevealOverlay {
   private get paint() {
     return this.app.game.state.paints[this.car] ?? this.look.paint;
   }
-  private get room() { return ROOMS[this.car] ?? ROOMS.muscle; }
+  private get room() { const c = carById(this.car); return ROOMS[this.car] ?? (c.variantOf ? ROOMS[c.variantOf] : undefined) ?? ROOMS.muscle; }
 
   private down(e: PointerEvent) {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -156,7 +156,8 @@ export class RevealOverlay {
   private advantage(): string {
     const c = carById(this.car);
     const i = ENABLED_CARS.findIndex((x) => x.id === this.car);
-    const prev = i > 0 ? ENABLED_CARS[i - 1] : null;
+    // a variant (e.g. the Kestrel 1600 R) is compared with the car it is built from, not the car listed before it
+    const prev = c.variantOf ? carById(c.variantOf) : i > 0 ? ENABLED_CARS[i - 1] : null;
     if (this.replay || !prev) return `${c.name} · equips parts up to T${c.cap}`;
     const s = this.app.game.state;
     const fittedN = Object.keys(s.installed[this.car] ?? {}).length;
