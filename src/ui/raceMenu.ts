@@ -177,6 +177,18 @@ export class RaceView implements View {
       }, here ? `Crew racing · ${left} s` : small ? h('span', { class: 'stack' }, 'Quick', h('small', {}, `$${crew[0]}`))
         : h('span', { class: 'stack' }, 'Quick Race', h('small', {}, `crew drives · up to $${crew[0]}`)));
     };
+    /** Where a race stands for you: won (done), part-way (a bronze or silver medal), still to win, or locked. */
+    const raceState = (e: RaceEvent): { st: 'done' | 'part' | 'todo' | 'locked'; badge: string } => {
+      const u = P.eventUnlocked(s, e);
+      const r = s.events[e.id];
+      const medal = s.medals?.[e.id] ?? 0;
+      if (!u.ok && !u.switchCar && !r?.wins && !medal) return { st: 'locked', badge: 'Locked' };
+      if (e.timeAttack || e.speedTrap) return medal >= 3 ? { st: 'done', badge: '✓ Gold' } : medal ? { st: 'part', badge: medal === 2 ? 'Silver' : 'Bronze' } : { st: 'todo', badge: 'To do' };
+      if (e.knockout) return r?.wins ? { st: 'done', badge: '✓ Champion' } : { st: 'todo', badge: 'To win' };
+      if (e.boss && s.bosses.includes(e.boss.rival)) return { st: 'done', badge: '✓ Beaten' };
+      return r?.wins ? { st: 'done', badge: '✓ Won' } : { st: 'todo', badge: 'To win' };
+    };
+    const stateBadge = (e: RaceEvent) => { const x = raceState(e); return x.st === 'locked' ? null : h('span', { class: `win-badge ${x.st}` }, x.badge); };
     const course = (e: RaceEvent) => h('span', { class: 'course' }, TRACKS[e.track].course);
     const diffTag = (e: RaceEvent) => {
       const car = P.eventUnlocked(s, e).switchCar ?? s.activeCar;
@@ -206,7 +218,7 @@ export class RaceView implements View {
     const tip = hint && !(hint.action?.kind === 'race' && hint.action.eventId === rec.id) ? hint.text : null;
     const featured = h('section', { class: 'featured lead', 'aria-label': 'Recommended race', 'data-jump': 'top' },
       h('div', { class: 'feat-label' }, 'Recommended for you'),
-      h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null, h('span', { class: `diff ${d.cls}` }, d.label)),
+      h('div', { class: 'top' }, h('span', { class: 'name' }, rec.name), stateBadge(rec), rec.boss && !s.bosses.includes(rec.boss.rival) ? h('span', { class: 'tag boss' }, 'Rival') : null, h('span', { class: `diff ${d.cls}` }, d.label)),
       h('p', { class: 'reason' }, reasonFor(rec)),
       h('div', { class: 'feat-reward' }, h('small', {}, shown.timeAttack ? 'Pays' : pz.firstClear ? 'First win pays' : 'Win pays'), h('b', { class: 'num' }, reward)),
       rec.goals ? goalList(s, rec) : null,
@@ -232,7 +244,7 @@ export class RaceView implements View {
     // A second choice beside the recommendation: a different route with its own reward.
     const alts = P.alternatives(s, rec);
     const altBox = alts.length ? h('section', { class: 'alts', 'aria-label': 'Also worth racing' }, h('div', { class: 'feat-label' }, 'Or try'),
-      ...alts.map(({ e }) => h('div', { class: 'alt' }, h('div', { class: 'grow' }, h('b', {}, e.name), ' ', diffTag(e), h('div', { class: 'd' }, reasonFor(e))),
+      ...alts.map(({ e }) => h('div', { class: `alt st-${raceState(e).st}` }, h('div', { class: 'grow' }, h('b', {}, e.name), ' ', stateBadge(e), ' ', diffTag(e), h('div', { class: 'd' }, reasonFor(e))),
         h('button', { class: 'btn sm pit-btn', 'data-pit': e.id, 'aria-label': `Pit Setup for ${e.name}`, onclick: () => this.openPit(e.id) }, 'Pit'),
         h('button', { class: `btn sm${q?.eventId === e.id ? ' off' : ''}`, onclick: () => this.startLive(e.id) }, P.eventUnlocked(s, e).switchCar ? `Race · ${carById(P.eventUnlocked(s, e).switchCar!).model.split(' ')[0]}` : 'Race')))) : null;
     const comp = competitionStrip(s, (id) => this.jumpToEvent(id));
@@ -261,8 +273,15 @@ export class RaceView implements View {
       // stars: three goals per event plus (1.10) one per speed-trap medal (bronze · silver · gold), as P.starsIn counts them
       else if (dist === 'downtown') summary = `★ ${P.starsIn(s, dist)}/${evs.filter((e) => e.goals && e.district === dist).length * 3 + evs.filter((e) => e.speedTrap && e.district === dist).length * 3} · ${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
       else summary = `${evs.filter((e) => s.events[e.id]?.wins).length}/${evs.length} won`;
+      const states = evs.map((e) => raceState(e).st);
+      const doneN = states.filter((x) => x === 'done').length, leftN = evs.length - doneN;
+      // one count for every district, the same rule as the row badges (a speed trap or time attack is done at gold)
+      if (dist === 'downtown') summary = `★ ${P.starsIn(s, dist)}/${evs.filter((e) => e.goals).length * 3 + evs.filter((e) => e.speedTrap).length * 3} · ${doneN}/${evs.length} done`;
+      else if (dist !== 'trials' && dist !== 'meets') summary = `${doneN}/${evs.length} won`;
       const locked = !open.length;
       if (locked) summary = `🔒 ${P.eventUnlocked(s, evs[0]).why}`;
+      else summary = leftN ? `${summary} · ${leftN} to go` : `✓ All complete · ${summary}`;
+      const bar = locked ? null : h('span', { class: `dist-bar${leftN ? '' : ' full'}`, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round((doneN / evs.length) * 100)}%` }));
       const rows: HTMLElement[] = [];
       for (const e of evs) {
         if (e.id === rec.id) continue;
@@ -291,9 +310,10 @@ export class RaceView implements View {
           e.goals ? starTag(s.stars?.[e.id] ?? 0) : null,
           e.trophy && s.badges.includes(e.trophy) ? h('span', { class: 'tag done' }, `🏆 ${e.trophy}`) : null,
         ];
-        rows.push(h('div', { class: `evt-row${u.ok ? '' : ' locked'}` },
+        const rs = raceState(e);
+        rows.push(h('div', { class: `evt-row st-${rs.st}${u.ok ? '' : ' locked'}`, 'data-state': rs.st },
           h('div', { class: 'row-main' },
-            h('div', { class: 'name' }, e.name, ...tags),
+            h('div', { class: 'name' }, stateBadge(e), e.name, ...tags),
             h('div', { class: 'meta' }, course(e), ' ', u.ok || u.switchCar ? diffTag(e) : null, ` ${status}`)),
           action,
           u.ok || u.switchCar ? details(e) : null));
@@ -301,12 +321,19 @@ export class RaceView implements View {
       if (!rows.length) continue;
       const shouldOpen = firstRender ? (!locked && evs.some((e) => !s.events[e.id]?.wins || (e.timeAttack && (s.medals?.[e.id] ?? 0) < 3))) : openSections.has(dist);
       sections.push({ locked, el: h('details', { class: `district-sec${locked ? ' locked' : ''}`, 'data-district': dist, ...(shouldOpen ? { open: '' } : {}) },
-        h('summary', { class: 'district' }, h('span', {}, DISTRICTS[dist as keyof typeof DISTRICTS].name), h('span', { class: 'dist-sum' }, summary)),
-        ...rows) });
+        h('summary', { class: 'district' }, h('span', {}, DISTRICTS[dist as keyof typeof DISTRICTS].name), h('span', { class: 'dist-sum' }, summary), bar),
+        ...rows, leftN ? null : h('p', { class: 'all-won' }, `✓ Every ${DISTRICTS[dist as keyof typeof DISTRICTS].name} race is complete`)) });
     }
     const openSecs = sections.filter((x) => !x.locked).map((x) => x.el);
     const lockedSecs = sections.filter((x) => x.locked).map((x) => x.el);
-    if (openSecs.length) out.push(h('div', { class: 'feat-label cat-label', 'data-jump': 'all' }, 'All races'), ...openSecs);
+    const hideDone = readHideDone();
+    const filter = h('div', { class: 'race-filter', role: 'group', 'aria-label': 'Show races' },
+      ...([[false, 'All races'], [true, 'Still to win']] as const).map(([v, label]) => h('button', {
+        class: `chip${hideDone === v ? ' on' : ''}`, 'aria-pressed': String(hideDone === v),
+        onclick: () => { writeHideDone(v); this.list.classList.toggle('hide-done', v); for (const b of filter.querySelectorAll('button')) { const on = b.textContent === label; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); } },
+      }, label)));
+    this.list.classList.toggle('hide-done', hideDone);
+    if (openSecs.length) out.push(h('div', { class: 'feat-label cat-label all-head', 'data-jump': 'all' }, h('span', {}, 'All races'), filter), ...openSecs);
     if (lockedSecs.length) out.push(h('div', { class: 'feat-label cat-label', ...(openSecs.length ? {} : { 'data-jump': 'all' }) }, 'Still locked'), ...lockedSecs);
     const scroll = this.list.scrollTop;
     this.list.replaceChildren(...out);
@@ -408,3 +435,8 @@ function heatList(s: GameState, e: RaceEvent): HTMLElement {
     return h('li', { class: k < at && s.knockout ? 'done' : k === at ? 'now' : '' }, h('b', {}, hEv.name), ` · ${hEv.advance === 1 ? 'win to take it' : `top ${hEv.advance} go through`}`);
   }));
 }
+
+/** "Still to win" filter for the race list, remembered per device (a convenience: safe if storage is unavailable). */
+const HIDE_DONE_KEY = 'revup:raceFilter';
+function readHideDone(): boolean { try { return localStorage.getItem(HIDE_DONE_KEY) === 'todo'; } catch { return false; } }
+function writeHideDone(v: boolean) { try { localStorage.setItem(HIDE_DONE_KEY, v ? 'todo' : 'all'); } catch { /* private mode: filter just isn't remembered */ } }
